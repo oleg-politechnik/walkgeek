@@ -1,0 +1,15 @@
+.cproject
+.project
+_todo
+/Build
+
+*.bin
+*.o
+*.a
+*.d
+*.i
+*~
+core
+debug.gdb
+
+Literature/

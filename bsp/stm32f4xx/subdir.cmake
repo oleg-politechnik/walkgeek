@@ -1,0 +1,16 @@
+IF(NOT STM32_USBLib_DIR)
+    SET(STM32_USBLib_DIR "$ENV{HOME}/Local/src/STM32_USB-Host-Device_Lib_V2.1.0")
+    MESSAGE(STATUS "No STM32_USBLib_DIR specified, using default: " ${STM32_USBLib_DIR})
+ENDIF()
+
+INCLUDE(${CMAKE_CURRENT_LIST_DIR}/cmsis.cmake)
+INCLUDE(${CMAKE_CURRENT_LIST_DIR}/stdperiph.cmake)
+INCLUDE(${CMAKE_CURRENT_LIST_DIR}/usblib.cmake)
+
+INCLUDE(${CMAKE_CURRENT_LIST_DIR}/cpu.cmake)
+
+STM32F4XX_SET_PARAMS("1024K" "128K")
+SET(CMAKE_EXE_LINKER_FLAGS "-T${CMAKE_CURRENT_BINARY_DIR}/stm32_flash.ld -Wl,-Map -Wl,${CMAKE_PROJECT_NAME}.map -mthumb -mcpu=cortex-m4" CACHE INTERNAL "exe link flags")
+# -Wl,-nostartfiles 
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_LIST_DIR}/inc)
+INCLUDE_SUBDIR(src)

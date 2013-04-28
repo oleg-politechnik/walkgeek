@@ -1,0 +1,21 @@
+set confirm off
+set pagination off
+
+target remote localhost:10000
+set remote hardware-watchpoint-limit 4
+set remote hardware-breakpoint-limit 6
+
+load Build/walkgeek.elf
+#mon reset halt
+symbol-file Build/walkgeek.elf
+
+# Enable CPU Clock when in WFI state, which is needed for JTAG/SWD
+
+b System_Init
+c
+
+set debug_mode=1
+
+#put your breakpoints here
+
+c
