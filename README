@@ -1,0 +1,13 @@
+== Compiling
+= Patching CMake
+
+...
+-- Check for working C compiler: /home/oleg/Local/gcc-arm-none-eabi-4_6-2012q2/bin/arm-none-eabi-gcc -- broken
+...
+  exit.c:(.text.exit+0x2c): undefined reference to `_exit'
+
+  collect2: ld returned 1 exit status
+...
+
+cd /usr/share/cmake-2.8/Modules/
+sudo patch < %walkeek_root_dir%/cmake_patch_linaro.diff

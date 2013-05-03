@@ -33,6 +33,8 @@
 /* Private typedef ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+static volatile u32 nesting = 0;
+
 /* Private function prototypes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void CPU_EnableSysTick(u16 hz)
@@ -42,6 +44,20 @@ void CPU_EnableSysTick(u16 hz)
   /* SysTick end of count event each 1ms !!! */
   RCC_GetClocksFreq(&RCC_Clocks);
   SysTick_Config(RCC_Clocks.HCLK_Frequency / hz);
+}
+
+void CPU_EnableFPU(void)
+{
+  /* (c) http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0553a/BEHBJHIG.html*/
+
+  asm volatile (
+          "LDR.W   R0, =0xE000ED88                                \n"
+          "LDR     R1, [R0]                                       \n"
+          "ORR     R1, R1, #(0xF << 20)                           \n"
+          "STR     R1, [R0]                                       \n"
+          "DSB                                                    \n"
+          "ISB                                                    \n"
+  );
 }
 
 void CPU_EnterLowPowerState(void)
@@ -85,4 +101,19 @@ void CPU_EnterLowPowerState(void)
   PWR_FlashPowerDownCmd(ENABLE);
 
   PWR_EnterSTANDBYMode();
+}
+
+void CPU_DisableInterrupts(void)
+{
+  __disable_irq();
+  nesting++;
+}
+
+void CPU_RestoreInterrupts(void)
+{
+  if (nesting)
+  {
+    nesting--;
+    __enable_irq();
+  }
 }

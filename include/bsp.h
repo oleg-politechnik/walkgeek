@@ -52,22 +52,27 @@ u32 BSP_GetLast_ADC_Result_mV(void);
 void BSP_PowerEnable(void);
 void BSP_PowerDisable(void);
 
-
-void BSP_Keyboard_Init(void);
-u8 BSP_KeyboardGetRowValues(u8 row_index);
-void BSP_InitPPPButton(void);
-bool BSP_GetPPPButton(void);
-bool BSP_GetESCButton(void);
-
+void BSP_Keypad_Init(void);
+bool BSP_Keypad_GetKeyStatus(KEY_Typedef key);
 
 void Disp_GPIO_Init();
-
 
 void SD_LowLevel_DeInit(void);
 void SD_LowLevel_Init(void);
 uint8_t SD_Detect(void);
 
+void Vibrator_Init(void);
+void Vibrator_Disable(void);
+void Vibrator_Enable(void);
 
+void USB_OTG_BSP_DeInit(void);
 void BSP_USBD_MSC_Init(void);
+
+/* MM */
+
+void *ccm_malloc(size_t size);
+void *ccm_zalloc(size_t size);
+void ccm_free(void *mem);
+void ccm_calloc(size_t n, size_t elem_size);
 
 #endif /* BSP_H_ */

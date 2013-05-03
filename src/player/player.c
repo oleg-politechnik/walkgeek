@@ -34,6 +34,7 @@
 #include "mediafile.h"
 #include "audio_if.h"
 #include "playlist.h"
+//#include "utf8.h"
 #include <stdio.h>
 #include "decoder.h"
 
@@ -82,6 +83,8 @@ void Player_Init()
 {
   if (PlayerState != PS_INACTIVE)
     return;
+
+  trace("[init] Player Application\r\n");
 
   Player_SetState(PS_STOPPED);
 
@@ -332,7 +335,8 @@ void Player_ChangeVolume(int8_t delta)
   FS_EXEC(f_close(&fil)); } while (0)
 
 #define OPEN_WRITE(fil, name) do { \
-  FS_EXEC(f_open(&fil, name, FA_WRITE | FA_CREATE_ALWAYS)); } while (0)
+  u8_towc(f_name_buf, SIZE_OF(f_name_buf), name); \
+  FS_EXEC(f_open(&fil, f_name_buf, FA_WRITE | FA_CREATE_ALWAYS)); } while (0)
 
 extern PlaylistEntry_Typedef plist[PLAYLIST_MAX_ENTRIES];
 extern int plist_curr;
@@ -341,6 +345,8 @@ FuncResult Player_StoreSettings()
 {
   FIL fil;
   UINT bytes_to_write, bytes_written;
+
+  TCHAR f_name_buf[255];
 
   //  TCHAR file_name[255];
   u8 volume;
@@ -391,8 +397,10 @@ FuncResult Player_RestoreSettings()
   u8 volume;
   u32 fptr, mstime_curr;
   TCHAR file_name[100];
+  TCHAR f_name_buf[100];
 
-  res = f_open(&fil, "volume", FA_READ);
+  u8_towc(f_name_buf, SIZE_OF(f_name_buf), "volume");
+  res = f_open(&fil, f_name_buf, FA_READ);
   if (res == FR_OK)
   {
     bytes_to_read = sizeof(volume);
@@ -409,7 +417,8 @@ FuncResult Player_RestoreSettings()
 
   //
 
-  res = f_open(&fil, "file.fname", FA_READ);
+  u8_towc(f_name_buf, SIZE_OF(f_name_buf), "file.fname");
+  res = f_open(&fil, f_name_buf, FA_READ);
   if (res != FR_OK)
     return FUNC_ERROR;
 
@@ -425,7 +434,8 @@ FuncResult Player_RestoreSettings()
 
   //
 
-  res = f_open(&fil, "file.fptr", FA_READ);
+  u8_towc(f_name_buf, SIZE_OF(f_name_buf), "file.fptr");
+  res = f_open(&fil, f_name_buf, FA_READ);
   if (res != FR_OK)
     return FUNC_ERROR;
 
@@ -440,7 +450,8 @@ FuncResult Player_RestoreSettings()
 
   //
 
-  res = f_open(&fil, "file.meta.mstime_curr", FA_READ);
+  u8_towc(f_name_buf, SIZE_OF(f_name_buf), "file.meta.mstime_curr");
+  res = f_open(&fil, f_name_buf, FA_READ);
   if (res != FR_OK)
     return FUNC_ERROR;
 
@@ -500,7 +511,8 @@ PlaylistEntry_Typedef plist[PLAYLIST_MAX_ENTRIES];
 int plist_cnt;
 int plist_curr;
 
-static char root[] = "0:/";
+static TCHAR root[] =
+{ '0', ':', '/', 0 };
 
 /* Private function prototypes -----------------------------------------------*/
 /* Private functions ---------------------------------------------------------*/
@@ -516,11 +528,15 @@ FuncResult Playlist_Init(void)
   file_info.lfname = 0;
   file_info.lfsize = 0;
 
+  char fname_u8_buf[26];
+
   //
   FS_EXEC(f_mount(0, &fatfs));
 
   FS_EXEC(f_opendir(&dir, root));
   FS_EXEC(f_readdir(&dir, 0));
+
+  trace("playlist:\r\n");
 
   while (plist_cnt < PLAYLIST_MAX_ENTRIES)
   {
@@ -539,12 +555,17 @@ FuncResult Playlist_Init(void)
     if (file_info.fattrib & AM_DIR)
       continue; /* It is a directory */
 
-    if (MediaFile_CheckExtension(file_info.fname, "mp3") == FUNC_SUCCESS
-            || MediaFile_CheckExtension(file_info.fname, "wav") == FUNC_SUCCESS)//fixme
+    wc_toutf8(fname_u8_buf, SIZE_OF(fname_u8_buf), file_info.fname);
+
+    if (MediaFile_CheckExtension(fname_u8_buf, "mp3") == FUNC_SUCCESS
+            || MediaFile_CheckExtension(fname_u8_buf, "wav") == FUNC_SUCCESS)//fixme
     {
       memcpy(plist[plist_cnt].fname, file_info.fname,
               sizeof(plist[plist_cnt].fname));
       plist[plist_cnt].f_index = f_index;
+
+      trace("%s\r\n", fname_u8_buf);
+
       plist_cnt++;
     }
   }
@@ -588,7 +609,7 @@ FuncResult Playlist_SetCurrentTrack(TCHAR *file_name) //fixme+dir
 
   for (int i = 0; i < plist_cnt; ++i)
   {
-    if (strcmp(plist[i].fname, file_name) == 0) //fixme store settings inside the playlist
+    if (strcmp_wc(plist[i].fname, file_name) == 0) //fixme store settings inside the playlist
     {
       plist_curr = i;
 
@@ -641,11 +662,11 @@ FuncResult Playlist_TryLoadCurrentTrack()
     FS_EXEC(f_readdir(&dir, &file_info));
   }
 
-  assert_param(strcmp(file_info.fname, plist[plist_curr].fname) == 0);
+  assert_param(strcmp_wc(file_info.fname, plist[plist_curr].fname) == 0);
 
   MF_EXEC(MediaFile_Open(&mfile, plist[plist_curr].fname));
 
-  snprintf(mfile.meta.file_name, SIZE_OF(mfile.meta.file_name),
+  wc_toutf8(mfile.meta.file_name, SIZE_OF(mfile.meta.file_name),
           file_info.lfname[0] ? file_info.lfname : file_info.fname);
 
   return Player_TryFile(&mfile);

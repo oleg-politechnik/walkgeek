@@ -34,9 +34,11 @@
 #include <string.h>
 #include <stdio.h>
 #include "types.h"
+#include "trace.h"
 
 /* Exported defines ----------------------------------------------------------*/
 #define RAM_FUNC __attribute__ ((section(".fastcode")))
+#define ICODE_ATTR      /*__attribute__ ((section(".fastcode")))*/
 
 #define _BV(shift)  (1 << shift)
 
@@ -70,6 +72,9 @@ typedef enum
 } bool;
 
 /* Exported macro ------------------------------------------------------------*/
+#define F1_2            "%1u.%02u"
+#define FLOAT_TO_1_2(f) (unsigned int) f, (unsigned int) ((f - (unsigned int) f) * 100)
+
 /* Exported functions --------------------------------------------------------*/
 
 

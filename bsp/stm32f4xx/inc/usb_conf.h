@@ -177,11 +177,11 @@
  #define TX2_FIFO_FS_SIZE_MSC                      0
  #define TX3_FIFO_FS_SIZE_MSC                      0
 
- #define RX_FIFO_FS_SIZE_AUDIO                    256
- #define TX0_FIFO_FS_SIZE_AUDIO                    64
- #define TX1_FIFO_FS_SIZE_AUDIO                     0
- #define TX2_FIFO_FS_SIZE_AUDIO                     0
- #define TX3_FIFO_FS_SIZE_AUDIO                     0
+ #define RX_FIFO_FS_SIZE_CDC                      128
+ #define TX0_FIFO_FS_SIZE_CDC                      32
+ #define TX1_FIFO_FS_SIZE_CDC                     128
+ #define TX2_FIFO_FS_SIZE_CDC                      32
+ #define TX3_FIFO_FS_SIZE_CDC                       0
 
 // #define USB_OTG_FS_LOW_PWR_MGMT_SUPPORT
 // #define USB_OTG_FS_SOF_OUTPUT_ENABLED
@@ -194,7 +194,9 @@
 #endif
 
 /****************** USB OTG MISC CONFIGURATION ********************************/
-#define VBUS_SENSING_ENABLED
+//#define VBUS_SENSING_ENABLED
+//#define SOF_PIN_ENABLED
+//#define ID_PIN_ENABLED
 
 /****************** USB OTG MODE CONFIGURATION ********************************/
 //#define USE_HOST_MODE

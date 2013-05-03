@@ -105,7 +105,7 @@ USBD_DEVICE USR_MSC_desc =
   #endif
 #endif /* USB_OTG_HS_INTERNAL_DMA_ENABLED */
 /* USB Standard Device Descriptor */
-__ALIGN_BEGIN uint8_t USBD_DeviceDesc[USB_SIZ_DEVICE_DESC] __ALIGN_END =
+static __ALIGN_BEGIN uint8_t USBD_MSC_DeviceDesc[USB_SIZ_DEVICE_DESC] __ALIGN_END =
 {
     0x12,                       /*bLength */
     USB_DEVICE_DESCRIPTOR_TYPE, /*bDescriptorType*/
@@ -127,40 +127,6 @@ __ALIGN_BEGIN uint8_t USBD_DeviceDesc[USB_SIZ_DEVICE_DESC] __ALIGN_END =
     USBD_CFG_MAX_NUM            /*bNumConfigurations*/
 }; /* USB_DeviceDescriptor */
 
-
-#ifdef USB_OTG_HS_INTERNAL_DMA_ENABLED
-  #if defined ( __ICCARM__ ) /*!< IAR Compiler */
-    #pragma data_alignment=4
-  #endif
-#endif /* USB_OTG_HS_INTERNAL_DMA_ENABLED */
-/* USB Standard Device Descriptor */
-__ALIGN_BEGIN uint8_t USBD_DeviceQualifierDesc[USB_LEN_DEV_QUALIFIER_DESC] __ALIGN_END =
-{
-  USB_LEN_DEV_QUALIFIER_DESC,
-  USB_DESC_TYPE_DEVICE_QUALIFIER,
-  0x00,
-  0x02,
-  0x00,
-  0x00,
-  0x00,
-  0x40,
-  0x01,
-  0x00,
-};
-
-#ifdef USB_OTG_HS_INTERNAL_DMA_ENABLED
-  #if defined ( __ICCARM__ ) /*!< IAR Compiler */
-    #pragma data_alignment=4
-  #endif
-#endif /* USB_OTG_HS_INTERNAL_DMA_ENABLED */
-/* USB Standard Device Descriptor */
-__ALIGN_BEGIN uint8_t USBD_LangIDDesc[USB_SIZ_STRING_LANGID] __ALIGN_END =
-{
-     USB_SIZ_STRING_LANGID,
-     USB_DESC_TYPE_STRING,
-     LOBYTE(USBD_LANGID_STRING),
-     HIBYTE(USBD_LANGID_STRING),
-};
 
 /**
   * @}
@@ -188,8 +154,8 @@ __ALIGN_BEGIN uint8_t USBD_LangIDDesc[USB_SIZ_STRING_LANGID] __ALIGN_END =
 */
 uint8_t *  USBD_MSC_DeviceDescriptor( uint8_t speed , uint16_t *length)
 {
-  *length = sizeof(USBD_DeviceDesc);
-  return USBD_DeviceDesc;
+  *length = sizeof(USBD_MSC_DeviceDesc);
+  return USBD_MSC_DeviceDesc;
 }
 
 /**

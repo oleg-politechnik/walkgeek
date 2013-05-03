@@ -36,13 +36,13 @@
 /* Exported defines ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Exported types ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Exported macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-#define CPU_DisableInterrupts         __disable_irq
-#define CPU_EnableInterrupts          __enable_irq
 #define CPU_WaitForInterrupt          __WFI
 
 /* Exported functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void CPU_EnterLowPowerState(void);
 void CPU_EnableSysTick(u16 hz);
+void CPU_InitMM(void);
+void CPU_EnableFPU(void);
 
 /* Exported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Exported static inline functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -54,15 +54,15 @@ void CPU_EnableSysTick(u16 hz);
 static inline bool CPU_CompareExchange(volatile uint32_t *ptr, uint32_t oldValue,
         uint32_t newValue)
 {
-  // эксклюзивно читаем значение переменной и сравниваем со старым значением
   if (__LDREXW(ptr) == oldValue)
   {
-    // пытаемся эксклюзивно записать в переменную новое значение
     return __STREXW(newValue, ptr) == 0;
   }
-  // кто-то изменил ячейку до нас
   __CLREX();
   return false;
 }
+
+void CPU_DisableInterrupts(void);
+void CPU_RestoreInterrupts(void);
 
 #endif /* CPU_H_ */

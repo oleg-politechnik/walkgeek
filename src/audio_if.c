@@ -209,7 +209,7 @@ static void AudioCommandMutex(bool lock, bool *old_value)
   {
     main_thread_in_do_command = *old_value;
   }
-  CPU_EnableInterrupts();
+  CPU_RestoreInterrupts();
 
   if (!main_thread_in_do_command)
   {

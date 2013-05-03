@@ -43,9 +43,9 @@ static u32 LastADC_Value_mV;
 /* Power monitoring --------------------------------------------------------- */
 void ADC_IRQHandler(void)
 {
-  if (ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) == SET)
+  if (ADC_GetFlagStatus(ADC_BAT_CHRG_ADC, ADC_FLAG_EOC) == SET)
   {
-    LastADC_Value_mV = ADC_GetConversionValue(ADC1) * 2500 * 2 / 0xFFF;
+    LastADC_Value_mV = ADC_GetConversionValue(ADC_BAT_CHRG_ADC) * 2500 * 2 / 0xFFF;
   }
 }
 
@@ -57,25 +57,50 @@ u32 BSP_GetLast_ADC_Result_mV(void)
 void BSP_InitPowerManager(void)
 {
   GPIO_InitTypeDef GPIO_InitStructure;
+
+  RCC_AHB1PeriphClockCmd(ADC_BAT_RCC_AHB1Periph_GPIO, ENABLE); /*todo define*/
+
+  /* Configure ADC Channels pin as analog input */
+  GPIO_InitStructure.GPIO_Pin = ADC_BAT_PIN;
+  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
+  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+  GPIO_Init(ADC_BAT_GPIO, &GPIO_InitStructure);
+
+  RCC_AHB1PeriphClockCmd(ADC_CHRG_RCC_AHB1Periph_GPIO, ENABLE); /*todo define*/
+
+  /* Configure ADC Channels pin as analog input */
+  GPIO_InitStructure.GPIO_Pin = ADC_CHRG_PIN;
+  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
+  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+  GPIO_Init(ADC_CHRG_GPIO, &GPIO_InitStructure);
+
+  ADC_InitTypeDef ADC_InitStructure;
+  ADC_CommonInitTypeDef ADC_CommonInitStructure;
   NVIC_InitTypeDef NVIC_InitStructure;
 
-  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE); /*todo define*/
+  /* ADC */
+  RCC_APB2PeriphClockCmd(ADC_BAT_CHRG_RCC_APB2Periph_ADC, ENABLE);
 
-  /* Configure ADC Channels pin as analog input */
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1;
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
-  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-  GPIO_Init(GPIOC, &GPIO_InitStructure);
+  ADC_ITConfig(ADC_BAT_CHRG_ADC, ADC_IT_EOC, DISABLE);
 
-  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE); /*todo define*/
+  /* ADC Common Init */
+  ADC_CommonInitStructure.ADC_Mode = ADC_Mode_Independent;
+  ADC_CommonInitStructure.ADC_Prescaler = ADC_Prescaler_Div8;
+  ADC_CommonInitStructure.ADC_DMAAccessMode = ADC_DMAAccessMode_Disabled;
+  ADC_CommonInitStructure.ADC_TwoSamplingDelay = ADC_TwoSamplingDelay_20Cycles;
+  ADC_CommonInit(&ADC_CommonInitStructure);
 
-  /* Configure ADC Channels pin as analog input */
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
-  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-  GPIO_Init(GPIOB, &GPIO_InitStructure);
+  /* ADC peripherals Init */
+  ADC_StructInit(&ADC_InitStructure);
+  ADC_InitStructure.ADC_Resolution = ADC_Resolution_12b;
+  ADC_InitStructure.ADC_ScanConvMode = DISABLE;
+  ADC_InitStructure.ADC_ContinuousConvMode = DISABLE;
+  ADC_InitStructure.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_None;
+  ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;
+  ADC_InitStructure.ADC_NbrOfConversion = 1;
+  ADC_Init(ADC_BAT_CHRG_ADC, &ADC_InitStructure);
 
   NVIC_InitStructure.NVIC_IRQChannel = ADC_IRQn;
   NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 2;
@@ -103,51 +128,29 @@ void BSP_StartPowerManagerADC(ADC_Source_Typedef ADC_Source)
   assert_param(ADC_Source < ADCS_MAX);
 
   uint8_t ADC_Channel;
-  ADC_InitTypeDef ADC_InitStructure;
-  ADC_CommonInitTypeDef ADC_CommonInitStructure;
 
   switch (ADC_Source)
   {
     case ADCS_BATTERY_VOLTAGE:
-      ADC_Channel = ADC_Channel_11;
+      ADC_Channel = ADC_BAT_CHANNEL;
       break;
 
     case ADCS_CHARGE_CURRENT:
-      ADC_Channel = ADC_Channel_8;
+      ADC_Channel = ADC_CHRG_CHANNEL;
       break;
 
     default:
       return;
   }
 
-  RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE);
-
-  ADC_ITConfig(ADC1, ADC_IT_EOC, DISABLE);
-
-  /* ADC Common Init */
-  ADC_CommonInitStructure.ADC_Mode = ADC_Mode_Independent;
-  ADC_CommonInitStructure.ADC_Prescaler = ADC_Prescaler_Div8;
-  ADC_CommonInitStructure.ADC_DMAAccessMode = ADC_DMAAccessMode_Disabled;
-  ADC_CommonInitStructure.ADC_TwoSamplingDelay = ADC_TwoSamplingDelay_20Cycles;
-  ADC_CommonInit(&ADC_CommonInitStructure);
-
-  /* ADC peripherals Init */
-  ADC_StructInit(&ADC_InitStructure);
-  ADC_InitStructure.ADC_Resolution = ADC_Resolution_12b;
-  ADC_InitStructure.ADC_ScanConvMode = DISABLE;
-  ADC_InitStructure.ADC_ContinuousConvMode = DISABLE;
-  ADC_InitStructure.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_None;
-  ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;
-  ADC_InitStructure.ADC_NbrOfConversion = 1;
-  ADC_Init(ADC1, &ADC_InitStructure);
-
-  ADC_RegularChannelConfig(ADC1, ADC_Channel, 1, ADC_SampleTime_3Cycles);
+  ADC_RegularChannelConfig(ADC_BAT_CHRG_ADC, ADC_Channel, 1,
+          ADC_SampleTime_3Cycles); //todo
 
   /* Enable ADC */
-  ADC_Cmd(ADC1, ENABLE);
-  ADC_ITConfig(ADC1, ADC_IT_EOC, ENABLE);
+  ADC_Cmd(ADC_BAT_CHRG_ADC, ENABLE);
+  ADC_ITConfig(ADC_BAT_CHRG_ADC, ADC_IT_EOC, ENABLE);
 
-  ADC_SoftwareStartConv(ADC1);
+  ADC_SoftwareStartConv(ADC_BAT_CHRG_ADC);
 }
 
 bool BSP_IsPowerSourceConnected(void)
@@ -163,7 +166,7 @@ void BSP_PowerEnable(void)
 
   GPIO_InitStructure.GPIO_Pin = PWR_EN_PIN;
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
   GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
   GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
   GPIO_Init(PWR_EN_GPIO, &GPIO_InitStructure);
@@ -186,11 +189,6 @@ void BSP_PowerDisable(void)
 /* disp_1100 -----------------------------------------------------------------*/
 #include "disp_1100.h"
 
-void SPI1_IRQHandler(void)
-{
-  Disp_IRQHandler();
-}
-
 void Disp_GPIO_Init()
 {
   GPIO_InitTypeDef GPIO_InitStructure;
@@ -199,9 +197,9 @@ void Disp_GPIO_Init()
   RCC_AHB1PeriphClockCmd(DISP_GPIO_CLK, ENABLE);
   RCC_APB2PeriphClockCmd(DISP_RCC_APB2Periph_SPI, ENABLE);
 
-  GPIO_InitStructure.GPIO_Pin = DISP_Pin_BKL | DISP_Pin_RST | DISP_Pin_CS;
+  GPIO_InitStructure.GPIO_Pin = DISP_Pin_RST | DISP_Pin_CS;
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_25MHz;
   GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
   GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
   GPIO_Init(DISP_GPIO, &GPIO_InitStructure);
@@ -209,6 +207,13 @@ void Disp_GPIO_Init()
   /* Configure SPI pins: SCK (PA5), MOSI (PA7) */
   GPIO_InitStructure.GPIO_Pin = GPIO_Pin_5 | GPIO_Pin_7;
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+  GPIO_Init(DISP_GPIO, &GPIO_InitStructure);
+
+  GPIO_InitStructure.GPIO_Pin = DISP_Pin_BKL;
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
+  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+  GPIO_InitStructure.GPIO_OType = GPIO_OType_OD;
+  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
   GPIO_Init(DISP_GPIO, &GPIO_InitStructure);
 
   GPIO_PinAFConfig(DISP_GPIO, GPIO_PinSource5, DISP_GPIO_AF_SPI);
@@ -225,6 +230,11 @@ void Disp_SetCS(FunctionalState enabled)
 {
   (enabled == ENABLE) ? GPIO_ResetBits(DISP_GPIO, DISP_Pin_CS) : GPIO_SetBits(
           DISP_GPIO, DISP_Pin_CS);
+}
+
+bool Disp_GetCS(void)
+{
+  return (GPIO_ReadInputDataBit(DISP_GPIO, DISP_Pin_CS) == Bit_RESET);
 }
 
 void Disp_SetRST(FunctionalState enabled)
@@ -292,7 +302,7 @@ void SD_LowLevel_Init(void)
 
   /* GPIOC and GPIOD Periph clock enable */
   RCC_AHB1PeriphClockCmd(
-          RCC_AHB1Periph_GPIOC | RCC_AHB1Periph_GPIOD/* | SD_DETECT_GPIO_CLK*/,
+          RCC_AHB1Periph_GPIOC | RCC_AHB1Periph_GPIOD | SD_DETECT_GPIO_CLK,
           ENABLE);
 
   GPIO_PinAFConfig(GPIOC, GPIO_PinSource8, GPIO_AF_SDIO);
@@ -305,7 +315,7 @@ void SD_LowLevel_Init(void)
   /* Configure PC.08, PC.09, PC.10, PC.11 pins: D0, D1, D2, D3 pins */
   GPIO_InitStructure.GPIO_Pin = GPIO_Pin_8 | GPIO_Pin_9 | GPIO_Pin_10
           | GPIO_Pin_11;
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_25MHz;
+  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
   GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
   GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
@@ -321,10 +331,10 @@ void SD_LowLevel_Init(void)
   GPIO_Init(GPIOC, &GPIO_InitStructure);
 
   /*!< Configure SD_SPI_DETECT_PIN pin: SD Card detect pin */
-  //    GPIO_InitStructure.GPIO_Pin = SD_DETECT_PIN;
-  //    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
-  //    GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
-  //    GPIO_Init(SD_DETECT_GPIO_PORT, &GPIO_InitStructure);
+  GPIO_InitStructure.GPIO_Pin = SD_DETECT_PIN;
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
+  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
+  GPIO_Init(SD_DETECT_GPIO_PORT, &GPIO_InitStructure);
   /* Enable the SDIO APB2 Clock */
   RCC_APB2PeriphClockCmd(RCC_APB2Periph_SDIO, ENABLE);
 
@@ -341,119 +351,41 @@ uint8_t SD_Detect(void)
 {
   __IO uint8_t status = SD_PRESENT;
 
-  //  /*!< Check GPIO to detect SD */
-  //  if (GPIO_ReadInputDataBit(SD_DETECT_GPIO_PORT, SD_DETECT_PIN) != Bit_RESET)
-  //  {
-  //    status = SD_NOT_PRESENT;
-  //  }
+  /*!< Check GPIO to detect SD */
+  if (GPIO_ReadInputDataBit(SD_DETECT_GPIO_PORT, SD_DETECT_PIN) != Bit_SET)
+  {
+    status = SD_NOT_PRESENT;
+  }
   return status;
 }
 
 /* keyboard ------------------------------------------------------------------*/
-#include "keyboard.h"
+static KeyPin_Typedef KeyPins[] =
+{
+        KEY_PIN_TYPEDEFS
+};
 
-static void BSP_KeyboardSetRow(u8 row_index)
+void BSP_Keypad_Init(void)
 {
   GPIO_InitTypeDef GPIO_InitStructure;
+  KEY_Typedef key;
 
-  /* Configure row pins as input */
-  GPIO_InitStructure.GPIO_Pin = KEYBOARD_ROW_PINS;
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
-  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_DOWN;
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-  GPIO_Init(KEYBOARD_ROW_GPIO, &GPIO_InitStructure);
+  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
+  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
 
-  GPIO_ResetBits(KEYBOARD_ROW_GPIO, KEYBOARD_ROW_PINS);
-
-  /* Configure row pins as output */
-  switch (row_index)
+  for (key = 0; key < KEY_MAX; key++)
   {
-    case 1:
-      GPIO_SetBits(KEYBOARD_ROW_GPIO, KEYBOARD_ROW1_PIN);
-      GPIO_InitStructure.GPIO_Pin = KEYBOARD_ROW1_PIN;
-      break;
+    RCC_AHB1PeriphClockCmd(KeyPins[key].RCC_AHB1Periph_GPIOx, ENABLE);
 
-    case 2:
-      GPIO_SetBits(KEYBOARD_ROW_GPIO, KEYBOARD_ROW2_PIN);
-      GPIO_InitStructure.GPIO_Pin = KEYBOARD_ROW2_PIN;
-      break;
-
-    default:
-      return;
-      break;
+    GPIO_InitStructure.GPIO_Pin = (1 << KeyPins[key].GPIO_PinSourcex);
+    GPIO_Init(KeyPins[key].GPIOx, &GPIO_InitStructure);
   }
-
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
-  GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-  GPIO_Init(KEYBOARD_ROW_GPIO, &GPIO_InitStructure);
 }
 
-void BSP_Keyboard_Init(void)
+bool BSP_Keypad_GetKeyStatus(KEY_Typedef key)
 {
-  GPIO_InitTypeDef GPIO_InitStructure;
-
-  RCC_AHB1PeriphClockCmd(KEYBOARD_COL_CLOCK, ENABLE);
-
-  /* Configure col pins as input */
-  GPIO_InitStructure.GPIO_Pin = KEYBOARD_COL0_PIN | KEYBOARD_COL1_PIN
-          | KEYBOARD_COL2_PIN;
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
-  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_DOWN;
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-  GPIO_Init(KEYBOARD_COL_GPIO, &GPIO_InitStructure);
-
-  RCC_AHB1PeriphClockCmd(KEYBOARD_ROW_CLOCK, ENABLE);
-  BSP_KeyboardSetRow(-1);
-
-  //
-
-  RCC_AHB1PeriphClockCmd(BUTTON_ESC_CLOCK, ENABLE);
-  GPIO_InitStructure.GPIO_Pin = BUTTON_ESC_PIN;
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
-  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-  GPIO_Init(BUTTON_ESC_GPIO, &GPIO_InitStructure);
-}
-
-u8 BSP_KeyboardGetRowValues(u8 row_index)
-{
-  u32 value = 0, temp;
-
-  BSP_KeyboardSetRow(row_index);
-
-  temp = GPIO_ReadInputData(KEYBOARD_COL_GPIO);
-  value |= (temp & KEYBOARD_COL0_PIN) >> (KEYBOARD_COL0_PINSRC - 0);
-  value |= (temp & KEYBOARD_COL1_PIN) >> (KEYBOARD_COL1_PINSRC - 1);
-  value |= (temp & KEYBOARD_COL2_PIN) >> (KEYBOARD_COL2_PINSRC - 2);
-
-  BSP_KeyboardSetRow(-1);
-
-  return value;
-}
-
-void BSP_InitPPPButton()
-{
-  GPIO_InitTypeDef GPIO_InitStructure;
-
-  RCC_AHB1PeriphClockCmd(BUTTON_PPP_CLOCK, ENABLE);
-
-  GPIO_InitStructure.GPIO_Pin = BUTTON_PPP_PIN;
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
-  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-  GPIO_Init(BUTTON_PPP_GPIO, &GPIO_InitStructure);
-}
-
-bool BSP_GetPPPButton()
-{
-  return !GPIO_ReadInputDataBit(BUTTON_PPP_GPIO, BUTTON_PPP_PIN);
-}
-
-bool BSP_GetESCButton()
-{
-  return false /* !GPIO_ReadInputDataBit(BUTTON_ESC_GPIO, BUTTON_ESC_PIN) */ ;
+  return !GPIO_ReadInputDataBit(KeyPins[key].GPIOx, (1 << KeyPins[key].GPIO_PinSourcex));
 }
 
 /**
@@ -487,7 +419,7 @@ uint32_t Codec_TIMEOUT_UserCallback(void)
 
   /* I2C error recovered */
 
-  return 0;
+  return 1;
 }
 
 /**
@@ -498,4 +430,33 @@ uint32_t Codec_TIMEOUT_UserCallback(void)
 uint16_t EVAL_AUDIO_GetSampleCallBack(void)
 {
   return 0;
+}
+
+/* vibrator ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+void Vibrator_Init(void)
+{
+  GPIO_InitTypeDef GPIO_InitStructure;
+
+  RCC_AHB1PeriphClockCmd(VIBRATOR_RCC_AHB1Periph_GPIO, ENABLE);
+
+  GPIO_InitStructure.GPIO_Pin = VIBRATOR_PIN;
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
+  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+  GPIO_InitStructure.GPIO_OType = GPIO_OType_OD;
+  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+  GPIO_Init(VIBRATOR_GPIO, &GPIO_InitStructure);
+
+  Vibrator_Disable();
+}
+
+void Vibrator_Disable(void)
+{
+  GPIO_SetBits(VIBRATOR_GPIO, VIBRATOR_PIN);
+}
+
+
+void Vibrator_Enable(void)
+{
+  GPIO_ResetBits(VIBRATOR_GPIO, VIBRATOR_PIN);
 }

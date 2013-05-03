@@ -69,13 +69,13 @@ void PowerManager_MainThread(void)
     //System_SetState(SS_PLAYER); /* TODO */
     PowerManagerState = PM_ONLINE;
 
-    USBD_Init();
+    System_VbusApplied();
   }
   else if ((PowerManagerState == PM_ONLINE) && !BSP_IsPowerSourceConnected())
   {
     PowerManagerState = PM_OFFLINE;
 
-    USBD_DeInit();
+    System_VbusDetached();
   }
 }
 

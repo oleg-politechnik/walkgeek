@@ -42,7 +42,7 @@
 typedef enum {
   SS_START,
   SS_PLAYER,
-  SS_USB,
+  SS_USB_MSC,
   SS_SHUTDOWN
 } SystemState_Typedef;
 
@@ -59,16 +59,18 @@ void System_SetState(SystemState_Typedef NewState);
 void System_PowerEnable(void);
 void RAM_FUNC System_SetState(SystemState_Typedef NewState);
 void RAM_FUNC System_SysTickHandler(void);
+void System_VbusApplied(void);
+void System_VbusDetached(void);
+
+void USB_MSC_Init(void);
+void USB_Audio_Init(void);
+void USB_CDC_Init(void);
 
 /* Exported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-extern volatile SystemState_Typedef SystemState;
-//extern __IO u32 msDelay;
+extern SystemState_Typedef SystemState;
+extern __IO u32 msDelay;
 extern u32 MSC_RxSpeed, MSC_TxSpeed;
 
 /* Exported static inline functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-//static inline void Delay_1msCallback()
-//{
-//  msDelay++;
-//}
 
 #endif /* SYSTEM_H_ */

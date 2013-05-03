@@ -30,6 +30,7 @@
 #include "decoder.h"
 #include "mp3_decoder.h"
 #include "wav_decoder.h"
+#include "opus_decoder.h"
 
 /* Imported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private define ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -56,9 +57,11 @@ Decoder_TypeDef decoders[] =
         }
         ,
         {
-                .FastFileCheckFunc = 0,
-                .LoadFileFunc = 0,
-                .DecodeFunc = 0,
-                .SeekFunc = 0
+                .FastFileCheckFunc = Opus_FastFileCheck,
+                .LoadFileFunc = Opus_TryFile,
+                .DecodeFunc = Opus_Decode,
+                .SeekFunc = Opus_Seek
         }
+        ,
+        0
 };

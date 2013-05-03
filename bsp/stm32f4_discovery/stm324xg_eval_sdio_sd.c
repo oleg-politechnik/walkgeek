@@ -381,6 +381,20 @@ uint8_t convert_from_bytes_to_power_of_two(uint16_t NumberOfBytes);
  * @{
  */
 
+static void SD_CapacityToString(char *buf, uint8_t size, uint64_t CardCapacity)
+{
+  float CardCapacityF_MB = CardCapacity / (1024 * 1024);
+
+  if (CardCapacityF_MB < (uint64_t) 1024)
+  {
+    snprintf(buf, size, F1_2"MB", FLOAT_TO_1_2(CardCapacityF_MB));
+  }
+  else
+  {
+    CardCapacityF_MB /= 1024;
+    snprintf(buf, size, F1_2"GB", FLOAT_TO_1_2(CardCapacityF_MB));
+  }
+}
 
 /**
  * @brief  Configures the DMA2 Channel4 for SDIO Tx request.
@@ -528,12 +542,17 @@ SD_Error SD_Init(void)
     errorstatus = SD_GetCardInfo(&SDCardInfo);
 
     if (errorstatus == SD_OK) {
+      char str_buf[64];
+      SD_CapacityToString(str_buf, sizeof(str_buf), SDCardInfo.CardCapacity);
+      trace("sdio: found %s card\r\n", str_buf);
+
         /*----------------- Select Card --------------------------------*/
         errorstatus = SD_SelectDeselect((uint32_t)(SDCardInfo.RCA << 16));
     }
 
     if (errorstatus == SD_OK) {
         errorstatus = SD_EnableWideBusOperation(SDIO_BusWide_4b);
+        trace("sdio: enabled 4bit wide bus\r\n");
     }
 
     return (errorstatus);

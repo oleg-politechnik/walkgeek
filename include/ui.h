@@ -31,6 +31,9 @@
 
 /* Includes ------------------------------------------------------------------*/
 /* Exported constants --------------------------------------------------------*/
+#define KEY_PREV      KEY_1
+#define KEY_NEXT      KEY_3
+
 /* Exported types ------------------------------------------------------------*/
 typedef enum
 {
@@ -54,5 +57,7 @@ typedef enum
 void UI_Init(void);
 void UI_MainCycle(void);
 void UI_DeInit(void);
+
+void Vibrator_SendSignal(u16 ms);
 
 #endif /* UI_H_ */

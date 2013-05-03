@@ -45,8 +45,8 @@
  *  the only file you'll need to change.
  **************************************************************************************/
 
+//#include "hlxclib/stdlib.h"		/* for malloc, free */
 #include "coder.h"
-#include <stdlib.h>
 
 /**************************************************************************************
  * Function:    ClearBuffer

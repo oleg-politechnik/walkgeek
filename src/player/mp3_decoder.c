@@ -32,7 +32,6 @@
 #include "mp3_decoder.h"
 #include "mediafile.h"
 #include "playlist.h"
-#include "decoder.h"
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/

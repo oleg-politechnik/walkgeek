@@ -14,13 +14,11 @@ INCLUDE_DIRECTORIES(
 
 SET(USBLIB_HEADERS ${USBLIB_HEADERS}
     ${USB_Device_LibraryOtgInc_DIR}/usb_bsp.h
-    ${USB_Device_LibraryOtgInc_DIR}/usb_conf_template.h
+#    ${USB_Device_LibraryOtgInc_DIR}/usb_conf_template.h
     ${USB_Device_LibraryOtgInc_DIR}/usb_core.h
     ${USB_Device_LibraryOtgInc_DIR}/usb_dcd.h
     ${USB_Device_LibraryOtgInc_DIR}/usb_dcd_int.h
     ${USB_Device_LibraryOtgInc_DIR}/usb_defines.h
-#    ${USB_Device_LibraryOtgInc_DIR}/usb_hcd.h
-#    ${USB_Device_LibraryOtgInc_DIR}/usb_hcd_int.h
 #    ${USB_Device_LibraryOtgInc_DIR}/usb_otg.h
     ${USB_Device_LibraryOtgInc_DIR}/usb_regs.h
 )
@@ -64,9 +62,9 @@ SET(USBLIB_SOURCES ${USBLIB_SOURCES}
 #SET(USBLIB_SOURCES ${USBLIB_SOURCES}
 #    ${USB_Device_LibraryAudioSrc_DIR}/usbd_audio_core.c
 #)
-#
+
 # MSC ##########################################################################
-#
+
 SET(USB_Device_LibraryMscInc_DIR
     ${STM32_USBLib_DIR}/Libraries/STM32_USB_Device_Library/Class/msc/inc
 )

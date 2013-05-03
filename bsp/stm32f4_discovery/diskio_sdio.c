@@ -13,7 +13,10 @@
 /*-----------------------------------------------------------------------*/
 #include <string.h>
 #include "diskio.h"
-//#include "../sdio/sdcard.h"
+#include <stdint.h>
+#include "stm324xg_eval_sdio_sd.h"
+#include "integer.h"
+#include "usbd_storage_msd.h"
 
 /*-----------------------------------------------------------------------*/
 /* Correspondence between physical drive number and physical drive.      */
@@ -21,13 +24,6 @@
 /* accesses drive number 0.                                              */
 
 #define SECTOR_SIZE 512
-
-#include "diskio.h"
-#include <stdint.h>
-#include "stm324xg_eval_sdio_sd.h"
-#include "integer.h"
-#include "usbd_storage_msd.h"
-#include <string.h>
 
 extern SD_CardInfo SDCardInfo;
 
@@ -237,6 +233,8 @@ DWORD sector, /* Sector address (LBA) */
 BYTE count /* Number of sectors to read (1..255) */
 )
 {
+  SDTransferState state;
+
   if (drv != MMC)
     return RES_PARERR;
 
@@ -251,16 +249,28 @@ BYTE count /* Number of sectors to read (1..255) */
   {
     SD_ReadBlock((u8*) buff2, sector << 9, SECTOR_SIZE);
     SD_WaitReadOperation();
-    while (SD_GetStatus() != SD_TRANSFER_OK)
+    while ((state = SD_GetStatus()) == SD_TRANSFER_BUSY)
       ;
+
+    if (state == SD_TRANSFER_ERROR)
+    {
+      return RES_ERROR;
+    }
+
     memcpy(buff, buff2, SECTOR_SIZE);
   }
   else
   {
     SD_ReadMultiBlocks((u8*) buff2, sector << 9, SECTOR_SIZE, count);
     SD_WaitReadOperation();
-    while (SD_GetStatus() != SD_TRANSFER_OK)
+    while ((state = SD_GetStatus()) == SD_TRANSFER_BUSY)
       ;
+
+    if (state == SD_TRANSFER_ERROR)
+    {
+      return RES_ERROR;
+    }
+
     memcpy(buff, buff2, SECTOR_SIZE * count);
   }
   return RES_OK;

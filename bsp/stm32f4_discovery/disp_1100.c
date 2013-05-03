@@ -29,11 +29,9 @@
 #include "disp_1100.h"
 #include "stm32f4xx_conf.h"
 #include "misc.h"
-
-#define BUF_SIZE DISP_CMD_STACK_SIZE
-#include "circ_buffer.h"
 #include <string.h>
 #include "scheduler.h"
+#include "system.h"
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
@@ -46,19 +44,15 @@
 #define DISP_IS_VALID_INDEX(ix)     (ix < DISP_INDEX_COUNT)
 
 #define DISP_INDEX(x, row)          (x + row * DISP_X_COUNT)
-#define DISP_IS_VALID_STACK_PTR(ptr)(ptr < DISP_CMD_STACK_SIZE)
 
 #define ALL_DISP_DIRTY              DISP_ROW_COUNT
 
 /* Private variables ---------------------------------------------------------*/
-static uint8_t dispBUF[DISP_ROW_COUNT][DISP_X_COUNT];
 static uint8_t dispRAM[DISP_ROW_COUNT][DISP_X_COUNT];
-circular_buffer_t cmd_buf;
 static __IO uint32_t dirty_row_flags;
+static __IO uint32_t busy;
 static u16 ram_x;
 static u8 ram_row;
-static u16 flush_spi_x;
-static u8 flush_spi_row;
 
 static const uint8_t FontLookup[][5] =
 {
@@ -166,7 +160,10 @@ static void Disp_Interface_Init()
   SPI_InitTypeDef SPI_InitStructure;
 
   SPI_StructInit(&SPI_InitStructure);
-  SPI_InitStructure.SPI_Direction = SPI_Direction_1Line_Tx;
+  SPI_InitStructure.SPI_Direction = SPI_Direction_2Lines_FullDuplex;
+  /* would have been SPI_Direction_1Line_Tx but i need RXNE interrupt
+   * in order to catch the end of transmission and manually reset CS in its ISR
+   */
   SPI_InitStructure.SPI_Mode = SPI_Mode_Master;
   SPI_InitStructure.SPI_FirstBit = SPI_FirstBit_MSB;
   SPI_InitStructure.SPI_DataSize = SPI_DataSize_16b;
@@ -179,59 +176,36 @@ static void Disp_Interface_Init()
   SPI_Cmd(DISP_SPI, ENABLE);
 }
 
-bool Disp_IsBusy()
-{
-  uint16_t itmask = 0;
-
-  itmask = (uint16_t) 1 << (uint16_t) (SPI_I2S_IT_TXE >> 4);
-
-  return ((DISP_SPI->CR2 & itmask) == itmask) ? (true) : (false);
-}
-
-static inline void Disp_SetBusy(bool enable)
-{
-  SPI_I2S_ITConfig(DISP_SPI, SPI_I2S_IT_TXE, enable);
-}
-
-void Disp_Sync()
-{
-  //  Disp_SetBusy(ENABLE);
-}
-
 static inline void Disp_SendByte(u16 byte)
 {
-  while (SPI_I2S_GetFlagStatus(DISP_SPI, SPI_I2S_FLAG_BSY) == SET)
+  while (busy)
     ;
 
+  busy = true;
   Disp_SetCS(true);
 
-  SPI_I2S_GetITStatus(DISP_SPI, SPI_I2S_IT_TXE); //ClearIRQ
-  Disp_SetBusy(ENABLE);
-
   SPI_I2S_SendData(DISP_SPI, byte);
+
+  /* XXX clear? */
+  SPI_I2S_ITConfig(DISP_SPI, SPI_I2S_IT_RXNE, ENABLE);
 }
 
 static inline void Disp_SendData(u8 byte)
 {
   Disp_SendByte((byte | 0x100) << 7);
-
-  flush_spi_x++;
 }
 
-static inline void Disp_QueueCommand(uint8_t c)
+static void Disp_SendCommand(u8 byte)
 {
-  while (circular_fifo_is_full(&cmd_buf))
-  {
-    Disp_Sync();
-  }
+  Disp_SendByte((byte & ~0x100) << 7);
+}
 
-  CPU_DisableInterrupts();
-  {
-    circular_fifo_push(&cmd_buf, (c & ~0x100) << 7);
-  }
-  CPU_EnableInterrupts();
+static void Disp_SetXRow(u8 x, u8 row)
+{
+  Disp_SendCommand(0x10 | ((x >> 4) & 0x7));
+  Disp_SendCommand(x & 0x0f);
 
-  Disp_Sync();
+  Disp_SendCommand(0xB0 | (row & 0x0f));
 }
 
 static inline void Disp_SetRowDirty(uint8_t row, bool dirty)
@@ -240,75 +214,37 @@ static inline void Disp_SetRowDirty(uint8_t row, bool dirty)
 
   CPU_DisableInterrupts();
   {
-    //dirty_row_flags &= (1 << DISP_ROW_COUNT) - 1;
-
     if (dirty)
       dirty_row_flags |= _BV(row);
     else
       dirty_row_flags &= ~_BV(row);
   }
-  CPU_EnableInterrupts();
+  CPU_RestoreInterrupts();
 }
 
-static inline FuncResult Disp_SyncColRow(u16 x, u8 row)
+static inline void FeedDisp()
 {
-  FuncResult res = FUNC_SUCCESS;
-
-  assert_param(DISP_IS_VALID_X(x));
-  assert_param(DISP_IS_VALID_ROW(row));
-
-  if (flush_spi_x != x)
+  if (DISP_IS_VALID_X(ram_x))
   {
-    Disp_QueueCommand(0x10 | ((x >> 4) & 0x7));
-    Disp_QueueCommand(x & 0x0f);
-    flush_spi_x = x;
+    assert_param(DISP_IS_VALID_ROW(ram_row));
 
-    res = FUNC_ERROR;
+    Disp_SendData(dispRAM[ram_row][ram_x]);
+    ram_x++;
   }
-
-  if (flush_spi_row != row)
-  {
-    Disp_QueueCommand(0xB0 | (row & 0x0f));
-    flush_spi_row = row;
-
-    res = FUNC_ERROR;
-  }
-
-  return res;
 }
 
-//static inline FuncResult Disp_NextColRow(u16 *x, u8 *row)
-//{
-//  (*x)++;
-//
-//  if (!DISP_IS_VALID_X(*x))
-//  {
-//    (*x) = 0;
-//    (*row)++;
-//  }
-//
-//  if (!DISP_IS_VALID_ROW(*row))
-//  {
-//    (*row) = 0;
-//    return FR_ERROR;
-//  }
-//
-//  return FR_SUCCESS;
-//}
-
-void Disp_Manager()
+void Disp_MainThread()
 {
   u32 temp;
   u16 i;
 
-  if (Disp_IsBusy())
+  if (busy)
   {
     return;
   }
 
-  if (!circular_fifo_is_empty(&cmd_buf))
+  if (DISP_IS_VALID_X(ram_x))
   {
-    Disp_SetBusy(ENABLE);
     return;
   }
 
@@ -332,78 +268,28 @@ void Disp_Manager()
 
     assert_param(DISP_IS_VALID_ROW(ram_row));
 
-    ram_x = 0;
+    Disp_SetXRow(0, ram_row);
     Disp_SetRowDirty(ram_row, false);
-    Disp_SetBusy(ENABLE);
+    ram_x = 0;
 
-    flush_spi_x = DISP_X_COUNT;
-    flush_spi_row = DISP_ROW_COUNT;
+    FeedDisp();
     return;
   }
 }
 
 void Disp_IRQHandler()
 {
-  u16 x, word;
+  u16 temp;
 
-  Disp_SetCS(DISABLE);
-
-  assert_param(DISP_IS_VALID_ROW(ram_row));
-
-  //  if (SPI_I2S_GetFlagStatus(DISP_SPI, SPI_I2S_FLAG_BSY) == SET)
-  //    return;
-
-  if (!circular_fifo_is_empty(&cmd_buf))
+  if (SPI_GetITStatus(DISP_SPI, SPI_IT_RXNE))
   {
-    CPU_DisableInterrupts();
-    {
-      circular_fifo_pop(&cmd_buf, &word);
-    }
-    CPU_EnableInterrupts();
-    Disp_SendByte(word);
-    return;
+    temp = SPI_I2S_ReceiveData(DISP_SPI);
+
+    Disp_SetCS(DISABLE);
+    busy = false;
+
+    FeedDisp();
   }
-  else if (DISP_IS_VALID_X(ram_x))
-  {
-    for (x = ram_x; x < DISP_X_COUNT; x++)
-    {
-      if (dispRAM[ram_row][x] != dispBUF[ram_row][x] || (dirty_row_flags
-              & _BV(ALL_DISP_DIRTY)))
-      {
-        //        if (offset != 0 && offset <= 3)
-        //        {
-        //          for (i = 1; i <= offset; i++)//fixme?i=1
-        //            dispBUF[ram_ix + i] = dispRAM[ram_ix + i] + 1;
-        //        }
-        //        ix = ram_ix;
-
-        ram_x = x;
-
-        if (Disp_SyncColRow(ram_x, ram_row) == FUNC_ERROR)
-          return;
-
-        dispBUF[ram_row][ram_x] = dispRAM[ram_row][ram_x];
-        Disp_SendData(dispBUF[ram_row][ram_x]);
-        ram_x++;
-
-        flush_spi_x = DISP_X_COUNT;
-        flush_spi_row = DISP_ROW_COUNT;
-
-        return;
-      }
-    }
-
-    ram_x = DISP_X_COUNT;
-  }
-
-  Disp_SetBusy(DISABLE);
-}
-
-void Disp_SetContrast(uint8_t contrast)
-{
-  Disp_QueueCommand(0x21); // LCD Extended Commands.
-  Disp_QueueCommand(0x80 | contrast); // Set LCD Vop (Contrast).
-  Disp_QueueCommand(0x20); // LCD Standard Commands, Horizontal addressing mode.
 }
 
 //static inline FuncResult Disp_NextXY(u16 *x, u16 *y, u8 row_size)
@@ -462,7 +348,7 @@ void Disp_Clear(void)
   {
     for (x = 0; x < DISP_X_COUNT; ++x)
     {
-      Disp_SetData(x, row, /*(x + row * DISP_X_COUNT) % 0xFF*/0);
+      Disp_SetData(x, row, 0/*(x + row * DISP_X_COUNT) % 0xFF*/);
     }
   }
 }
@@ -516,8 +402,6 @@ void Disp_String(uint8_t col, uint8_t row, const char *ptr, bool new_line)
     Disp_SetData(i_col, i_row, 0);
     i_col++;
   }
-
-  Disp_Sync();
 }
 
 /* Private functions ---------------------------------------------------------*/
@@ -527,38 +411,26 @@ static void Disp_InitFinally()
 
   NVIC_InitTypeDef NVIC_InitStructure;
   NVIC_InitStructure.NVIC_IRQChannel = DISP_SPI_IRQ;
-  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 2;
-  NVIC_InitStructure.NVIC_IRQChannelSubPriority = 2;
+  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
+  NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
   NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
   NVIC_Init(&NVIC_InitStructure);
 
-  Disp_QueueCommand(0x20); // write VOP register
-  Disp_QueueCommand(0x90);
-  Disp_QueueCommand(0xA4); // all on/normal display
-  Disp_QueueCommand(0x2F); // Power control set(charge pump on/off)
-  Disp_QueueCommand(0x40); // set start row address = 0
-
-  //  Disp_QueueCommand(0xb0); // set Y-address = 0
-  //  Disp_QueueCommand(0x10); // set X-address, upper 3 bits
-  //  Disp_QueueCommand(0x0); // set X-address, lower 4 bits
-
-  //  Disp_Cmd(0xC8); // mirror Y axis (about X axis)
-  //  Disp_Cmd(0xa1); // Invert screen in horizontal axis
-  Disp_QueueCommand(0xac); // set initial row (R0) of the display
-  Disp_QueueCommand(0x07);
-  Disp_QueueCommand(0xF9); //
-  Disp_QueueCommand(0xaf); // display ON/OFF
-  Disp_QueueCommand(0xa6); // normal display (non inverted)
+  Disp_SendCommand(0x20); // write VOP register
+  Disp_SendCommand(0x90);
+  Disp_SendCommand(0xA4); // all on/normal display
+  Disp_SendCommand(0x2F); // Power control set(charge pump on/off)
+  Disp_SendCommand(0x40); // set start row address = 0
+  Disp_SendCommand(0xac); // set initial row (R0) of the display
+  Disp_SendCommand(0x07);
+  Disp_SendCommand(0xF9); //
+  Disp_SendCommand(0xaf); // display ON/OFF
+  Disp_SendCommand(0xa6); // normal display (non inverted) a6
 
   //
 
-  flush_spi_x = DISP_X_COUNT;
-  flush_spi_row = DISP_ROW_COUNT;
-
   dirty_row_flags = _BV(DISP_ROW_COUNT) - 1;
   Disp_SetRowDirty(ALL_DISP_DIRTY, true);
-
-  Scheduler_PutTask(10, &Disp_Manager, REPEAT);
 }
 
 void Disp_Init()
@@ -566,17 +438,18 @@ void Disp_Init()
   ram_x = DISP_X_COUNT;
   dirty_row_flags = 0;
 
-  circular_fifo_init(&cmd_buf);
-
-  memset(dispRAM, 0, sizeof(dispRAM));
-
   Disp_GPIO_Init();
   Disp_SetRST(ENABLE);
   Disp_SetCS(DISABLE);
+  busy = false;
 
   Disp_Interface_Init();
 
-  Scheduler_PutTask(100, &Disp_InitFinally, NO_REPEAT);
+  msDelay = 100;
+  while (msDelay)
+    ;
+
+  Disp_InitFinally();
 }
 
 //

@@ -65,7 +65,7 @@ AudioBuffer_Typedef *AudioBuffer_TryGetProducer(void)
     {
       ix = (index_consumer + length) % AUDIO_BUFFER_COUNT;
     }
-    CPU_EnableInterrupts();
+    CPU_RestoreInterrupts();
 
     return (&buffers[ix]);
   }
@@ -82,7 +82,7 @@ void AudioBuffer_MoveProducer(void)
   {
     length++;
   }
-  CPU_EnableInterrupts();
+  CPU_RestoreInterrupts();
 }
 
 AudioBuffer_Typedef *AudioBuffer_TryGetConsumer(void)
@@ -102,7 +102,7 @@ void AudioBuffer_MoveConsumer(void)
     buffers[index_consumer].size = 0;
     index_consumer = (index_consumer + 1) % AUDIO_BUFFER_COUNT;
   }
-  CPU_EnableInterrupts();
+  CPU_RestoreInterrupts();
 
   //    iprintf("con_length %i\n", length);
 }

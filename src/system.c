@@ -27,7 +27,7 @@
 
 /* Includes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 #include "system.h"
-#include "keyboard.h"
+#include "keypad.h"
 #include "player.h"
 #include "ui.h"
 #include "powermanager.h"
@@ -38,14 +38,24 @@
 /* Private typedef ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-volatile SystemState_Typedef SystemState;
+SystemState_Typedef SystemState;
 static SystemState_Typedef SystemStateNew;
+
+__IO u32 msDelay;
 
 u32 MSC_RxSpeed, MSC_TxSpeed;
 u32 displayVariableFlags[MAX_DISPLAY_VARIABLES];
 
 static bool debug_mode = false;
 static bool can_sleep = false;
+
+static char *stateNames[] =
+{
+        "START",
+        "PLAYER",
+        "USB_MSC",
+        "SHUTDOWN"
+};
 
 /* Private function prototypes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -61,10 +71,7 @@ void System_ForbidDebugging(void)
 
 void System_PowerEnable(void)
 {
-  UI_Init();
   BSP_PowerEnable();
-  //  if (SystemState != SS_START)
-//  System_SetState(SS_PLAYER); /* TODO NO_APP */
 }
 
 static void System_StartPlayer(void)
@@ -76,12 +83,34 @@ static void System_StartPlayer(void)
   System_SetState(SS_PLAYER);
 }
 
+void System_VbusApplied(void)
+{
+  if (SystemState == SS_PLAYER || DISABLE_MSC)
+  {
+    USB_CDC_Init();
+  }
+  else
+  {
+    USB_MSC_Init();
+  }
+}
+
+void System_VbusDetached(void)
+{
+  /*USB_OTG_BSP_DeInit();*/
+
+  //TODO de-init USB and stop it
+}
+
 void System_Init(void)
 {
+  CPU_InitMM();
+  CPU_EnableFPU();
+
   Scheduler_Reset();
   BSP_InitPowerSourcesSense();
 
-  BSP_InitPPPButton();
+  Keypad_Init();
 
   CPU_EnableSysTick(HZ);
 
@@ -95,9 +124,11 @@ void System_Init(void)
 
 void RAM_FUNC System_SysTickHandler(void)
 {
-  Keyboard_Scan();
+  Keypad_1msScan();
   Scheduler_1msCycle();
-  //  Delay_1msCallback();
+
+  if (msDelay)
+    msDelay--;
 }
 
 /* TODO add check of calling from an isr */
@@ -111,6 +142,8 @@ void RAM_FUNC System_SetState(SystemState_Typedef NewState)
  */
 static void SetState(SystemState_Typedef NewState)
 {
+  trace("system: leaving state %s\r\n", stateNames[SystemState]);
+
   switch (SystemState)
   {
     case SS_PLAYER:
@@ -118,13 +151,15 @@ static void SetState(SystemState_Typedef NewState)
       Audio_Command(AC_STOP);
       break;
 
-    case SS_USB:
+    case SS_USB_MSC:
       //      USBD_Shutdown();
       break;
 
     default:
       break;
   }
+
+  trace("system: entering state %s\r\n", stateNames[NewState]);
 
   switch (NewState)
   {
@@ -138,11 +173,11 @@ static void SetState(SystemState_Typedef NewState)
       //BSP_PowerEnable();
       UI_Init();
       Player_Init();
+      //Vibrator_SendSignal(30);
       break;
 
-    case SS_USB:
+    case SS_USB_MSC: //fixme: when to  init & the need of vbus sensing (st stack may be de-initializing smth)
       UI_Init();
-      //      MSC_Init();
       break;
 
     default:
@@ -171,10 +206,7 @@ void System_MainThread(void)
       Player_MainCycle();
       break;
 
-    case SS_USB:
-      //      USBD_MainCycle();
-      break;
-
+    case SS_USB_MSC:
     default:
       break;
   }

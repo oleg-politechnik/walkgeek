@@ -28,14 +28,15 @@
 /* Includes ------------------------------------------------------------------*/
 #include "system.h"
 #include "ui.h"
-#include "player.h"
 #include "disp_1100.h"
-#include "keyboard.h"
+#include "keypad.h"
 #include "scheduler.h"
 #include "powermanager.h"
+#include "player.h"
 
 extern int plist_cnt;
 extern int plist_curr;
+extern uint32_t NeglectedDMA_Count;
 
 /* Private typedef -----------------------------------------------------------*/
 typedef struct
@@ -82,8 +83,8 @@ static UI_State_Typedef UiState = UIS_NOT_INITIALIZED;
 //
 static void Screen_DisableBacklightCallback(void);
 
-static void Keyboard_LockTimeoutCallback(void);
-static void Keyboard_HoldTimeoutCallback(void);
+static void Keypad_LockTimeoutCallback(void);
+static void Keypad_HoldTimeoutCallback(void);
 
 static void TimePoint(u32 raw_mstime, TimePoint_Typedef *time);
 
@@ -93,21 +94,16 @@ void UI_Init(void)
   if (UiState != UIS_NOT_INITIALIZED)
     return;
 
+  trace("[init] UI\r\n");
+
   UiState = UIS_INITIALIZING;
 
-  Keyboard_Init();
-  //  KeyProcessed = SET;
-  //  Keyboard_Scan();
-  //  if (Keyboard_CurrentKey() == _KEY_DUMMY)
-  //    KeyProcessed = RESET;
-  //  else
-  //    KeyProcessed = SET;
-
   Disp_Init();
-  Disp_SetBKL(ENABLE);
 
-  Scheduler_PutTask(1000, &Screen_DisableBacklightCallback, NO_REPEAT);
-  Scheduler_PutTask(100, &UI_Init, NO_REPEAT);
+  Vibrator_Init();
+
+  Scheduler_PutTask(2000, &Screen_DisableBacklightCallback, NO_REPEAT);
+  Disp_SetBKL(ENABLE);
 }
 
 void UI_DeInit(void)
@@ -162,17 +158,15 @@ void UI_VariableChangedHandler(VAR_Index var)
           SetVariable(VAR_ScreenMode, ScreenMode, UIM_Player);
           break;
 
-        case SS_USB:
-          Disp_SetBKL(true);
-          DISP_ALIGN_CENTER(1, "USB Disk");
+        case SS_USB_MSC:
+          DISP_ALIGN_CENTER(2, "USB Disk");
           SetVariable(VAR_ScreenMode, ScreenMode, UIM_MSC);
+
+          Scheduler_RemoveTask(&Screen_DisableBacklightCallback);
+          Disp_SetBKL(ENABLE);
+
           break;
 
-          //        case APP_MODE_USB_AUDIO:
-          //          Disp_SetBKL(true);
-          //          DISP_ALIGN_CENTER(1, "USB Audio");
-          //          SetVariable(VAR_ScreenMode, ScreenMode, UIM_MSC);
-          //          break;
         default:
           break;
       }
@@ -297,42 +291,47 @@ void UI_VariableChangedHandler(VAR_Index var)
       displayVariableFlags[VAR_plist_cnt] = RESET;
       break;
 
+    case VAR_media_sample_rate:
+      break;
+
+//    case VAR_Audio_NeglectedDMA_Count:
+//      sprintf(str_buf, "xDMA: %u", NeglectedDMA_Count);
+//      Disp_String(0, 5, str_buf, false);
+//      break;
+
     case VAR_media_status:
     case VAR_media_bitrate:
-    case VAR_media_sample_rate:
     case VAR_media_channel_count:
       //sprintf(str_buf, "%iHz", file->meta.sample_rate);
 
       DISP_ALIGN_CENTER(0, "  ");
       //Disp_String(0, 3, "                       ", false);
 
-      switch (Audio_GetState())
-      {
-        case AS_PLAYING:
-          DISP_ALIGN_CENTER(0, "O");
-          break;
+//      if (Audio_IsSuspendedPlayback())
+//      {
+//        DISP_ALIGN_CENTER(0, "=");
+//      }
+//      else
+//      {
+        switch (Audio_GetState())
+        {
+          case AS_PLAYING:
+            DISP_ALIGN_CENTER(0, "O");
+            break;
 
-        case AS_PAUSED:
-          DISP_ALIGN_CENTER(0, "-");
-          break;
+          case AS_STOPPED:
+            DISP_ALIGN_CENTER(0, "-");
+            break;
 
-        case AS_STOPPED:
-          DISP_ALIGN_CENTER(0, "S");
-          break;
-
-        case AS_ERROR:
-          DISP_ALIGN_CENTER(0, "E");
-          break;
-
-        case AS_INACTIVE:
-          DISP_ALIGN_CENTER(0, "~");
-          break;
-      }
+          case AS_ERROR:
+            DISP_ALIGN_CENTER(0, "~");
+            break;
+        }
+//      }
 
       displayVariableFlags[VAR_media_status] = RESET;
       displayVariableFlags[VAR_media_bitrate] = RESET;
       displayVariableFlags[VAR_media_channel_count] = RESET;
-      displayVariableFlags[VAR_media_sample_rate] = RESET;
       break;
 
     case VAR_media_time_curr:
@@ -371,12 +370,11 @@ void UI_VariableChangedHandler(VAR_Index var)
     case VAR_BatteryVoltage:
       if (PowerManager_GetState() == PM_ONLINE)
       {
-        sprintf(str_buf, "%1.2fC ", PowerManager_GetChargingCurrent());
+        sprintf(str_buf, F1_2"C ", FLOAT_TO_1_2(PowerManager_GetChargingCurrent()));
       }
       else
       {
-        sprintf(str_buf, "%1.2fv ", PowerManager_GetBatteryVoltage());
-
+        sprintf(str_buf, F1_2"v ", FLOAT_TO_1_2(PowerManager_GetBatteryVoltage()));
       }
       DISP_ALIGN_LEFT(0, str_buf);//region
       break;
@@ -392,6 +390,8 @@ void UI_MainCycle(void)
     return;
 
   u8 i = 0;
+
+  Disp_MainThread();
 
   if (UiState == UIS_INITIALIZING)
   {
@@ -424,8 +424,10 @@ static void TimePoint(u32 raw_mstime, TimePoint_Typedef *time)
   time->minute %= 60;
 }
 
-void Keyboard_KeyPressedCallback(KEY_Typedef key)
+void Keypad_KeyPressedCallback(KEY_Typedef key)
 {
+  trace("key %u pressed\r\n", key);
+
   if (UiState != UIS_INITIALIZED)
     return;
 
@@ -438,7 +440,7 @@ void Keyboard_KeyPressedCallback(KEY_Typedef key)
 
   if (key == KEY_PPP && ScreenMode != UIM_Player_Locked)
   {
-    Scheduler_PutTask(3000, &Keyboard_HoldTimeoutCallback, NO_REPEAT);
+    Scheduler_PutTask(3000, &Keypad_HoldTimeoutCallback, NO_REPEAT);
   }
 
   switch (ScreenMode)
@@ -448,29 +450,29 @@ void Keyboard_KeyPressedCallback(KEY_Typedef key)
       {
         case KEY_PREV:
           ScreenSubMode = -10;
-          Scheduler_PutTask(1000, &Keyboard_HoldTimeoutCallback, NO_REPEAT);
+          Scheduler_PutTask(1000, &Keypad_HoldTimeoutCallback, NO_REPEAT);
           break;
 
         case KEY_NEXT:
           ScreenSubMode = 10;
-          Scheduler_PutTask(1000, &Keyboard_HoldTimeoutCallback, NO_REPEAT);
+          Scheduler_PutTask(1000, &Keypad_HoldTimeoutCallback, NO_REPEAT);
           break;
 
         case KEY_UP:
           ScreenSubMode = 1;
           Player_AsyncCommand(PC_CHANGE_VOLUME, ScreenSubMode);
-          Scheduler_PutTask(1000, &Keyboard_HoldTimeoutCallback, NO_REPEAT);
+          Scheduler_PutTask(1000, &Keypad_HoldTimeoutCallback, NO_REPEAT);
           break;
 
         case KEY_DOWN:
           ScreenSubMode = -1;
           Player_AsyncCommand(PC_CHANGE_VOLUME, ScreenSubMode);
-          Scheduler_PutTask(1000, &Keyboard_HoldTimeoutCallback, NO_REPEAT);
+          Scheduler_PutTask(1000, &Keypad_HoldTimeoutCallback, NO_REPEAT);
           break;
 
         case KEY_SEL:
           SetVariable(VAR_ScreenMode, ScreenMode, UIM_Player_HalfLocked);
-          Scheduler_PutTask(1000, &Keyboard_LockTimeoutCallback, NO_REPEAT);
+          Scheduler_PutTask(1000, &Keypad_LockTimeoutCallback, NO_REPEAT);
           break;
 
         default:
@@ -481,13 +483,13 @@ void Keyboard_KeyPressedCallback(KEY_Typedef key)
     case UIM_Player_HalfLocked:
       switch (key)
       {
-        case KEY_SHARP:
+        case KEY_ASTERICK:
           SetVariable(VAR_ScreenMode, ScreenMode, UIM_Player_Locked);
           KeyProcessed = SET;
           /* fall through */
 
         default:
-          Keyboard_LockTimeoutCallback();
+          Keypad_LockTimeoutCallback();
           break;
       }
       break;
@@ -497,7 +499,7 @@ void Keyboard_KeyPressedCallback(KEY_Typedef key)
       {
         case KEY_SEL:
           SetVariable(VAR_ScreenMode, ScreenMode, UIM_Player_HalfUnlocked);
-          Scheduler_PutTask(1000, &Keyboard_LockTimeoutCallback, NO_REPEAT);
+          Scheduler_PutTask(1000, &Keypad_LockTimeoutCallback, NO_REPEAT);
           break;
 
         default:
@@ -508,16 +510,18 @@ void Keyboard_KeyPressedCallback(KEY_Typedef key)
     case UIM_Player_HalfUnlocked:
       switch (key)
       {
-        case KEY_SHARP:
+        case KEY_ASTERICK:
           SetVariable(VAR_ScreenMode, ScreenMode, UIM_Player);
           KeyProcessed = SET;
+          Scheduler_PutTask(5000, &Screen_DisableBacklightCallback, NO_REPEAT);
+          Disp_SetBKL(ENABLE);
 
         case KEY_PPP:
         case KEY_UP:
         case KEY_DOWN:
         case KEY_SEL:
-        case KEY_ESC:
-          Keyboard_LockTimeoutCallback();
+        case KEY_C:
+          Keypad_LockTimeoutCallback();
           break;
 
         default:
@@ -560,8 +564,10 @@ void Keyboard_KeyPressedCallback(KEY_Typedef key)
   }
 }
 
-void Keyboard_KeyReleasedCallback(KEY_Typedef key)
+void Keypad_KeyReleasedCallback(KEY_Typedef key)
 {
+  trace("key %u released\r\n", key);
+
   if (UiState != UIS_INITIALIZED)
     return;
 
@@ -572,7 +578,7 @@ void Keyboard_KeyReleasedCallback(KEY_Typedef key)
   }
 
   Scheduler_PutTask(5000, &Screen_DisableBacklightCallback, NO_REPEAT);
-  Scheduler_RemoveTask(&Keyboard_HoldTimeoutCallback);
+  Scheduler_RemoveTask(&Keypad_HoldTimeoutCallback);
 
   switch (ScreenMode)
   {
@@ -618,9 +624,9 @@ void Keyboard_KeyReleasedCallback(KEY_Typedef key)
   }
 }
 
-void Keyboard_HoldTimeoutCallback(void)
+void Keypad_HoldTimeoutCallback(void)
 {
-  KEY_Typedef key = Keyboard_CurrentKey();
+  KEY_Typedef key = Keypad_CurrentKey();
 
   if (KeyProcessed == SET)
   {
@@ -644,14 +650,14 @@ void Keyboard_HoldTimeoutCallback(void)
         case KEY_PREV:
           //Player_AsyncCommand(PC_PAUSE, 0);
           SetVariable(VAR_ScreenMode, ScreenMode, UIM_Player_Seeking);
-          Scheduler_PutTask(100, &Keyboard_HoldTimeoutCallback, NO_REPEAT);
+          Scheduler_PutTask(100, &Keypad_HoldTimeoutCallback, NO_REPEAT);
           Player_AsyncCommand(PC_SEEK, ScreenSubMode);
           break;
 
         case KEY_UP:
         case KEY_DOWN:
           Player_AsyncCommand(PC_CHANGE_VOLUME, ScreenSubMode);
-          Scheduler_PutTask(100, &Keyboard_HoldTimeoutCallback, NO_REPEAT);
+          Scheduler_PutTask(100, &Keypad_HoldTimeoutCallback, NO_REPEAT);
           break;
 
         default:
@@ -669,9 +675,9 @@ void Screen_DisableBacklightCallback(void)
   Disp_SetBKL(DISABLE);
 }
 
-void Keyboard_LockTimeoutCallback(void)
+void Keypad_LockTimeoutCallback(void)
 {
-  Scheduler_RemoveTask(&Keyboard_LockTimeoutCallback);
+  Scheduler_RemoveTask(&Keypad_LockTimeoutCallback);
   switch (ScreenMode)
   {
     case UIM_Player_HalfLocked: //lock failed
@@ -685,4 +691,10 @@ void Keyboard_LockTimeoutCallback(void)
     default:
       break;
   }
+}
+
+void Vibrator_SendSignal(u16 ms)
+{
+  Vibrator_Enable();
+  Scheduler_PutTask(ms, Vibrator_Disable, NO_REPEAT);
 }

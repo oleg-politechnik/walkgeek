@@ -33,10 +33,6 @@
 #include "stm32f4_discovery_audio_codec.h"
 
 /* Exported defines ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-#define DISP_SPI                    SPI1
-#define DISP_SPI_IRQ                SPI1_IRQn
-#define DISP_GPIO_AF_SPI            GPIO_AF_SPI1
-#define DISP_RCC_APB2Periph_SPI     RCC_APB2Periph_SPI1
 #define PWR_EN_GPIO                 GPIOB
 #define PWR_EN_AHB1_CLK             RCC_AHB1Periph_GPIOB
 #define PWR_EN_PIN                  GPIO_Pin_2
@@ -51,38 +47,72 @@
 #define DISP_Pin_BKL                GPIO_Pin_3
 #define DISP_Pin_CS                 GPIO_Pin_4
 
+#define DISP_Pin_SCK                GPIO_Pin_5
+#define DISP_Pin_MOSI               GPIO_Pin_7
+#define DISP_PinSrc_SCK             GPIO_PinSource5
+#define DISP_PinSrc_MOSI            GPIO_PinSource7
+
+#define DISP_SPI                    SPI1
+#define DISP_SPI_IRQ                SPI1_IRQn
+#define DISP_GPIO_AF_SPI            GPIO_AF_SPI1
+#define DISP_RCC_APB2Periph_SPI     RCC_APB2Periph_SPI1
+
+#define Disp_IRQHandler             SPI1_IRQHandler
+
 /* keyboard ------------------------------------------------------------------*/
-#define KEYBOARD_DEBOUNCE_MS 20
+#define KEY_DEBOUNCE_MS             20
 
-#define KEYBOARD_ROW_COUNT 3
-#define KEYBOARD_COL_COUNT 3
+typedef struct {
+  GPIO_TypeDef* GPIOx;
+  uint8_t GPIO_PinSourcex;
+  uint16_t RCC_AHB1Periph_GPIOx;
+} KeyPin_Typedef;
 
-#define KEYBOARD_ROW_GPIO             GPIOE
-#define KEYBOARD_ROW_CLOCK            RCC_AHB1Periph_GPIOE
+#include "keypad.h"
 
-#define KEYBOARD_COL_GPIO             KEYBOARD_ROW_GPIO
-#define KEYBOARD_COL_CLOCK            KEYBOARD_ROW_CLOCK
+/* Keep this in sync with KEY_Typedef */
 
-#define KEYBOARD_COL0_PIN             GPIO_Pin_6
-#define KEYBOARD_COL1_PIN             GPIO_Pin_4
-#define KEYBOARD_COL2_PIN             GPIO_Pin_8
-#define KEYBOARD_COL_PINS             (KEYBOARD_COL0_PIN | KEYBOARD_COL1_PIN | KEYBOARD_COL2_PIN)
+#define KEY_PIN_TYPEDEFS \
+  { /* KEY_PPP      */ GPIOA, GPIO_PinSource0,  RCC_AHB1Periph_GPIOA}, \
+  { /* KEY_C        */ GPIOC, GPIO_PinSource15, RCC_AHB1Periph_GPIOC}, \
+  { /* KEY_SEL      */ GPIOD, GPIO_PinSource13, RCC_AHB1Periph_GPIOD}, \
+  { /* KEY_UP       */ GPIOE, GPIO_PinSource8,  RCC_AHB1Periph_GPIOE}, \
+  { /* KEY_DOWN     */ GPIOE, GPIO_PinSource14, RCC_AHB1Periph_GPIOE}, \
+  { /* KEY_1        */ GPIOD, GPIO_PinSource11, RCC_AHB1Periph_GPIOD}, \
+  { /* KEY_2        */ GPIOD, GPIO_PinSource10, RCC_AHB1Periph_GPIOD}, \
+  { /* KEY_3        */ GPIOE, GPIO_PinSource10, RCC_AHB1Periph_GPIOE}, \
+  { /* KEY_4        */ GPIOA, GPIO_PinSource15, RCC_AHB1Periph_GPIOA}, \
+  { /* KEY_5        */ GPIOE, GPIO_PinSource15, RCC_AHB1Periph_GPIOE}, \
+  { /* KEY_6        */ GPIOE, GPIO_PinSource11, RCC_AHB1Periph_GPIOE}, \
+  { /* KEY_7        */ GPIOE, GPIO_PinSource12, RCC_AHB1Periph_GPIOE}, \
+  { /* KEY_8        */ GPIOD, GPIO_PinSource15, RCC_AHB1Periph_GPIOD}, \
+  { /* KEY_9        */ GPIOE, GPIO_PinSource9,  RCC_AHB1Periph_GPIOE}, \
+  { /* KEY_ASTERICK */ GPIOE, GPIO_PinSource13, RCC_AHB1Periph_GPIOE}, \
+  { /* KEY_0        */ GPIOA, GPIO_PinSource8,  RCC_AHB1Periph_GPIOA}, \
+  { /* KEY_POUND    */ GPIOE, GPIO_PinSource7,  RCC_AHB1Periph_GPIOE}
 
-#define KEYBOARD_COL0_PINSRC          GPIO_PinSource6
-#define KEYBOARD_COL1_PINSRC          GPIO_PinSource4
-#define KEYBOARD_COL2_PINSRC          GPIO_PinSource8
+/* Vibrator ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
+#define VIBRATOR_RCC_AHB1Periph_GPIO  RCC_AHB1Periph_GPIOB
+#define VIBRATOR_PIN                  GPIO_Pin_4
+#define VIBRATOR_GPIO                 GPIOB
 
-#define KEYBOARD_ROW1_PIN             GPIO_Pin_10
-#define KEYBOARD_ROW2_PIN             GPIO_Pin_12
-#define KEYBOARD_ROW_PINS             (KEYBOARD_ROW1_PIN | KEYBOARD_ROW2_PIN)
+/* ADC ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
+#define ADC_BAT_GPIO                  GPIOB
+#define ADC_BAT_RCC_AHB1Periph_GPIO   RCC_AHB1Periph_GPIOB
+#define ADC_BAT_PIN                   GPIO_Pin_0
+#define ADC_BAT_CHANNEL               ADC_Channel_8
 
-#define BUTTON_PPP_GPIO               GPIOD
-#define BUTTON_PPP_CLOCK              RCC_AHB1Periph_GPIOD
-#define BUTTON_PPP_PIN                GPIO_Pin_7
+#define ADC_CHRG_GPIO                 GPIOB
+#define ADC_CHRG_RCC_AHB1Periph_GPIO  RCC_AHB1Periph_GPIOB
+#define ADC_CHRG_PIN                  GPIO_Pin_1
+#define ADC_CHRG_CHANNEL              ADC_Channel_9
 
-#define BUTTON_ESC_GPIO               GPIOC
-#define BUTTON_ESC_CLOCK              RCC_AHB1Periph_GPIOC
-#define BUTTON_ESC_PIN                GPIO_Pin_14
+#define ADC_BAT_CHRG_ADC                 ADC1
+#define ADC_BAT_CHRG_RCC_APB2Periph_ADC  RCC_APB2Periph_ADC1
+
+
+
+
 
 /* SD ------------------------------------------------------------------------*/
 #define SDIO_IRQ_PRIORITY       1
@@ -140,11 +170,11 @@
 /* Uncomment the defines below to select if the Master clock mode should be
   enabled or not */
 #define CODEC_MCLK_ENABLED
-/*#define CODEC_MCLK_DISABLED*/
+/* #deine CODEC_MCLK_DISABLED */
 
 /* Uncomment this line to enable verifying data sent to codec after each write
   operation */
-#define VERIFY_WRITTENDATA
+//#define VERIFY_WRITTENDATA
 
 #define PLLI2S_N   258
 #define PLLI2S_R   3
@@ -154,9 +184,9 @@
                     Hardware Configuration defines parameters
                                      -----------------------------------------*/
 /* Audio Reset Pin definition */
-#define AUDIO_RESET_GPIO_CLK           RCC_AHB1Periph_GPIOD
-#define AUDIO_RESET_PIN                GPIO_Pin_4
-#define AUDIO_RESET_GPIO               GPIOD
+#define AUDIO_RESET_GPIO_CLK           RCC_AHB1Periph_GPIOC
+#define AUDIO_RESET_PIN                GPIO_Pin_7
+#define AUDIO_RESET_GPIO               GPIOC
 
 /* I2S peripheral configuration defines */
 #define CODEC_I2S                      SPI2
@@ -203,7 +233,6 @@
 
  #define Audio_MAL_I2S_IRQHandler       DMA1_Stream4_IRQHandler
 
-
  /* DAC DMA Stream definitions */
  #define AUDIO_DAC_DMA_CLOCK            RCC_AHB1Periph_DMA1
  #define AUDIO_DAC_DMA_STREAM           DMA1_Stream0
@@ -220,15 +249,15 @@
 
 
 /* I2C peripheral configuration defines (control interface of the audio codec) */
-#define CODEC_I2C                      I2C1
-#define CODEC_I2C_CLK                  RCC_APB1Periph_I2C1
+#define CODEC_I2C                      I2C2
+#define CODEC_I2C_CLK                  RCC_APB1Periph_I2C2
 #define CODEC_I2C_GPIO_CLOCK           RCC_AHB1Periph_GPIOB
-#define CODEC_I2C_GPIO_AF              GPIO_AF_I2C1
+#define CODEC_I2C_GPIO_AF              GPIO_AF_I2C2
 #define CODEC_I2C_GPIO                 GPIOB
-#define CODEC_I2C_SCL_PIN              GPIO_Pin_6
-#define CODEC_I2C_SDA_PIN              GPIO_Pin_9
-#define CODEC_I2S_SCL_PINSRC           GPIO_PinSource6
-#define CODEC_I2S_SDA_PINSRC           GPIO_PinSource9
+#define CODEC_I2C_SCL_PIN              GPIO_Pin_10
+#define CODEC_I2C_SDA_PIN              GPIO_Pin_11
+#define CODEC_I2S_SCL_PINSRC           GPIO_PinSource10
+#define CODEC_I2S_SDA_PINSRC           GPIO_PinSource11
 
 /* Maximum Timeout values for flags and events waiting loops. These timeouts are
    not based on accurate values, they just guarantee that the application will
@@ -270,9 +299,9 @@
 /*----------------------------------------------------------------------------*/
 
 /* Exported constants --------------------------------------------------------*/
-//#define SD_DETECT_PIN                    GPIO_Pin_13                 /* PH.13 */
-//#define SD_DETECT_GPIO_PORT              GPIOH                       /* GPIOH */
-//#define SD_DETECT_GPIO_CLK               RCC_AHB1Periph_GPIOH
+#define SD_DETECT_PIN                    GPIO_Pin_1
+#define SD_DETECT_GPIO_PORT              GPIOD
+#define SD_DETECT_GPIO_CLK               RCC_AHB1Periph_GPIOD
 
 #define SDIO_FIFO_ADDRESS                ((uint32_t)0x40012C80)
 /**

@@ -55,6 +55,7 @@ typedef enum
   VAR_BatteryVoltage,
   VAR_MSC_RxSpeed,
   VAR_MSC_TxSpeed,
+  VAR_Audio_NeglectedDMA_Count,
   MAX_DISPLAY_VARIABLES
 } VAR_Index;
 

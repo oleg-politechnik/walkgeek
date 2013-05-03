@@ -27,7 +27,6 @@
 #include "usb_dcd_int.h"
 #include "stm324xg_eval_sdio_sd.h"
 #include "disp_1100.h"
-#include "keyboard.h"
 
 extern uint32_t USBD_OTG_ISR_Handler(USB_OTG_CORE_HANDLE *pdev);
 
@@ -61,11 +60,61 @@ void NMI_Handler(void)
  * @retval None
  */
 
+void HardFault_TopHandler(unsigned int * hardfault_args)
+{
+  // From Joseph Yiu, minor edits by FVH
+  // hard fault handler in C,
+  // with stack frame location as input parameter
+  // called from HardFault_Handler in file xxx.s
+
+  unsigned int stacked_r0;
+  unsigned int stacked_r1;
+  unsigned int stacked_r2;
+  unsigned int stacked_r3;
+  unsigned int stacked_r12;
+  unsigned int stacked_lr;
+  unsigned int stacked_pc;
+  unsigned int stacked_psr;
+
+  stacked_r0 = ((unsigned long) hardfault_args[0]);
+  stacked_r1 = ((unsigned long) hardfault_args[1]);
+  stacked_r2 = ((unsigned long) hardfault_args[2]);
+  stacked_r3 = ((unsigned long) hardfault_args[3]);
+
+  stacked_r12 = ((unsigned long) hardfault_args[4]);
+  stacked_lr = ((unsigned long) hardfault_args[5]);
+  stacked_pc = ((unsigned long) hardfault_args[6]);
+  stacked_psr = ((unsigned long) hardfault_args[7]);
+
+  /*printf ("\n\n[Hard fault handler - all numbers in hex]\n");
+  printf ("R0 = %x\n", stacked_r0);
+  printf ("R1 = %x\n", stacked_r1);
+  printf ("R2 = %x\n", stacked_r2);
+  printf ("R3 = %x\n", stacked_r3);
+  printf ("R12 = %x\n", stacked_r12);
+  printf ("LR [R14] = %x  subroutine call return address\n", stacked_lr);
+  printf ("PC [R15] = %x  program counter\n", stacked_pc);
+  printf ("PSR = %x\n", stacked_psr);
+  printf ("BFAR = %x\n", (*((volatile unsigned long *)(0xE000ED38))));
+  printf ("CFSR = %x\n", (*((volatile unsigned long *)(0xE000ED28))));
+  printf ("HFSR = %x\n", (*((volatile unsigned long *)(0xE000ED2C))));
+  printf ("DFSR = %x\n", (*((volatile unsigned long *)(0xE000ED30))));
+  printf ("AFSR = %x\n", (*((volatile unsigned long *)(0xE000ED3C))));
+  printf ("SCB_SHCSR = %x\n", SCB->SHCSR);*/
+
+  while (1);
+}
+
+void HardFault_Handler(void) __attribute__ ((naked));
 void HardFault_Handler(void)
 {
-  /* Go to infinite loop when Hard Fault exception occurs */
-  while(1)
-      ;
+  asm volatile (
+          "TST LR, #4 \n"
+          "ITE EQ \n"
+          "MRSEQ R0, MSP \n"
+          "MRSNE R0, PSP \n"
+          "B HardFault_TopHandler"
+  );
 }
 
 /**
@@ -209,24 +258,24 @@ void SD_SDIO_DMA_IRQHANDLER(void)
  */
 void OTG_FS_WKUP_IRQHandler(void)
 {
-  if (USB_OTG_Core.cfg.low_power)
-  {
-    /* Reset SLEEPDEEP and SLEEPONEXIT bits */
-
-    SCB->SCR
-            &= (u32) ~((u32) (SCB_SCR_SLEEPDEEP_Msk | SCB_SCR_SLEEPONEXIT_Msk));
-
-    SystemInit();/* After wake-up from sleep mode, reconfigure the system clock */
-
-    USB_OTG_UngateClock(&USB_OTG_Core);
-//    STM_EVAL_LEDInit(LED3);
-//    STM_EVAL_LEDOn(LED3);
-  }
-  else
-  {
-//    STM_EVAL_LEDInit(LED4);
-//    STM_EVAL_LEDOn(LED4);
-  }
+//  if (USB_OTG_Core.cfg.low_power)
+//  {
+//    /* Reset SLEEPDEEP and SLEEPONEXIT bits */
+//
+//    SCB->SCR
+//            &= (u32) ~((u32) (SCB_SCR_SLEEPDEEP_Msk | SCB_SCR_SLEEPONEXIT_Msk));
+//
+//    SystemInit();/* After wake-up from sleep mode, reconfigure the system clock */
+//
+//    USB_OTG_UngateClock(&USB_OTG_Core);
+////    STM_EVAL_LEDInit(LED3);
+////    STM_EVAL_LEDOn(LED3);
+//  }
+//  else
+//  {
+////    STM_EVAL_LEDInit(LED4);
+////    STM_EVAL_LEDOn(LED4);
+//  }
   EXTI_ClearITPendingBit(EXTI_Line18);
 }
 

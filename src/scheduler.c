@@ -72,7 +72,7 @@ void Scheduler_Reset(void)
 
     task_count = 0;
   }
-  CPU_EnableInterrupts();
+  CPU_RestoreInterrupts();
 }
 
 FuncResult Scheduler_PutTask(u32 timeout_ms, void(*callback)(void),
@@ -135,7 +135,7 @@ FuncResult Scheduler_PutTask(u32 timeout_ms, void(*callback)(void),
     }
     //}
   } while (0);
-  CPU_EnableInterrupts();
+  CPU_RestoreInterrupts();
 
   return ret;
 }
@@ -159,7 +159,7 @@ void Scheduler_RemoveTask(void(*callback)(void))
       }
     }
   }
-  CPU_EnableInterrupts();
+  CPU_RestoreInterrupts();
 }
 
 void RAM_FUNC Scheduler_1msCycle(void)
@@ -198,7 +198,7 @@ void RAM_FUNC Scheduler_1msCycle(void)
         }
       }
     }
-    CPU_EnableInterrupts();
+    CPU_RestoreInterrupts();
 
     if (callback)
     {

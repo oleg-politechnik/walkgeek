@@ -37,8 +37,6 @@
 #define DISP_Y_COUNT                65
 #define DISP_Y_PER_ROW              8
 
-#define DISP_CMD_STACK_SIZE         200
-
 /* Exported types ------------------------------------------------------------*/
 /* Exported macro ------------------------------------------------------------*/
 #define DISP_ROW_COUNT              ((DISP_Y_COUNT+DISP_Y_PER_ROW)/DISP_Y_PER_ROW)
@@ -53,15 +51,15 @@ void Disp_PreInit();
 void Disp_Init();
 void Disp_GPIO_Init();
 
+void Disp_MainThread(void);
+
 void Disp_IRQHandler();
 void Disp_Sync();
 
-bool Disp_IsBusy();
-
 void Disp_SetBKL(FunctionalState enabled);
 void Disp_SetCS(FunctionalState enabled);
+bool Disp_GetCS(void);
 void Disp_SetRST(FunctionalState enabled);
-void Disp_SetContrast(uint8_t contrast);
 
 void Disp_Clear();
 void Disp_SetData(u8 x, u8 row, u8 byte);
