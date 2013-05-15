@@ -1,7 +1,7 @@
 /*
  * player.h
  *
- * Copyright (c) 2012, Oleg Tsaregorodtsev
+ * Copyright (c) 2013, Oleg Tsaregorodtsev
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,60 +25,72 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef __PLAYER_H
-#define __PLAYER_H
+#ifndef PLAYER_H_
+#define PLAYER_H_
 
-/* Includes ------------------------------------------------------------------*/
-#include "ff.h"
-#include "software_conf.h"
-#include "audio_if.h"
-#include "mediafile.h"
+/* Includes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 #include "metadata.h"
 
-/* Exported constants --------------------------------------------------------*/
-/* Exported types ------------------------------------------------------------*/
+/* Exported defines ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+/* Exported macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+/* Exported types ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 typedef enum
 {
-  PS_INACTIVE,  /* fs not mounted */
-  PS_ERROR,
-  PS_STOPPED,   /* fs mounted, no file loaded */
-  PS_FILE_ERROR,/* non-fatal error related to the current file being played */
+  PS_STOPPED,
+
+  PS_ERROR_FILE,
+
   PS_PLAYING,
-  PS_PAUSED,
-  PS_SEEKING    /* fast forward or rewind */
-} PlayerState_Typedef;
+  PS_SEEKING,
+
+  PS_EOF,
+
+  PS_MAX
+} PlayerStatus_Typedef;
 
 typedef enum
 {
-  PC_EMPTY,
+  PC_DUMMY,
 
-  PC_PLAY,
-  PC_PAUSE,
   PC_NEXT,
   PC_PREV,
-  PC_SEEK, /* arg = secs +- */
 
-  PC_CHANGE_VOLUME,
-/* arg = steps +- */
+  PC_NEXT_DIR,
+  PC_PREV_DIR,
+
+  PC_SEEK
 } PlayerCommand_Typedef;
 
-/* Exported macro ------------------------------------------------------------*/
-/* Exported functions ------------------------------------------------------- */
+typedef struct
+{
+  void (*LoadFile)(char *filepath);
+  void (*MainThread)(void);
+  void (*Seek)(u32 msec);
+  void (*Stop)(void);
+} Decoder_Typedef;
+
+typedef struct
+{
+  Metadata_TypeDef metadata;
+} PlayerState_Typedef;
+
+/* Exported functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void Player_Init(void);
 void Player_DeInit(void);
 
-/* Playback is async, managed through Player_MainCycle */
+void Player_Play(void);
+void Player_Stop(void);
+
+void Player_MainThread(void);
 void Player_AsyncCommand(PlayerCommand_Typedef cmd, s32 arg);
-void Player_MainCycle(void);
 
-MediaFile_Typedef *Player_CurrentFile(void);
+PlayerState_Typedef *Player_GetState(void);
+PlayerStatus_Typedef Player_GetStatus(void);
 
-PlayerState_Typedef Player_GetState(void);
+void Player_AudioFileError(char *error);
+char *Player_GetErrorString(void);
 
-/* Exported variables ------------------------------------------------------- */
+/* Exported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+/* Exported static inline functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
-#endif /* __PLAYER_H */
-
-
-
+#endif /* PLAYER_H_ */

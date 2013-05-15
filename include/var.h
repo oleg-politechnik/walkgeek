@@ -36,26 +36,18 @@ typedef enum
 {
   VAR_SystemState,
   VAR_ScreenMode,
+
   VAR_ApplicationState,
-  VAR_media_status,
-  VAR_media_file_name,
-  VAR_media_album,
-  VAR_media_artist,
-  VAR_media_bitrate,
-  VAR_media_channel_count,
-  VAR_media_genre,
-  VAR_media_time_curr,
-  VAR_media_mstime_max,
-  VAR_media_sample_rate,
-  VAR_media_title,
-  VAR_media_volume,
-  VAR_media_year,
-  VAR_plist_curr,
-  VAR_plist_cnt,
-  VAR_BatteryVoltage,
-  VAR_MSC_RxSpeed,
-  VAR_MSC_TxSpeed,
+
+  VAR_AudioStatus,
+  VAR_PlayerState,
+  VAR_AudioVolume,
+  VAR_AudioPosition,
   VAR_Audio_NeglectedDMA_Count,
+
+  VAR_BatteryState,
+
+  VAR_MSC_Speed,
   MAX_DISPLAY_VARIABLES
 } VAR_Index;
 

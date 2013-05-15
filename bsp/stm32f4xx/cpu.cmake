@@ -1,8 +1,10 @@
-SET(CPU_CMAKE ${CMAKE_CURRENT_LIST_FILE})
+add_definitions(-DSTM32F4XX)
+add_definitions(-DARM)
+add_definitions(-DEMBEDDED_ARM)
+add_definitions(-DARM5E_ASM)
+add_definitions(-DARM7M_ASM)
 
-ADD_DEFINE(STM32F4XX)
-ADD_DEFINE(ARM)
-
-SET(CMAKE_C_FLAGS "-isystem ${TOOLCHAIN_INC_DIR} -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mcpu=cortex-m4 -fno-builtin -Wall -Wextra -std=gnu99 ${CMAKE_C_FLAGS}") # CACHE INTERNAL "c compiler flags"
-SET(CMAKE_CXX_FLAGS "-isystem ${TOOLCHAIN_INC_DIR} -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mcpu=cortex-m4 -fno-builtin -Wall  -fdata-sections -ffunction-sections ${CMAKE_C_FLAGS}") # CACHE INTERNAL "cxx compiler flags"
-SET(CMAKE_ASM_FLAGS "-mthumb -mcpu=cortex-m4" CACHE INTERNAL "asm compiler flags")
+SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mcpu=cortex-m4")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mcpu=cortex-m4")
+SET(CMAKE_ASM_FLAGS "-mthumb -mcpu=cortex-m4")
+#${CMAKE_ASM_FLAGS} 

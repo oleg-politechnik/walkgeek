@@ -31,7 +31,7 @@
 #include "player.h"
 #include "ui.h"
 #include "powermanager.h"
-#include "disp_1100.h"
+#include "audio_if.h"
 
 /* Imported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private define ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -41,12 +41,14 @@
 SystemState_Typedef SystemState;
 static SystemState_Typedef SystemStateNew;
 
-__IO u32 msDelay;
+u32 msDelay;
+
+u32 SysMsCounter;
 
 u32 MSC_RxSpeed, MSC_TxSpeed;
 u32 displayVariableFlags[MAX_DISPLAY_VARIABLES];
 
-static bool debug_mode = false;
+bool debug_mode = false;
 static bool can_sleep = false;
 
 static char *stateNames[] =
@@ -69,72 +71,110 @@ void System_ForbidDebugging(void)
   }
 }
 
-void System_PowerEnable(void)
-{
-  BSP_PowerEnable();
-}
-
-static void System_StartPlayer(void)
+static void System_Check_PPP_Button(void)
 {
   if (SystemState != SS_START)
     return;
 
-  System_PowerEnable();
+  if (!BSP_Keypad_GetKeyStatus(KEY_PPP))
+  {
+    BSP_PowerDisable();
+  }
+}
+
+void System_PowerEnable(void)
+{
+  BSP_PowerEnable();
+
+  Scheduler_RemoveTask(System_Check_PPP_Button);
+
+  UI_Init();
+
+//  Vibrator_SendSignal(30);
+}
+
+static void System_StartPlayer(void)
+{
+//  if (SystemState != SS_START)
+//    return;
+
   System_SetState(SS_PLAYER);
 }
 
 void System_VbusApplied(void)
 {
-  if (SystemState == SS_PLAYER || DISABLE_MSC)
+  System_StartPlayer();
+
+  if (SystemState != SS_USB_MSC)
   {
+#if ENABLE_TRACE
     USB_CDC_Init();
-  }
-  else
-  {
-    USB_MSC_Init();
+#endif
+    return;
   }
 }
 
 void System_VbusDetached(void)
 {
-  /*USB_OTG_BSP_DeInit();*/
-
-  //TODO de-init USB and stop it
+  //XXX de-init USB properly?
+  //the need of vbus sensing (st stack may be de-initializing smth)
+  USB_DeInit();
 }
 
 void System_Init(void)
 {
-  CPU_InitMM();
   CPU_EnableFPU();
 
   Scheduler_Reset();
-  BSP_InitPowerSourcesSense();
-
-  Keypad_Init();
 
   CPU_EnableSysTick(HZ);
 
   SystemState = SS_START;
 
-  /*BSP_PowerDisable();*/
+  BSP_Keypad_Init();
+
   PowerManager_Init();
-  Scheduler_PutTask(2000, System_StartPlayer, NO_REPEAT);
+  PowerManager_MainThread();
+
+  if (PowerManager_GetState() == PM_ONLINE)
+  {
+    System_StartPlayer();
+  }
+  else
+  {
+    Scheduler_PutTask(10, System_Check_PPP_Button, REPEAT);
+    Scheduler_PutTask(1000, System_StartPlayer, NO_REPEAT);
+  }
+
   Scheduler_PutTask(10000, System_ForbidDebugging, NO_REPEAT);
+
+#if PROFILING
+  System_StartPlayer();
+  USB_CDC_Init();
+#endif
 }
 
 void RAM_FUNC System_SysTickHandler(void)
 {
+#if !PROFILING
   Keypad_1msScan();
   Scheduler_1msCycle();
 
   if (msDelay)
     msDelay--;
+#endif
+
+  SysMsCounter++;
 }
 
 /* TODO add check of calling from an isr */
 void RAM_FUNC System_SetState(SystemState_Typedef NewState)
 {
   SystemStateNew = NewState;
+  if (NewState == SS_SHUTDOWN)
+  {
+    //Scheduler_PutTask(1000, BSP_PowerDisable, NO_REPEAT);
+  }
 }
 
 /*
@@ -142,42 +182,43 @@ void RAM_FUNC System_SetState(SystemState_Typedef NewState)
  */
 static void SetState(SystemState_Typedef NewState)
 {
-  trace("system: leaving state %s\r\n", stateNames[SystemState]);
+  trace("system: leaving state %s\n", stateNames[SystemState]);
+
+  if (NewState == SS_SHUTDOWN)
+  {
+    Vibrator_SendSignal(30);
+  }
 
   switch (SystemState)
   {
     case SS_PLAYER:
       Player_DeInit();
-      Audio_Command(AC_STOP);
       break;
 
     case SS_USB_MSC:
-      //      USBD_Shutdown();
+      USB_DeInit();
       break;
 
     default:
       break;
   }
 
-  trace("system: entering state %s\r\n", stateNames[NewState]);
+  trace("system: entering state %s\n", stateNames[NewState]);
 
   switch (NewState)
   {
     case SS_SHUTDOWN:
       CPU_DisableInterrupts();
       BSP_PowerDisable();
-      CPU_EnterLowPowerState();
       break;
 
     case SS_PLAYER:
-      //BSP_PowerEnable();
-      UI_Init();
+      System_PowerEnable();
       Player_Init();
-      //Vibrator_SendSignal(30);
       break;
 
-    case SS_USB_MSC: //fixme: when to  init & the need of vbus sensing (st stack may be de-initializing smth)
-      UI_Init();
+    case SS_USB_MSC:
+      USB_MSC_Init();
       break;
 
     default:
@@ -197,13 +238,15 @@ void System_MainThread(void)
   }
 
   /* Main work */
+#if! PROFILING
   UI_MainCycle();
+#endif
   PowerManager_MainThread();
 
   switch (SystemState)
   {
     case SS_PLAYER:
-      Player_MainCycle();
+      Player_MainThread();
       break;
 
     case SS_USB_MSC:
@@ -217,31 +260,3 @@ void System_MainThread(void)
     CPU_WaitForInterrupt();
   }
 }
-
-#ifdef  USE_FULL_ASSERT
-void assert_failed(uint8_t* file, uint32_t line, uint8_t* expr)
-{
-  /* User can add his own implementation to report the file name and line number,
-   ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
-
-  char *buf[1024];
-  int row = 0;
-
-  //TODO: add application state
-
-  Disp_Clear();
-
-  Disp_String(0, row++, "ASSERT FAILED", true);
-  Disp_String(0, row, expr, true);
-  row += 2;
-
-  sprintf(buf, "line %i in %s", (int) line, strrchr(file, '/') ? strrchr(file, '/') + 1 : file);
-  /*todo: test on windows*/
-  Disp_String(0, row, buf, true);
-
-  /* Infinite loop */
-  while (1)
-  {
-  }
-}
-#endif

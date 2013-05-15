@@ -257,7 +257,7 @@
 /**
  * @brief  SDIO Static flags, TimeOut, FIFO Address
  */
-#define NULL 0
+//#define NULL 0
 #define SDIO_STATIC_FLAGS               ((uint32_t)0x000005FF)
 #define SDIO_CMD0TIMEOUT                ((uint32_t)0x00010000)
 
@@ -544,7 +544,7 @@ SD_Error SD_Init(void)
     if (errorstatus == SD_OK) {
       char str_buf[64];
       SD_CapacityToString(str_buf, sizeof(str_buf), SDCardInfo.CardCapacity);
-      trace("sdio: found %s card\r\n", str_buf);
+      trace("sdio: found %s card\n", str_buf);
 
         /*----------------- Select Card --------------------------------*/
         errorstatus = SD_SelectDeselect((uint32_t)(SDCardInfo.RCA << 16));
@@ -552,7 +552,7 @@ SD_Error SD_Init(void)
 
     if (errorstatus == SD_OK) {
         errorstatus = SD_EnableWideBusOperation(SDIO_BusWide_4b);
-        trace("sdio: enabled 4bit wide bus\r\n");
+        trace("sdio: enabled 4bit wide bus\n");
     }
 
     return (errorstatus);

@@ -31,15 +31,15 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "player.h"
+#include "mediafile.h"
 
 /* Exported constants --------------------------------------------------------*/
 /* Exported types ------------------------------------------------------------*/
 /* Exported macro ------------------------------------------------------------*/
 /* Exported functions ------------------------------------------------------- */
-void MP3_Init();
-FuncResult MP3_FastFileCheck(const char *fname);
-FuncResult MP3_TryFile(MediaFile_Typedef *mfile);
-FuncResult MP3_Decode(MediaFile_Typedef *mfile, AudioBuffer_Typedef *audio_buf);
-FuncResult MP3_Seek(MediaFile_Typedef *mfile, s32 msec);
+void MP3_LoadFile(char *filepath);
+void MP3_MainThread(void);
+void MP3_Seek(u32 msec);
+void MP3_Stop(void);
 
 #endif /* MP3_DECODER_H_ */

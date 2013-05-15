@@ -32,16 +32,16 @@
 /* Entry Point */
 ENTRY(Reset_Handler)
 
-/* Generate a link error if heap and stack don't fit into RAM */
-_Min_Stack_Size = 0x900; /* required amount of stack */
-
 /* Specify the memory areas */
 MEMORY
 {
   FLASH (rx)      : ORIGIN = 0x08000000, LENGTH = 1024K
-  RAM (xrw)       : ORIGIN = 0x20000000, LENGTH = 128K
+  RAM (xrw)       : ORIGIN = 0x20000000, LENGTH = 0xF000
+  CCM (xrw)       : ORIGIN = 0x10000000, LENGTH = 64K
   MEMORY_B1 (rx)  : ORIGIN = 0x60000000, LENGTH = 0K
 }
+
+_ssram1 = ORIGIN(RAM) + 128K;
 
 /* Define output sections */
 SECTIONS
@@ -113,6 +113,8 @@ SECTIONS
     _sdata = .;        /* create a global symbol at data start */
     *(.data)           /* .data sections */
     *(.data*)          /* .data* sections */
+    *(.fastcode)
+    *(.fastcode*)
 
     . = ALIGN(4);
     _edata = .;        /* define a global symbol at data end */
@@ -132,21 +134,16 @@ SECTIONS
     . = ALIGN(4);
     _ebss = .;         /* define a global symbol at bss end */
     __bss_end__ = _ebss;
-  } >RAM
-
-  /* User_heap_stack section */
-  ._user_stack :
-  {
-    . = ALIGN(4);
-    PROVIDE ( end = . );
-    PROVIDE ( _end = . );
-    . = . + _Min_Stack_Size;
-    . = ALIGN(4);
-
-    _estack = .;
+    
+    _sheap_newlib = .;
   } >RAM
   
-  _ssram1 = ORIGIN(RAM) + LENGTH(RAM);
+  _eheap_newlib = ORIGIN(RAM) + LENGTH(RAM);
+  
+  _sheap_user = _eheap_newlib;
+
+  _sstack = ORIGIN(CCM);
+  _estack = ORIGIN(CCM) + LENGTH(CCM);
 
   /* MEMORY_bank1 section, code must be located here explicitly            */
   /* Example: extern int foo(void) __attribute__ ((section (".mb1text"))); */

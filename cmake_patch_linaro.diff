@@ -1,5 +1,5 @@
---- CMakeTestCXXCompiler.cmake	2013-05-05 16:07:18.369718547 +0600
-+++ CMakeTestCXXCompiler (copy).cmake	2013-05-05 16:03:26.000000000 +0600
+--- CMakeTestCXXCompiler.cmake.new	2013-05-05 16:07:18.369718547 +0600
++++ CMakeTestCXXCompiler.cmake	2013-05-05 16:03:26.000000000 +0600
 @@ -25,6 +25,11 @@
      "#ifndef __cplusplus\n"
      "# error \"The CMAKE_CXX_COMPILER is set to a C compiler\"\n"
@@ -12,8 +12,8 @@
      "int main(){return 0;}\n")
    TRY_COMPILE(CMAKE_CXX_COMPILER_WORKS ${CMAKE_BINARY_DIR} 
      ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/testCXXCompiler.cxx
---- CMakeTestCCompiler.cmake	2013-05-05 16:07:15.149702656 +0600
-+++ CMakeTestCCompiler (copy).cmake	2013-05-05 16:03:10.000000000 +0600
+--- CMakeTestCCompiler.cmake.new	2013-05-05 16:07:15.149702656 +0600
++++ CMakeTestCCompiler.cmake	2013-05-05 16:03:10.000000000 +0600
 @@ -25,6 +25,11 @@
      "#ifdef __cplusplus\n"
      "# error \"The CMAKE_C_COMPILER is set to a C++ compiler\"\n"

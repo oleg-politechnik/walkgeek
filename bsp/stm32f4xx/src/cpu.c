@@ -27,6 +27,8 @@
 
 /* Includes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 #include "cpu.h"
+#include "system.h"
+#include "profile.h"
 
 /* Imported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private define ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -34,6 +36,13 @@
 /* Private macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 static volatile u32 nesting = 0;
+
+static u32 profile_entry_points[PF_MAX];
+static u32 profile_results[PF_MAX];
+static char* profile_func_names[PF_MAX];
+
+extern unsigned int _sstack;
+extern unsigned int _estack;
 
 /* Private function prototypes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -83,24 +92,25 @@ void CPU_EnterLowPowerState(void)
   GPIO_Init(GPIOD, &GPIO_InitStructure);
   GPIO_Init(GPIOE, &GPIO_InitStructure);
   GPIO_Init(GPIOA, &GPIO_InitStructure);
-  GPIO_Init(GPIOB, &GPIO_InitStructure);
 
   /* Disable GPIOs clock */
   RCC_AHB1PeriphClockCmd(
-          RCC_AHB1Periph_GPIOA | RCC_AHB1Periph_GPIOB | RCC_AHB1Periph_GPIOC
+          RCC_AHB1Periph_GPIOA | RCC_AHB1Periph_GPIOC
                   | RCC_AHB1Periph_GPIOD | RCC_AHB1Periph_GPIOE, DISABLE);
 
-  RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR, ENABLE);
+//  RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR, ENABLE);
 
   /* Enable WakeUp pin */
   //  PWR_WakeUpPinCmd(ENABLE);
 
   /* Enable Clock Security System(CSS) */
-  RCC_ClockSecuritySystemCmd(ENABLE);
+//  RCC_ClockSecuritySystemCmd(ENABLE);
 
-  PWR_FlashPowerDownCmd(ENABLE);
+//  PWR_FlashPowerDownCmd(ENABLE);
 
-  PWR_EnterSTANDBYMode();
+//  PWR_EnterSTANDBYMode();
+  while(1)
+    ;
 }
 
 void CPU_DisableInterrupts(void)
@@ -117,3 +127,105 @@ void CPU_RestoreInterrupts(void)
     __enable_irq();
   }
 }
+
+extern unsigned int _sheap_user;
+void *CPU_GetUserHeapStart(void)
+{
+  return &_sheap_user;
+}
+
+size_t CPU_GetUserHeapSize(void)
+{
+  extern unsigned int _ssram1;
+
+  int has_256K_sram = (*(volatile uint16_t *) 0x1FFF7A22 == 2048);
+  char *_eheap_user = (char *) &_ssram1 + (has_256K_sram ? 64 : 0) * 1024;
+
+  return (size_t) (_eheap_user - (char *) &_sheap_user);
+}
+
+size_t CPU_GetStackSize(void)
+{
+  return (size_t) (&_estack - &_sstack);
+}
+
+void *CPU_AllocFromStackBottom(size_t size)
+{
+  if (size < CPU_GetStackSize())
+    return &_sstack;
+
+  return NULL;
+}
+
+void CPU_FreeStackBottom(void)
+{
+  //todo: refill with 0xa5 pattern
+}
+
+#if PROFILING
+static u32 uS_Profiler_GetValue(void)
+{
+  u32 ret;
+
+  CPU_DisableInterrupts();
+
+  ret = SysMsCounter*1000 + (SysTick->VAL) / (SysTick->LOAD + 1);
+
+  CPU_RestoreInterrupts();
+
+  return ret;
+}
+
+static u32 uS_Profiler_GetDiff(u32 value)
+{
+  u32 cur;
+
+  cur = uS_Profiler_GetValue();
+
+  assert_param(cur >= value);
+
+  return cur - value;
+}
+
+void Profiler_DoEnterFunc(char *func_name, ProfileFunction_Typedef func)
+{
+  assert_param(func < PF_MAX);
+
+  profile_func_names[func] = func_name;
+
+  profile_entry_points[func] = uS_Profiler_GetValue();
+}
+
+unsigned int Profiler_GetResult(ProfileFunction_Typedef func)
+{
+  assert_param(func < PF_MAX);
+
+  return profile_results[func];
+}
+
+void Profiler_ExitFunc(ProfileFunction_Typedef func)
+{
+  assert_param(func < PF_MAX);
+
+  profile_results[func] += uS_Profiler_GetDiff(profile_entry_points[func]);
+}
+
+void Profiler_Print(void)
+{
+  int i;
+
+  if (!profile_results[PF_TOTAL])
+  {
+    printf("Ooops... no profile results\n");
+    return;
+  }
+
+  printf("\nCPU profile results:\n");
+
+  for (i = 0; i < PF_MAX; i++)
+  {
+    printf("%s:\t%3u.%02u%%\n", profile_func_names[i],
+            FLOAT_TO_1_2((double) profile_results[i] / ((double) profile_results[PF_TOTAL] / 100)));
+  }
+}
+#endif

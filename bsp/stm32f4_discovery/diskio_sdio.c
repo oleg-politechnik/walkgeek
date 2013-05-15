@@ -134,7 +134,7 @@ static __IO SD_Error SDStatus;
 //  {
 //    SDStatus = SD_ReadMultiBlocks(buff, sector * 512, SD_BLOCK_SIZE, count);
 //    SDStatus = SD_WaitReadOperation();
-//    while (SD_GetStatus() != SD_TRANSFER_OK)
+//    while (SD_GetStatus() != SD_TRANSFER_OK) /*fixme CPU idle*/
 //      ;
 //  }
 //
@@ -164,14 +164,13 @@ BYTE count /* Number of sectors to write (1..255) */
   if (disk_status(drv) & STA_NOINIT)
     return RES_NOTRDY;
 
-  memcpy(buff2, buff, SECTOR_SIZE * count);
 //  if (STORAGE_Write(drv, (u8*) buff, sector << 9, count) != 0)
 //    return RES_ERROR;
-  //    memcpy(buff2, buff, SECTOR_SIZE);
+  memcpy(buff2, buff, SECTOR_SIZE);
 
   SD_WriteMultiBlocks((u8*) buff2, sector << 9, SECTOR_SIZE, count);
   SD_WaitWriteOperation();
-  while (SD_GetStatus() != SD_TRANSFER_OK)
+  while (SD_GetStatus() != SD_TRANSFER_OK) /*fixme CPU idle*/
     ;
 
   return RES_OK;
@@ -244,34 +243,36 @@ BYTE count /* Number of sectors to read (1..255) */
   if (disk_status(drv) & STA_NOINIT)
     return RES_NOTRDY;
 
-  //    memset(buff2, 0, sizeof(buff2));
   if (count == 1)
   {
     SD_ReadBlock((u8*) buff2, sector << 9, SECTOR_SIZE);
+
     SD_WaitReadOperation();
-    while ((state = SD_GetStatus()) == SD_TRANSFER_BUSY)
+    while ((state = SD_GetStatus()) == SD_TRANSFER_BUSY) /*fixme CPU idle*/
       ;
+
+    memcpy(buff, buff2, SECTOR_SIZE);
 
     if (state == SD_TRANSFER_ERROR)
     {
       return RES_ERROR;
     }
-
-    memcpy(buff, buff2, SECTOR_SIZE);
   }
   else
   {
+    assert_param(SECTOR_SIZE*count<=sizeof(buff2));
+
     SD_ReadMultiBlocks((u8*) buff2, sector << 9, SECTOR_SIZE, count);
     SD_WaitReadOperation();
-    while ((state = SD_GetStatus()) == SD_TRANSFER_BUSY)
+    while ((state = SD_GetStatus()) == SD_TRANSFER_BUSY) /*fixme CPU idle*/
       ;
+
+    memcpy(buff, buff2, SECTOR_SIZE*count);
 
     if (state == SD_TRANSFER_ERROR)
     {
       return RES_ERROR;
     }
-
-    memcpy(buff, buff2, SECTOR_SIZE * count);
   }
   return RES_OK;
 }

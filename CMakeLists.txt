@@ -1,22 +1,57 @@
-INCLUDE(gnu_toolchain.cmake)
-
-PROJECT(walkgeek C)
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8.4)
-ENABLE_LANGUAGE(ASM)
 
-ADD_DEFINE(USE_FULL_ASSERT)
+if(NOT PLATFORM STREQUAL "SIMULATOR")
+  include(gnu_toolchain.cmake)
+endif()
 
-INCLUDE_DIRECTORIES(${CMAKE_CURRENT_LIST_DIR}/lib)
-INCLUDE_DIRECTORIES(${CMAKE_CURRENT_LIST_DIR}/include)
-INCLUDE_DIRECTORIES(${CMAKE_CURRENT_LIST_DIR}/include/nuttx)
+PROJECT(walkgeek C ASM)
 
-INCLUDE_SUBDIR(bsp)
-INCLUDE_SUBDIR(src)
-INCLUDE_SUBDIR(lib)
+include(flags.cmake)
 
-SET (SOURCES ${SOURCES}
+include_directories(
+  include
+  lib/fat_fs
+  lib/mp3-fixpt-helix/pub
+  lib/minIni
+  lib/opus/include
+)
+
+add_definitions(-DUSE_FULL_ASSERT)
+
+include(bsp/bsp.cmake)
+
+IF(USE_MP3)
+  add_definitions(-DUSE_MP3)
+endif()
+
+add_subdirectory(lib)
+
+set (SOURCES
+    src/audio_buffer.c
+#    src/player/wav_decoder.c
+    src/player/opus_decoder.c
+    src/player/player.c
+    src/navigator.c
+    src/nestedfilter.c
+    src/powermanager.c
+    src/scheduler.c
+    src/system.c
+    src/ui.c
+    src/usbd.c
+    
     main.c
 )
 
-ADD_EXECUTABLE(${CMAKE_PROJECT_NAME}.elf ${HEADERS} ${SOURCES})
-TARGET_FINALLY(${CMAKE_PROJECT_NAME}.elf)
+IF(USE_MP3)
+  set (SOURCES ${SOURCES}
+      src/player/mp3_decoder.c
+  )
+endif()
+
+add_executable(${CMAKE_PROJECT_NAME}.elf ${SOURCES} ${CSP_SOURCES} ${BSP_SOURCES})
+
+target_link_libraries(${CMAKE_PROJECT_NAME}.elf lib ${LIBRARIES})
+
+add_custom_target(${CMAKE_PROJECT_NAME}.hex DEPENDS ${CMAKE_PROJECT_NAME}.elf COMMAND ${CMAKE_OBJCOPY} -Oihex ${CMAKE_PROJECT_NAME}.elf ${CMAKE_PROJECT_NAME}.hex)
+add_custom_target(${CMAKE_PROJECT_NAME}.bin DEPENDS ${CMAKE_PROJECT_NAME}.elf COMMAND ${CMAKE_OBJCOPY} -Obinary ${CMAKE_PROJECT_NAME}.elf ${CMAKE_PROJECT_NAME}.bin)
+add_custom_target(${CMAKE_PROJECT_NAME}.dis DEPENDS ${CMAKE_PROJECT_NAME}.elf COMMAND ${CMAKE_OBJDUMP} -dDsS ${CMAKE_PROJECT_NAME}.elf > ${CMAKE_PROJECT_NAME}.dis)

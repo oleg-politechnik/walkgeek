@@ -59,13 +59,17 @@ typedef enum
   KEY_0,
   KEY_POUND,
 
+  KEY_MAX_GPIO,
+
+  KEY_BTN = KEY_MAX_GPIO,
+
   KEY_MAX,
   _KEY_DUMMY = KEY_MAX
 } KEY_Typedef;
 
 /* Exported functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void Keypad_Init(void);
-void Keypad_1msScan(void);
+void Keypad_1msScan(void) RAM_FUNC;
 
 bool Keypad_GetKeyState(KEY_Typedef key);
 void Keypad_KeyPressedCallback(KEY_Typedef key);

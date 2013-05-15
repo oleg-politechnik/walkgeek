@@ -31,6 +31,7 @@
 
 /* Includes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 #include "stm32f4_discovery_audio_codec.h"
+#include "usbd_storage_msd.h"
 
 /* Exported defines ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 #define PWR_EN_GPIO                 GPIOB
@@ -107,16 +108,20 @@ typedef struct {
 #define ADC_CHRG_PIN                  GPIO_Pin_1
 #define ADC_CHRG_CHANNEL              ADC_Channel_9
 
-#define ADC_BAT_CHRG_ADC                 ADC1
-#define ADC_BAT_CHRG_RCC_APB2Periph_ADC  RCC_APB2Periph_ADC1
+#define ADC_BTN_GPIO                  GPIOC
+#define ADC_BTN_RCC_AHB1Periph_GPIO   RCC_AHB1Periph_GPIOC
+#define ADC_BTN_PIN                   GPIO_Pin_0
+#define ADC_BTN_CHANNEL               ADC_Channel_10
 
+#define BTN_PRESSED_LOW_THRESHOLD_MV  10
+#define BTN_PRESSED_HIGH_THRESHOLD_MV 400
 
-
-
+#define HANDSET_LOW_THRESHOLD_MV      500
+#define HANDSET_HIGH_THRESHOLD_MV     2000
 
 /* SD ------------------------------------------------------------------------*/
 #define SDIO_IRQ_PRIORITY       1
-#define SDIO_IRQ_SUBPRIORITY    0
+#define SDIO_IRQ_SUBPRIORITY    2
 
 /*------------------------------------
              CONFIGURATION: Audio Codec Driver Configuration parameters

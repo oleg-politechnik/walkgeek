@@ -39,11 +39,13 @@ typedef struct
 {
   s16 data[AUDIO_BUFFER_MAX_SIZE];
   u16 size;
+  u8 channel_count;
   uint32_t sampling_freq;
 } AudioBuffer_Typedef;
 
 /* Exported functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-AudioBuffer_Typedef *AudioBuffer_TryGetProducer(void);
+AudioBuffer_Typedef *AudioBuffer_TryGetProducer(void) RAM_FUNC;
+void AudioBuffer_MoveProducer(void) RAM_FUNC;
 
 /* Exported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Exported static inline functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/

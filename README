@@ -11,3 +11,6 @@
 
 cd /usr/share/cmake-2.8/Modules/
 sudo patch < %walkeek_root_dir%/cmake_patch_linaro.diff
+
+cd /usr/share/cmake-2.8/Modules/Platform/
+sudo patch < %walkeek_root_dir%/cmake_patch_arm_none_eabi.diff

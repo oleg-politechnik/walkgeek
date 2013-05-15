@@ -162,7 +162,7 @@ void Scheduler_RemoveTask(void(*callback)(void))
   CPU_RestoreInterrupts();
 }
 
-void RAM_FUNC Scheduler_1msCycle(void)
+void Scheduler_1msCycle(void)
 {
   u32 i;
   void (*callback)(void);
@@ -173,11 +173,12 @@ void RAM_FUNC Scheduler_1msCycle(void)
   if (counter > 0)
     return;
 
+  CPU_DisableInterrupts();
+
   for (i = 0; i < task_count; ++i)
   {
     callback = 0;
 
-    CPU_DisableInterrupts();
     if (tasks[i].callback != NULL)
     {
       if (tasks[i].timeout_ms > 0)
@@ -198,11 +199,12 @@ void RAM_FUNC Scheduler_1msCycle(void)
         }
       }
     }
-    CPU_RestoreInterrupts();
 
     if (callback)
     {
       (*callback)();
     }
   }
+
+  CPU_RestoreInterrupts();
 }

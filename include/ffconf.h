@@ -105,7 +105,7 @@
 /  ff_memalloc() and ff_memfree() must be added to the project. */
 
 
-#define	_LFN_UNICODE	1	/* 0:ANSI/OEM or 1:Unicode */
+#define	_LFN_UNICODE	0	/* 0:ANSI/OEM or 1:Unicode */
 /* To switch the character code set on FatFs API to Unicode,
 /  enable LFN feature and set _LFN_UNICODE to 1. */
 

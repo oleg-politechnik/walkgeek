@@ -6,7 +6,7 @@
 <setting alwaysvectorfont="yes"/>
 <setting verticaltext="up"/>
 </settings>
-<grid distance="0.05" unitdist="inch" unit="inch" style="lines" multiple="1" display="no" altdistance="0.01" altunitdist="inch" altunit="inch"/>
+<grid distance="0.1" unitdist="inch" unit="inch" style="lines" multiple="1" display="no" altdistance="0.01" altunitdist="inch" altunit="inch"/>
 <layers>
 <layer number="1" name="Top" color="4" fill="1" visible="no" active="no"/>
 <layer number="16" name="Bottom" color="1" fill="1" visible="no" active="no"/>
@@ -3482,18 +3482,18 @@ Source: LIS302DL.txt</description>
 <part name="R34" library="walkgeek-eagle" deviceset="R-EU_" device="R0805" value="47K"/>
 <part name="DD3" library="walkgeek-eagle" deviceset="LTC4054ES5-4.2" device=""/>
 <part name="R35" library="walkgeek-eagle" deviceset="R-EU_" device="R0805" value="1.65K 1%"/>
-<part name="R36" library="walkgeek-eagle" deviceset="R-EU_" device="R0805" value="220K"/>
-<part name="R37" library="walkgeek-eagle" deviceset="R-EU_" device="R0805" value="220K"/>
+<part name="R36" library="walkgeek-eagle" deviceset="R-EU_" device="R0805" value="N/A"/>
+<part name="R37" library="walkgeek-eagle" deviceset="R-EU_" device="R0805" value="0"/>
 <part name="GND17" library="supply1" deviceset="GND" device=""/>
 <part name="GND19" library="supply1" deviceset="GND" device=""/>
 <part name="GND20" library="supply1" deviceset="GND" device=""/>
-<part name="C19" library="walkgeek-eagle" deviceset="C-EU" device="C0805" value="0.1uF"/>
+<part name="C19" library="walkgeek-eagle" deviceset="C-EU" device="C0805" value="N/A"/>
 <part name="GND21" library="supply1" deviceset="GND" device=""/>
 <part name="GND22" library="supply1" deviceset="GND" device=""/>
 <part name="R38" library="walkgeek-eagle" deviceset="R-EU_" device="R0805" value="220K"/>
 <part name="R39" library="walkgeek-eagle" deviceset="R-EU_" device="R0805" value="220K"/>
 <part name="GND23" library="supply1" deviceset="GND" device=""/>
-<part name="C20" library="walkgeek-eagle" deviceset="C-EU" device="C0805" value="0.1uF"/>
+<part name="C20" library="walkgeek-eagle" deviceset="C-EU" device="C0805" value="N/A"/>
 <part name="GND24" library="supply1" deviceset="GND" device=""/>
 <part name="C21" library="walkgeek-eagle" deviceset="C-EU" device="C0805" value="1uF"/>
 <part name="GND25" library="supply1" deviceset="GND" device=""/>

@@ -32,6 +32,7 @@
 /* Includes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 #include "common.h"
 #include "var.h"
+#include "common.h"
 
 /* Exported defines ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Exported macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -50,6 +51,7 @@ typedef enum
   AC_RESET_BUFFERS,
   AC_PLAY,
   AC_PAUSE,
+  AC_PLAY_PAUSE,
   AC_SUSPEND,
   AC_STOP
 } AudioCommand_Typedef;
@@ -57,8 +59,9 @@ typedef enum
 /* Exported functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void Audio_DeInit(void);
 
-FuncResult Audio_Command(AudioCommand_Typedef cmd);
-FuncResult Audio_SetVolume(u32 NewVolume);
+FuncResult Audio_CommandSync(AudioCommand_Typedef cmd);
+FuncResult Audio_SetVolume(u8 NewVolume);
+FuncResult Audio_ChangeVolume(s8 delta);
 
 FuncResult Audio_PeriodicKick(void);
 

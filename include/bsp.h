@@ -36,6 +36,7 @@
 #include "cpu.h"
 #include "bsp_config.h"
 #include "powermanager.h"
+#include "keypad.h"
 
 /* Exported defines ----------------------------------------------------------*/
 /* Exported types ------------------------------------------------------------*/
@@ -46,14 +47,12 @@ bool BSP_IsCharging(void);
 
 void BSP_InitPowerManager(void);
 void BSP_InitPowerSourcesSense(void);
-void BSP_StartPowerManagerADC(ADC_Source_Typedef ADC_Source);
-u32 BSP_GetLast_ADC_Result_mV(void);
 
 void BSP_PowerEnable(void);
 void BSP_PowerDisable(void);
 
 void BSP_Keypad_Init(void);
-bool BSP_Keypad_GetKeyStatus(KEY_Typedef key);
+bool BSP_Keypad_GetKeyStatus(KEY_Typedef key) RAM_FUNC;
 
 void Disp_GPIO_Init();
 
@@ -70,9 +69,22 @@ void BSP_USBD_MSC_Init(void);
 
 /* MM */
 
-void *ccm_malloc(size_t size);
-void *ccm_zalloc(size_t size);
-void ccm_free(void *mem);
-void ccm_calloc(size_t n, size_t elem_size);
+void *user_malloc(size_t size);
+void *user_zalloc(size_t size);
+void user_free(void *mem);
+void *user_calloc(size_t n, size_t elem_size);
+void *user_realloc(void *oldmem, size_t size);
+
+/* AUDIO */
+
+void EVAL_AUDIO_SetAudioInterface(uint32_t Interface);
+uint32_t EVAL_AUDIO_Init(uint16_t OutputDevice, uint8_t Volume, uint32_t AudioFreq);
+uint32_t EVAL_AUDIO_DeInit(void);
+uint32_t EVAL_AUDIO_Play(uint16_t* pBuffer, uint32_t Size);
+uint32_t EVAL_AUDIO_PauseResume(uint32_t Cmd);
+uint32_t EVAL_AUDIO_Stop(uint32_t CodecPowerDown_Mode);
+uint32_t EVAL_AUDIO_VolumeCtl(uint8_t Volume);
+uint32_t EVAL_AUDIO_Mute(uint32_t Command);
+void Audio_MAL_Play(uint32_t Addr, uint32_t Size);
 
 #endif /* BSP_H_ */

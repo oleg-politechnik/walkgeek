@@ -35,9 +35,15 @@
 #include <stdio.h>
 #include "types.h"
 #include "trace.h"
+#include "assert.h"
 
 /* Exported defines ----------------------------------------------------------*/
-#define RAM_FUNC __attribute__ ((section(".fastcode")))
+#ifdef SIMULATOR
+# define RAM_FUNC
+#else
+# define RAM_FUNC __attribute__ ((section(".fastcode")))
+#endif
+
 #define ICODE_ATTR      /*__attribute__ ((section(".fastcode")))*/
 
 #define _BV(shift)  (1 << shift)
@@ -53,7 +59,9 @@
 # define MIN(a,b)  ((a) < (b) ? (a) : (b))
 #endif
 
-#define MAX(a,b)  ((a) < (b) ? (b) : (a))
+#ifndef MAX
+# define MAX(a,b)  ((a) < (b) ? (b) : (a))
+#endif
 
 #define UNUSED(var) (void)var
 
@@ -73,7 +81,7 @@ typedef enum
 
 /* Exported macro ------------------------------------------------------------*/
 #define F1_2            "%1u.%02u"
-#define FLOAT_TO_1_2(f) (unsigned int) f, (unsigned int) ((f - (unsigned int) f) * 100)
+#define FLOAT_TO_1_2(f) (unsigned int) (f), (unsigned int) (((f) - (unsigned int) (f)) * 100)
 
 /* Exported functions --------------------------------------------------------*/
 

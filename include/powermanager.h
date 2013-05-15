@@ -37,14 +37,14 @@
 typedef enum
 {
   PM_OFFLINE,
-  PM_ONLINE,
-  PM_CHARGING
+  PM_ONLINE
 } PowerManagerState_Typedef;
 
 typedef enum
 {
   ADCS_BATTERY_VOLTAGE,
   ADCS_CHARGE_CURRENT,
+  ADCS_HEADSET_STATE,
   ADCS_MAX
 } ADC_Source_Typedef;
 
@@ -55,6 +55,8 @@ void PowerManager_MainThread(void);
 PowerManagerState_Typedef PowerManager_GetState(void);
 float PowerManager_GetBatteryVoltage(void);
 float PowerManager_GetChargingCurrent(void);
+
+void PowerManager_ValuesReady(void);
 
 /* Exported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Exported static inline functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/

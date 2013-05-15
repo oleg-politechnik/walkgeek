@@ -159,8 +159,8 @@ static uint16_t VCP_DataRx (uint8_t* Buf, uint32_t Len)
 
 uint32_t usbd_cdc_GetBufferCount(void)
 {
-  if (!online)
-    return 0;
+//  if (!online)
+//    return 0;
 
   if (APP_Rx_ptr_out > APP_Rx_ptr_in) /* rollback */
   {

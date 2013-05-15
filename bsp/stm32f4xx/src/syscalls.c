@@ -15,29 +15,10 @@
 
 #include <stdlib.h>
 #include <sys/stat.h>
-/*#include "ff.h"*/
-#include "stm32f4xx_conf.h"
-#include "disp_1100.h"
-#include <nuttx/mm.h>
 #include <errno.h>
 #include <sys/stat.h>
 #include <unistd.h>
-
-/* XXX
- * #include <errno.h>
- * #undef errno
- * extern int errno;
- *
- */
-
-
-
-
-
-
-
-
-
+#include "common.h"
 
 char *__env[1] = { 0 };
 char **environ = __env;
@@ -51,19 +32,31 @@ void _exit(int rc)
     ;
 }
 
+int _open_r(struct _reent *ptr, const char *file, int flags, int mode)
+{
+  errno = -ENOSYS;
+  return -1; /* Always fails */
+}
+
+int _lseek(int file, int offset, int whence)
+{
+  if ((STDOUT_FILENO == file) || (STDERR_FILENO == file))
+  {
+    return 0;
+  }
+
+  errno = -EBADF;
+  return -1;
+}
+
 int _close(int file)
 {
   errno = EBADF;
-
-  //  if (file < FILE_MIN_USER || file > FILE_MAX_USER)
-  //    return -1;
-
-  return 0; //?????
+  return -1;
 }
 
 int _fstat(int file, struct stat *st)
 {
-  //fixme
   if ((STDOUT_FILENO == file) || (STDERR_FILENO == file))
   {
     st->st_mode = S_IFCHR;
@@ -103,37 +96,37 @@ int _kill(int pid, int sig)
   return -1; /* Always fails */
 }
 
-
-
 int _read(int file, char *ptr, int len)
 {
-  {
+  UNUSED(file);
+  UNUSED(ptr);
+  UNUSED(len);
+
     errno = EBADF;
     return -1;
-  }
 }
 
-
+int newlib_heap_size;
 
 void *_sbrk(int nbytes)
 {
-  extern unsigned int _estack;
-  extern unsigned int _ssram1;
+  extern unsigned int _sheap_newlib;
+  extern unsigned int _eheap_newlib;
 
   /* The statically held previous end of the heap, with its initialization. */
-  static void *heap_ptr = (void *) &_estack; /* Previous end */
+  static void *heap_ptr = (void *) &_sheap_newlib; /* Previous end */
 
-  int has_256K_sram = (*(volatile uint16_t *) 0x1FFF7A22 == 2048);
-  void *_eheap = &_ssram1 + (has_256K_sram ? 64 : 0) * 1024;
-
-  if (heap_ptr + nbytes < _eheap)
+  if ((unsigned int) heap_ptr + nbytes <= (unsigned int) &_eheap_newlib)
   {
     void *base = heap_ptr;
     heap_ptr += nbytes;
+    newlib_heap_size += nbytes;
     return base;
   }
   else
   {
+    assert_param(!"No mem");
+
     errno = ENOMEM;
     return (void *) -1;
   }

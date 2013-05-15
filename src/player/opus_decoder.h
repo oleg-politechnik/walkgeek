@@ -36,11 +36,10 @@
 /* Exported macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Exported types ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Exported functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-void Opus_Init();
-FuncResult Opus_FastFileCheck(const char *fname);
-FuncResult Opus_TryFile(MediaFile_Typedef *mfile);
-FuncResult Opus_Decode(MediaFile_Typedef *mfile, AudioBuffer_Typedef *audio_buf);
-FuncResult Opus_Seek(MediaFile_Typedef *mfile, s32 msec);
+void OPUS_LoadFile(char *filepath);
+void OPUS_MainThread(void);
+void OPUS_Seek(u32 msec);
+void OPUS_Stop(void);
 
 /* Exported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Exported static inline functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/

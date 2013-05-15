@@ -102,6 +102,55 @@ void BSP_USBD_CDC_Init(void)
           &USR_desc, &USBD_CDC_cb, &USR_cb);
 }
 
+void BSP_USBD_DeInit(void)
+{
+  GPIO_InitTypeDef GPIO_InitStructure;
+
+#ifdef USE_USB_OTG_FS
+
+  /* Configure SOF VBUS ID DM DP Pins */
+  GPIO_InitStructure.GPIO_Pin = /*GPIO_Pin_8  |*/
+          GPIO_Pin_9  |
+          GPIO_Pin_11 |
+          GPIO_Pin_12;
+
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
+  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
+  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+  GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+  /* this for ID line debug */
+
+  RCC_AHB2PeriphClockCmd(RCC_AHB2Periph_OTG_FS, DISABLE);
+
+#else // USE_USB_OTG_HS
+# error Not supported!
+#endif //USB_OTG_HS
+
+#ifdef USB_OTG_FS_LOW_PWR_MGMT_SUPPORT
+# error Not supported!
+#endif
+
+#ifdef USB_OTG_HS_LOW_PWR_MGMT_SUPPORT
+# error Not supported!
+#endif
+
+  NVIC_InitTypeDef NVIC_InitStructure;
+
+#ifdef USE_USB_OTG_HS
+  NVIC_InitStructure.NVIC_IRQChannel = OTG_HS_IRQn;
+#else
+  NVIC_InitStructure.NVIC_IRQChannel = OTG_FS_IRQn;
+#endif
+  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
+  NVIC_InitStructure.NVIC_IRQChannelSubPriority = 3;
+  NVIC_InitStructure.NVIC_IRQChannelCmd = DISABLE;
+  NVIC_Init(&NVIC_InitStructure);
+#ifdef USB_OTG_HS_DEDICATED_EP1_ENABLED
+# error Not supported!
+#endif
+}
+
 
 /** @addtogroup STM32_USB_OTG_DEVICE_LIBRARY
 * @{

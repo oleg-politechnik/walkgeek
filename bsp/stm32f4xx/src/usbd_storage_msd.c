@@ -31,9 +31,6 @@
 #include "stm324xg_eval_sdio_sd.h"
 #include "usbd_storage_msd.h"
 
-u32 MSC_DataIn;
-u32 MSC_DataOut;
-
 /** @addtogroup STM32_USB_OTG_DEVICE_LIBRARY
  * @{
  */

@@ -29,84 +29,203 @@
 #include "system.h"
 #include "powermanager.h"
 #include "disp_1100.h"
+#include "bsp.h"
 
 /* Imported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 static u32 LastADC_Value_mV;
 
 /* Private define ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private typedef ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+typedef enum
+{
+  HS_NOT_PRESENT,
+  HS_QUALIFYING,
+  HS_PRESENT
+} HeadsetStatus_Typedef;
+
 /* Private macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+static uint16_t adc_buff[128];
+extern uint16_t mV[ADCS_MAX];
+
+static ADC_Source_Typedef ADC_Source = ADCS_MAX;
+
+static HeadsetStatus_Typedef HeadsetStatus;
+static bool HeadsetButtonPressed;
+
 /* Private function prototypes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+static void UpdateHandsetStatus(void);
 
 /* Power monitoring --------------------------------------------------------- */
-void ADC_IRQHandler(void)
+static void RunADC(void)
 {
-  if (ADC_GetFlagStatus(ADC_BAT_CHRG_ADC, ADC_FLAG_EOC) == SET)
+  uint8_t ADC_Channel;
+
+  switch (ADC_Source)
   {
-    LastADC_Value_mV = ADC_GetConversionValue(ADC_BAT_CHRG_ADC) * 2500 * 2 / 0xFFF;
+    case ADCS_BATTERY_VOLTAGE:
+      ADC_Channel = ADC_BAT_CHANNEL;
+      break;
+
+    case ADCS_CHARGE_CURRENT:
+      ADC_Channel = ADC_CHRG_CHANNEL;
+      break;
+
+    case ADCS_HEADSET_STATE:
+      ADC_Channel = ADC_BTN_CHANNEL;
+      break;
+
+    default:
+      PowerManager_ValuesReady();
+      UpdateHandsetStatus();
+      return;
+  }
+
+  ADC_RegularChannelConfig(ADC1, ADC_Channel, 1, ADC_SampleTime_28Cycles);
+
+  /* Enable ADC */
+  ADC_Cmd(ADC1, ENABLE);
+
+  /* Clear DMA Stream Transfer Complete interrupt pending bit */
+  DMA_ClearITPendingBit(DMA2_Stream0, DMA_IT_TCIF0);
+
+  DMA_ITConfig(DMA2_Stream0, DMA_IT_TC, ENABLE);
+
+  ADC_SoftwareStartConv(ADC1);
+}
+
+void DMA2_Stream0_IRQHandler(void)
+{
+  /* Test on DMA Stream Transfer Complete interrupt */
+  if(DMA_GetITStatus(DMA2_Stream0, DMA_IT_TCIF0))
+  {
+    ADC_Cmd(ADC1, DISABLE);
+    DMA_ITConfig(DMA2_Stream0, DMA_IT_TC, DISABLE);
+
+    assert_param(ADC_Source < ADCS_MAX);
+
+    unsigned i;
+    uint32_t acc = 0;
+
+    for (i = 0; i < SIZE_OF(adc_buff); i++)
+    {
+      acc += adc_buff[i];
+    }
+
+    acc /= SIZE_OF(adc_buff);
+
+    mV[ADC_Source] = (acc * 2500) / (0xFFF);
+
+    ADC_Source++;
+
+    RunADC();
   }
 }
 
-u32 BSP_GetLast_ADC_Result_mV(void)
+static void ADC_GPIO_Config(void)
 {
-  return LastADC_Value_mV;
+  GPIO_InitTypeDef GPIO_InitStructure;
+
+  RCC_AHB1PeriphClockCmd(ADC_BAT_RCC_AHB1Periph_GPIO |
+      ADC_CHRG_RCC_AHB1Periph_GPIO | ADC_BTN_RCC_AHB1Periph_GPIO, ENABLE);
+
+  /* Configure ADC Channel pins as analog inputs */
+
+  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
+  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+
+  GPIO_InitStructure.GPIO_Pin = ADC_CHRG_PIN;
+  GPIO_Init(ADC_CHRG_GPIO, &GPIO_InitStructure);
+
+  GPIO_InitStructure.GPIO_Pin = ADC_BAT_PIN;
+  GPIO_Init(ADC_BAT_GPIO, &GPIO_InitStructure);
+
+  GPIO_InitStructure.GPIO_Pin = ADC_BTN_PIN;
+  GPIO_Init(ADC_BTN_GPIO, &GPIO_InitStructure);
+}
+
+static void ADC_DMA_Config(void)
+{
+  ADC_InitTypeDef       ADC_InitStructure;
+  ADC_CommonInitTypeDef ADC_CommonInitStructure;
+  DMA_InitTypeDef       DMA_InitStructure;
+  NVIC_InitTypeDef      NVIC_InitStructure;
+
+  /* Enable ADC3, DMA2 and GPIO clocks ****************************************/
+  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_DMA2, ENABLE);
+  RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE);
+
+  /* DMA2 Stream0 channel0 configuration **************************************/
+  DMA_InitStructure.DMA_Channel = DMA_Channel_0;
+  DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&ADC1->DR;
+  DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t)&adc_buff;
+  DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralToMemory;
+  DMA_InitStructure.DMA_BufferSize = SIZE_OF(adc_buff);
+  DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
+  DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;
+  DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_HalfWord;
+  DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_HalfWord;
+  DMA_InitStructure.DMA_Mode = DMA_Mode_Circular;
+  DMA_InitStructure.DMA_Priority = DMA_Priority_High;
+  DMA_InitStructure.DMA_FIFOMode = DMA_FIFOMode_Disable;
+  DMA_InitStructure.DMA_FIFOThreshold = DMA_FIFOThreshold_HalfFull;
+  DMA_InitStructure.DMA_MemoryBurst = DMA_MemoryBurst_Single;
+  DMA_InitStructure.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
+  DMA_Init(DMA2_Stream0, &DMA_InitStructure);
+  DMA_Cmd(DMA2_Stream0, ENABLE);
+
+  NVIC_InitStructure.NVIC_IRQChannel = DMA2_Stream0_IRQn;
+  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 2;
+  NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+  NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+  NVIC_Init(&NVIC_InitStructure);
+
+  /* ADC Common Init **********************************************************/
+  ADC_CommonInitStructure.ADC_Mode = ADC_Mode_Independent;
+  ADC_CommonInitStructure.ADC_Prescaler = ADC_Prescaler_Div2;
+  ADC_CommonInitStructure.ADC_DMAAccessMode = ADC_DMAAccessMode_Disabled;
+  ADC_CommonInitStructure.ADC_TwoSamplingDelay = ADC_TwoSamplingDelay_5Cycles;
+  ADC_CommonInit(&ADC_CommonInitStructure);
+
+  /* ADC1 Init ****************************************************************/
+  ADC_InitStructure.ADC_Resolution = ADC_Resolution_12b;
+  ADC_InitStructure.ADC_ScanConvMode = DISABLE;
+  ADC_InitStructure.ADC_ContinuousConvMode = ENABLE;
+  ADC_InitStructure.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_None;
+  ADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T1_CC1;
+  ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;
+  ADC_InitStructure.ADC_NbrOfConversion = 1;
+  ADC_Init(ADC1, &ADC_InitStructure);
+
+  /* Enable DMA request after last transfer (Single-ADC mode) */
+  ADC_DMARequestAfterLastTransferCmd(ADC1, ENABLE);
+
+  /* Enable ADC1 DMA */
+  ADC_DMACmd(ADC1, ENABLE);
+}
+
+static void BSP_StartADC(void)
+{
+  if (ADC_Source < ADCS_MAX)
+  {
+    trace("Warning! ADC conversion still in progress\n");
+    return;
+  }
+
+  ADC_Source = 0;
+
+  RunADC();
 }
 
 void BSP_InitPowerManager(void)
 {
-  GPIO_InitTypeDef GPIO_InitStructure;
+  ADC_GPIO_Config();
 
-  RCC_AHB1PeriphClockCmd(ADC_BAT_RCC_AHB1Periph_GPIO, ENABLE); /*todo define*/
+  ADC_DMA_Config();
 
-  /* Configure ADC Channels pin as analog input */
-  GPIO_InitStructure.GPIO_Pin = ADC_BAT_PIN;
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
-  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-  GPIO_Init(ADC_BAT_GPIO, &GPIO_InitStructure);
-
-  RCC_AHB1PeriphClockCmd(ADC_CHRG_RCC_AHB1Periph_GPIO, ENABLE); /*todo define*/
-
-  /* Configure ADC Channels pin as analog input */
-  GPIO_InitStructure.GPIO_Pin = ADC_CHRG_PIN;
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
-  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-  GPIO_Init(ADC_CHRG_GPIO, &GPIO_InitStructure);
-
-  ADC_InitTypeDef ADC_InitStructure;
-  ADC_CommonInitTypeDef ADC_CommonInitStructure;
-  NVIC_InitTypeDef NVIC_InitStructure;
-
-  /* ADC */
-  RCC_APB2PeriphClockCmd(ADC_BAT_CHRG_RCC_APB2Periph_ADC, ENABLE);
-
-  ADC_ITConfig(ADC_BAT_CHRG_ADC, ADC_IT_EOC, DISABLE);
-
-  /* ADC Common Init */
-  ADC_CommonInitStructure.ADC_Mode = ADC_Mode_Independent;
-  ADC_CommonInitStructure.ADC_Prescaler = ADC_Prescaler_Div8;
-  ADC_CommonInitStructure.ADC_DMAAccessMode = ADC_DMAAccessMode_Disabled;
-  ADC_CommonInitStructure.ADC_TwoSamplingDelay = ADC_TwoSamplingDelay_20Cycles;
-  ADC_CommonInit(&ADC_CommonInitStructure);
-
-  /* ADC peripherals Init */
-  ADC_StructInit(&ADC_InitStructure);
-  ADC_InitStructure.ADC_Resolution = ADC_Resolution_12b;
-  ADC_InitStructure.ADC_ScanConvMode = DISABLE;
-  ADC_InitStructure.ADC_ContinuousConvMode = DISABLE;
-  ADC_InitStructure.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_None;
-  ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;
-  ADC_InitStructure.ADC_NbrOfConversion = 1;
-  ADC_Init(ADC_BAT_CHRG_ADC, &ADC_InitStructure);
-
-  NVIC_InitStructure.NVIC_IRQChannel = ADC_IRQn;
-  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 2;
-  NVIC_InitStructure.NVIC_IRQChannelSubPriority = 2;
-  NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-  NVIC_Init(&NVIC_InitStructure);
+  Scheduler_PutTask(10, BSP_StartADC, REPEAT);
 }
 
 void BSP_InitPowerSourcesSense(void)
@@ -123,36 +242,6 @@ void BSP_InitPowerSourcesSense(void)
   GPIO_Init(GPIOA, &GPIO_InitStructure);
 }
 
-void BSP_StartPowerManagerADC(ADC_Source_Typedef ADC_Source)
-{
-  assert_param(ADC_Source < ADCS_MAX);
-
-  uint8_t ADC_Channel;
-
-  switch (ADC_Source)
-  {
-    case ADCS_BATTERY_VOLTAGE:
-      ADC_Channel = ADC_BAT_CHANNEL;
-      break;
-
-    case ADCS_CHARGE_CURRENT:
-      ADC_Channel = ADC_CHRG_CHANNEL;
-      break;
-
-    default:
-      return;
-  }
-
-  ADC_RegularChannelConfig(ADC_BAT_CHRG_ADC, ADC_Channel, 1,
-          ADC_SampleTime_3Cycles); //todo
-
-  /* Enable ADC */
-  ADC_Cmd(ADC_BAT_CHRG_ADC, ENABLE);
-  ADC_ITConfig(ADC_BAT_CHRG_ADC, ADC_IT_EOC, ENABLE);
-
-  ADC_SoftwareStartConv(ADC_BAT_CHRG_ADC);
-}
-
 bool BSP_IsPowerSourceConnected(void)
 {
   return GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_9);
@@ -166,7 +255,7 @@ void BSP_PowerEnable(void)
 
   GPIO_InitStructure.GPIO_Pin = PWR_EN_PIN;
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
   GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
   GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
   GPIO_Init(PWR_EN_GPIO, &GPIO_InitStructure);
@@ -178,12 +267,26 @@ void BSP_PowerDisable(void)
 {
   GPIO_InitTypeDef GPIO_InitStructure;
 
-  RCC_AHB1PeriphClockCmd(PWR_EN_AHB1_CLK, ENABLE);
+  RCC_AHB1PeriphClockCmd(
+          RCC_AHB1Periph_GPIOA | RCC_AHB1Periph_GPIOB | RCC_AHB1Periph_GPIOC
+                  | RCC_AHB1Periph_GPIOD | RCC_AHB1Periph_GPIOE, ENABLE);
 
-  GPIO_InitStructure.GPIO_Pin = PWR_EN_PIN;
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
+  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
   GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-  GPIO_Init(PWR_EN_GPIO, &GPIO_InitStructure);
+  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_All;
+  GPIO_Init(GPIOC, &GPIO_InitStructure);
+  GPIO_Init(GPIOD, &GPIO_InitStructure);
+  GPIO_Init(GPIOE, &GPIO_InitStructure);
+  GPIO_Init(GPIOA, &GPIO_InitStructure);
+  GPIO_Init(GPIOB, &GPIO_InitStructure);
+
+  /* Disable GPIOs clock */
+  RCC_AHB1PeriphClockCmd(
+          RCC_AHB1Periph_GPIOA | RCC_AHB1Periph_GPIOB | RCC_AHB1Periph_GPIOC
+                  | RCC_AHB1Periph_GPIOD | RCC_AHB1Periph_GPIOE, DISABLE);
+
+  NVIC_SystemReset();
 }
 
 /* disp_1100 -----------------------------------------------------------------*/
@@ -245,6 +348,7 @@ void Disp_SetRST(FunctionalState enabled)
 
 /* sdio ----------------------------------------------------------------------*/
 #include "stm324xg_eval_sdio_sd.h"
+#include "audio_if.h"
 
 /**
  * @brief  DeInitializes the SDIO interface.
@@ -352,10 +456,10 @@ uint8_t SD_Detect(void)
   __IO uint8_t status = SD_PRESENT;
 
   /*!< Check GPIO to detect SD */
-  if (GPIO_ReadInputDataBit(SD_DETECT_GPIO_PORT, SD_DETECT_PIN) != Bit_SET)
-  {
-    status = SD_NOT_PRESENT;
-  }
+//  if (GPIO_ReadInputDataBit(SD_DETECT_GPIO_PORT, SD_DETECT_PIN) != Bit_SET)
+//  {
+//    status = SD_NOT_PRESENT;
+//  }
   return status;
 }
 
@@ -371,13 +475,12 @@ void BSP_Keypad_Init(void)
   KEY_Typedef key;
 
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
-  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
   GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
 
-  for (key = 0; key < KEY_MAX; key++)
+  for (key = 0; key < KEY_MAX_GPIO; key++)
   {
     RCC_AHB1PeriphClockCmd(KeyPins[key].RCC_AHB1Periph_GPIOx, ENABLE);
-
     GPIO_InitStructure.GPIO_Pin = (1 << KeyPins[key].GPIO_PinSourcex);
     GPIO_Init(KeyPins[key].GPIOx, &GPIO_InitStructure);
   }
@@ -385,7 +488,61 @@ void BSP_Keypad_Init(void)
 
 bool BSP_Keypad_GetKeyStatus(KEY_Typedef key)
 {
+  if (key == KEY_BTN)
+  {
+    return HeadsetButtonPressed;
+  }
+
   return !GPIO_ReadInputDataBit(KeyPins[key].GPIOx, (1 << KeyPins[key].GPIO_PinSourcex));
+}
+
+void CheckHeadsetInserted(void)
+{
+  u16 head_mV = mV[ADCS_HEADSET_STATE];
+
+  if (HeadsetStatus == HS_QUALIFYING)
+  {
+    HeadsetStatus = (head_mV < HANDSET_LOW_THRESHOLD_MV && head_mV
+            < BTN_PRESSED_HIGH_THRESHOLD_MV) ? HS_PRESENT : HS_NOT_PRESENT;
+    HeadsetButtonPressed = false;
+
+    trace("Headset was inserted\n");
+  }
+}
+
+void UpdateHandsetStatus(void)
+{
+  if (HeadsetStatus == HS_QUALIFYING)
+    return;
+
+  u16 head_mV = mV[ADCS_HEADSET_STATE];
+
+  /* Apply hysteresis */
+  if (HeadsetStatus == HS_NOT_PRESENT && head_mV < HANDSET_LOW_THRESHOLD_MV
+          && head_mV < BTN_PRESSED_HIGH_THRESHOLD_MV)
+  {
+    /* ... and wait while pulling off / inserting */
+    HeadsetStatus = HS_QUALIFYING;
+    Scheduler_PutTask(500, CheckHeadsetInserted, NO_REPEAT);
+  }
+  else if (HeadsetStatus == HS_PRESENT && head_mV > HANDSET_HIGH_THRESHOLD_MV)
+  {
+    HeadsetStatus = HS_NOT_PRESENT;
+    HeadsetButtonPressed = false;
+    trace("Headset was removed\n");
+  }
+
+  if (HeadsetStatus == HS_PRESENT)
+  {
+    if (!HeadsetButtonPressed && head_mV < BTN_PRESSED_LOW_THRESHOLD_MV)
+    {
+      HeadsetButtonPressed = true;
+    }
+    else if (HeadsetButtonPressed && head_mV > BTN_PRESSED_HIGH_THRESHOLD_MV)
+    {
+      HeadsetButtonPressed = false;
+    }
+  }
 }
 
 /**
@@ -460,3 +617,36 @@ void Vibrator_Enable(void)
 {
   GPIO_ResetBits(VIBRATOR_GPIO, VIBRATOR_PIN);
 }
+
+
+#ifdef  USE_FULL_ASSERT
+void assert_failed(uint8_t* file, uint32_t line, uint8_t* expr)
+{
+  /* User can add his own implementation to report the file name and line number,
+   ex: printf("Wrong parameters value: file %s on line %d\n", file, line) */
+
+  char buf[1024];
+  int row = 0;
+
+  //TODO: add application state
+
+  Audio_CommandSync(AC_STOP);
+
+  Disp_Clear();
+
+  Disp_String(0, row++, "ASSERT FAILED", true);
+  Disp_String(0, row, expr, true);
+  row += 2;
+
+  sprintf(buf, "line %i in %s", (int) line, strrchr(file, '/') ? strrchr(file, '/') + 1 : file);
+  /*todo: test on windows*/
+  Disp_String(0, row, buf, true);
+
+  /* Infinite loop */
+  while (1)
+  {
+    Disp_IRQHandler();
+    Disp_MainThread();
+  }
+}
+#endif

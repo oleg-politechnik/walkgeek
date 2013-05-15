@@ -1,0 +1,94 @@
+Bugs:
+~~~~~~~~ Hardware / Drivers
+- display manager sometimes lags (hangs? -> adding some bytes after row/col is
+  set, probably problem is with ISR timeouts)
+
+- smth totally wrong with disp sometimes -> shifts rows and later hangs all the
+  player (observed only in one board of two)
+
+- I2S frequency is inaccurate
+- doesn't get back from msc
+
+- sd card double buffering bug -> temp. workaround -> reduce size
+
+- move celt funcs to mem?
+
+- SD card DMA timeouts
+
+- strange voltage drop on 0.2 V when in pause
+
+~~~~~~~~ Software / Algorithms / Sync
+- trace via CDC sometimes goes insane
+
+- navigator needs debugging
+
+- navigator "next" is slow on opus files (opus decoder problem?)
+
+- audio status play/pause sometimes hangs
+
+- PAUSE BROKEN
+- fadeouts
+
+- sometimes shutdown -> saving can stuck
+
+Features:
+- charge current display -> 0s or insane values (problem is with ADC)
+- remove pause->stop for audio buffer????
+- usb audio
+
+- XXX mem/stack/cpu consumption for celt and MP3?
+
+- handle additional cases: no sd card in
+
+- OGG bisect seeking
+
+- shutdown ADC threshold
+
+- assert/hard fault -> software irq-less DISP
+
+- Deinit USB
+
+- Centralized IRQ management
+
+
+
+CPU profile results:
+PF_TOTAL:       100.00%
+PF_FS:    1.79%
+PF_CODEC_TOTAL:  98.03%
+PF_CODEC_CELT_DEEMPH:     7.04%
+PF_CODEC_CELT_IMDCT:     32.94%
+PF_CODEC_CELT_BANDS:     13.52%
+PF_CODEC_CELT_13:        40.00%
+PF_CODEC_CELT_PART_2:    43.36%
+PF_CODEC_CELT_PART_3:    53.51%
+PF_CODEC_CELT:   97.98%
+PF_CODEC_CELT_BANDS_1:   13.41%
+PF_CODEC_CELT_BANDS_2:    0.00%
+PF_CODEC_CELT_BANDS_3:    0.09%
+PF_CODEC_CELT_BANDS_4:    0.00%
+
+
+
+30 vs 22 (moved to CCM, optimized)
+
+
+==================fltpt
+realtime: 51 codec time: 30+3
+
+CPU profile results:
+PF_TOTAL:       100.00%
+PF_FS:    4.82%
+PF_CODEC_TOTAL:  84.26%
+(null):   0.00%
+(null):   0.00%
+(null):   0.00%
+(null):   0.00%
+(null):   0.00%
+(null):   0.00%
+(null):   0.00%
+(null):   0.00%
+(null):   0.00%
+(null):   0.00%
+(null):   0.00%
+

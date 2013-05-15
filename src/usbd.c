@@ -26,7 +26,7 @@
  */
 
 /* Includes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-#include "usbd_storage_msd.h"
+#include "system.h"
 
 /* Imported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private define ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -38,6 +38,10 @@
 
 extern void BSP_USBD_MSC_Init(void);
 extern void BSP_USBD_CDC_Init(void);
+extern void BSP_USBD_DeInit(void);
+
+u32 MSC_DataIn;
+u32 MSC_DataOut;
 
 void USB_MSC_DisplaySpeed_Int(void)
 {
@@ -49,8 +53,8 @@ void USB_MSC_DisplaySpeed_Int(void)
 
   CPU_DisableInterrupts();
 
-  SetVariable(VAR_MSC_RxSpeed, MSC_RxSpeed, MSC_DataIn * USBD_MSC_SPEED_MPS);
-  SetVariable(VAR_MSC_TxSpeed, MSC_TxSpeed, MSC_DataOut * USBD_MSC_SPEED_MPS);
+  SetVariable(VAR_MSC_Speed, MSC_RxSpeed, MSC_DataIn * USBD_MSC_SPEED_MPS);
+  SetVariable(VAR_MSC_Speed, MSC_TxSpeed, MSC_DataOut * USBD_MSC_SPEED_MPS);
 
   MSC_DataIn = 0;
   MSC_DataOut = 0;
@@ -60,7 +64,7 @@ void USB_MSC_DisplaySpeed_Int(void)
 
 void USB_MSC_Init(void)
 {
-  trace("[usb] MSC mode activated\r\n");
+  trace("usb: MSC mode activated\n");
 
   Scheduler_PutTask(1000 / USBD_MSC_SPEED_MPS, USB_MSC_DisplaySpeed_Int, REPEAT);
 
@@ -69,7 +73,14 @@ void USB_MSC_Init(void)
 
 void USB_CDC_Init(void)
 {
-  trace("[usb] CDC mode activated\r\n");
+  trace("usb: CDC mode activated\n");
 
   BSP_USBD_CDC_Init();
+}
+
+void USB_DeInit(void)
+{
+  trace("usb: deinit\n");
+
+  BSP_USBD_DeInit();
 }

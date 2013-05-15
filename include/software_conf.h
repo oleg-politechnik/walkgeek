@@ -29,24 +29,38 @@
 #ifndef SOFTWARE_CONF_H_
 #define SOFTWARE_CONF_H_
 
+/* Software features */
 #define PLAYER_DEFAULT_VOLUME               20
+#define PLAYER_INI_FILE                     "0:/player.ini"
+
 #define DEBUG                               1
-#define ENABLE_TRACE                        1
+#define ENABLE_TRACE                        0
+#define PROFILING                           0
 
-#define PLAYLIST_MAX_ENTRIES                50
-
-#define HZ                                  1000
-
-#define FILE_BUFFER_SIZE                    2048
-#define AUDIO_BUFFER_MAX_SIZE               2500
-#define AUDIO_BUFFER_COUNT                  5
+#define NAVIGATOR_MAX_NESTING_LEVEL         10
 
 #define SD_BLOCK_SIZE                       512
 
 #define USBD_MSC_SPEED_MPS                  4
 
+/* Speeds and delays */
+#define HZ                                  1000
+
+/* Memory */
+#define FILE_BUFFER_SIZE                    2048
+#define AUDIO_BUFFER_MAX_SIZE               2500
+#define AUDIO_BUFFER_COUNT                  4
+
+/* CDC buf size */
+#define APP_RX_DATA_SIZE                    1024
+
 #if DEBUG
 # define DISABLE_MSC                        1
+#endif
+
+#ifdef SIMULATOR
+# undef ENABLE_TRACE
+#define ENABLE_TRACE                        1
 #endif
 
 #endif /* SOFTWARE_CONF_H_ */

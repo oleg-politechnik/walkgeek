@@ -58,18 +58,18 @@
 #define USBD_AUDIO_PID                   0x5730
 
 #define USBD_AUDIO_LANGID_STRING         0x409
-#define USBD_AUDIO_MANUFACTURER_STRING   "STMicroelectronics"
+#define USBD_AUDIO_MANUFACTURER_STRING   (uint8_t *)"STMicroelectronics"
 
-#define USBD_AUDIO_PRODUCT_FS_STRING          "STM32 AUDIO Streaming in FS Mode"
-#define USBD_AUDIO_PRODUCT_HS_STRING          "STM32 AUDIO Streaming in HS Mode"
-#define USBD_AUDIO_SERIALNUMBER_FS_STRING     "00000000034E"
-#define USBD_AUDIO_SERIALNUMBER_HS_STRING     "00000000034F"
+#define USBD_AUDIO_PRODUCT_FS_STRING          (uint8_t *)"STM32 AUDIO Streaming in FS Mode"
+#define USBD_AUDIO_PRODUCT_HS_STRING          (uint8_t *)"STM32 AUDIO Streaming in HS Mode"
+#define USBD_AUDIO_SERIALNUMBER_FS_STRING     (uint8_t *)"00000000034E"
+#define USBD_AUDIO_SERIALNUMBER_HS_STRING     (uint8_t *)"00000000034F"
 
-#define USBD_AUDIO_CONFIGURATION_FS_STRING    "AUDIO Config"
-#define USBD_AUDIO_INTERFACE_FS_STRING        "AUDIO Interface"
+#define USBD_AUDIO_CONFIGURATION_FS_STRING    (uint8_t *)"AUDIO Config"
+#define USBD_AUDIO_INTERFACE_FS_STRING        (uint8_t *)"AUDIO Interface"
 
-#define USBD_AUDIO_CONFIGURATION_HS_STRING    "AUDIO Config"
-#define USBD_AUDIO_INTERFACE_HS_STRING        "AUDIO Interface"
+#define USBD_AUDIO_CONFIGURATION_HS_STRING    (uint8_t *)"AUDIO Config"
+#define USBD_AUDIO_INTERFACE_HS_STRING        (uint8_t *)"AUDIO Interface"
 /**
   * @}
   */

@@ -31,7 +31,9 @@
 #include "player.h"
 #include "mp3_decoder.h"
 #include "mediafile.h"
-#include "playlist.h"
+#include "../../include/bsp.h"
+
+extern PlayerStatus_Typedef PlayerStatus;
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
@@ -49,6 +51,8 @@ MP3FrameInfo mp3FrameInfo;
 static bool vbr;
 static u8 toc[MP3_TABLE_OF_CONTENTS_SIZE];
 
+static MediaFile_Typedef *mfile;
+
 //uint16_t MP3_FrameSize; //fixme
 
 static int Frame_sampfreqs[4] =
@@ -59,12 +63,195 @@ static int Frame_bitrates[15] =
 
 /* Private function prototypes -----------------------------------------------*/
 /* Private functions ---------------------------------------------------------*/
+static void MediaFile_Clear(MediaFile_Typedef *mfile)
+{
+  mfile->buf_offset = mfile->bytes_in_buf = 0;
+}
+
+FuncResult MediaFile_Open(MediaFile_Typedef *mfile, const TCHAR *path)
+{
+  assert_param(mfile->state == MFS_EMPTY);
+
+  if (f_open(&mfile->file, path, FA_READ) != FR_OK)
+  {
+    mfile->state = MFS_ERROR;
+    return FUNC_ERROR;
+  }
+
+  MediaFile_Clear(mfile);
+
+  mfile->state = MFS_OPENED;
+  return FUNC_SUCCESS;
+}
+
+void MediaFile_Close(MediaFile_Typedef *mfile)
+{
+  if (mfile->state != MFS_EMPTY)
+  {
+    f_close(&mfile->file);
+
+    mfile->state = MFS_EMPTY;
+  }
+}
+
+FuncResult MediaFile_Seek(MediaFile_Typedef *mfile, u32 delta)
+{
+  assert_param(mfile->state >= MFS_OPENED);
+
+  assert_param(mfile->buf_offset < FILE_BUFFER_SIZE);
+  assert_param(mfile->bytes_in_buf + mfile->buf_offset <= FILE_BUFFER_SIZE);
+
+  u32 offset_to_load = mfile->file.fptr - mfile->bytes_in_buf + delta;
+
+  assert_param(offset_to_load/* + size_min*/ < mfile->file.fsize);
+
+  if (delta >= mfile->bytes_in_buf)
+  {
+    return MediaFile_FillFromFile(mfile, offset_to_load);
+  }
+
+  mfile->bytes_in_buf -= delta;
+  mfile->buf_offset += delta;
+
+  assert_param(mfile->buf_offset < FILE_BUFFER_SIZE);
+  assert_param(mfile->bytes_in_buf + mfile->buf_offset <= FILE_BUFFER_SIZE);
+
+//  if (size_min > mfile->bytes_in_buf)
+//  {
+    return MediaFile_ReFill(mfile);
+//  }
+//
+//  return FUNC_SUCCESS;
+}
+
+FuncResult MediaFile_FillFromFile(MediaFile_Typedef *mfile, u32 abs_offset)
+{
+  assert_param(mfile->state >= MFS_OPENED);
+
+  assert_param(abs_offset < mfile->file.fsize);
+
+  if (f_lseek(&mfile->file, abs_offset) != FR_OK)
+  {
+    mfile->state = MFS_ERROR;
+    return FUNC_ERROR;
+  }
+
+  MediaFile_Clear(mfile);
+  return MediaFile_ReFill(mfile);
+}
+
+FuncResult MediaFile_ReFill(MediaFile_Typedef *mfile)
+{
+  assert_param(mfile->state >= MFS_OPENED);
+
+  FRESULT res;
+  u32 bytes_returned, bytes_to_read, bytes_avail;
+
+//  if (size_min <= mfile->bytes_in_buf)
+//    /* nothing to do here */
+//    return FUNC_SUCCESS;
+
+  assert_param(mfile->buf_offset < FILE_BUFFER_SIZE);
+  assert_param(mfile->bytes_in_buf + mfile->buf_offset <= FILE_BUFFER_SIZE);
+
+  bytes_avail = mfile->file.fsize - mfile->file.fptr;
+
+  if (bytes_avail == 0)
+  {
+    mfile->state = MFS_EOF;
+    return FUNC_SUCCESS;
+  }
+
+//  if (bytes_avail >= FILE_BUFFER_SIZE)
+//  {
+    bytes_to_read = MIN(FILE_BUFFER_SIZE - mfile->bytes_in_buf, bytes_avail);
+//  }
+//  else
+//  {
+//    bytes_to_read = size_min - mfile->bytes_in_buf;
+//  }
+
+
+
+//  if (bytes_to_read > bytes_avail)
+//  {
+//    mfile->state = MFS_EOF;
+//    return FUNC_NOT_SUCCESS;
+//  }
+
+  /*
+   * x = free space
+   * B = old buffer data
+   *
+   * file->file_buf
+   * |
+   * |          file->buf_offset
+   * |          |
+   * |          <----> - file->bytes_in_buf
+   * |          |    |
+   * xxxxxxxxxxxBBBBBB
+   *                 ^
+   *                 file->fptr
+   */
+
+  memmove(mfile->file_buf, &mfile->file_buf[mfile->buf_offset], mfile->bytes_in_buf);
+
+  /*
+   * x = free space
+   * B = old buffer data
+   *
+   * file->file_buf
+   * |
+   * file->buf_offset
+   * |
+   * <----> - file->bytes_in_buf
+   * |    |
+   * BBBBBBxxxxxxxxxxx
+   *      ^
+   *      file->fptr
+   */
+
+  res = f_read(&mfile->file, &mfile->file_buf[mfile->bytes_in_buf], bytes_to_read,
+          (UINT*) &bytes_returned);
+
+  if (res != FR_OK || bytes_to_read != bytes_returned)
+  {
+    mfile->state = MFS_ERROR;
+    return FUNC_ERROR;
+  }
+
+  /*
+   * B = old buffer data
+   * F = new data
+   *
+   * file->buf_offset
+   * |
+   * <---------------> - file->bytes_in_buf
+   * |               |
+   * BBBBBBFFFFFFFFFFF
+   *                 ^
+   *                 file->fptr
+   */
+
+  mfile->buf_offset = 0;
+  mfile->bytes_in_buf += bytes_returned;
+
+  assert_param(mfile->buf_offset < FILE_BUFFER_SIZE);
+  assert_param(mfile->bytes_in_buf + mfile->buf_offset <= FILE_BUFFER_SIZE);
+
+  return FUNC_SUCCESS;
+}
+
+
+
 
 FuncResult MP3_ReadMetadata(MediaFile_Typedef *mfile)
 {
   uint32_t offset, frame_size, frame_header_size;
   u16 val; // record the start frame
   u8 version_major/*, extended_header*/;
+
+  Metadata_TypeDef *meta = &(Player_GetState()->metadata);
 
   vbr = true;
 
@@ -106,27 +293,27 @@ FuncResult MP3_ReadMetadata(MediaFile_Typedef *mfile)
 
       if (MP3_CHECK_TAG(mfile, "TT2") || MP3_CHECK_TAG(mfile, "TIT2"))
       {
-        strncpy(mfile->meta.title,
+        strncpy(meta->title,
                 (char *) &FILE_BUF(mfile, frame_header_size + 1),
-                MIN(frame_size - 1, sizeof(mfile->meta.title) - 1));
+                MIN(frame_size - 1, sizeof(meta->title) - 1));
       }
       else if (MP3_CHECK_TAG(mfile, "TP1") || MP3_CHECK_TAG(mfile, "TPE1"))
       {
-        strncpy(mfile->meta.artist,
+        strncpy(meta->artist,
                 (char *) &FILE_BUF(mfile, frame_header_size + 1),
-                MIN(frame_size - 1, sizeof(mfile->meta.artist) - 1));
+                MIN(frame_size - 1, sizeof(meta->artist) - 1));
       }
       else if (MP3_CHECK_TAG(mfile, "TAL"))
       {
-        strncpy(mfile->meta.album,
+        strncpy(meta->album,
                 (char *) &FILE_BUF(mfile, frame_header_size + 1),
-                MIN(frame_size - 1, sizeof(mfile->meta.album) - 1));
+                MIN(frame_size - 1, sizeof(meta->album) - 1));
       }
       else if (MP3_CHECK_TAG(mfile, "TDRC") || MP3_CHECK_TAG(mfile, "TYER"))
       {
-        strncpy(mfile->meta.year,
+        strncpy(meta->year,
                 (char *) &FILE_BUF(mfile, frame_header_size + 1),
-                MIN(frame_size - 1, sizeof(mfile->meta.year) - 1));
+                MIN(frame_size - 1, sizeof(meta->year) - 1));
       }
       else if (MP3_CHECK_TAG(mfile, "USLT"))
       {
@@ -134,8 +321,8 @@ FuncResult MP3_ReadMetadata(MediaFile_Typedef *mfile)
         ptr += strlen(ptr);
         ptr++;
 
-        strncpy(mfile->meta.notes, ptr,
-                MIN(frame_size - 1, sizeof(mfile->meta.notes) - 1));
+        strncpy(meta->notes, ptr,
+                MIN(frame_size - 1, sizeof(meta->notes) - 1));
       }
 
       //      TRCK    Track number
@@ -158,16 +345,16 @@ FuncResult MP3_ReadMetadata(MediaFile_Typedef *mfile)
     if (MP3_CHECK_TAG(mfile, "TAG"))
     {
       MF_EXEC(MediaFile_Seek(mfile, 3));
-      strncpy(mfile->meta.title, (char *) mfile->file_buf,
-              MIN(30, sizeof(mfile->meta.title) - 1));
+      strncpy(meta->title, (char *) mfile->file_buf,
+              MIN(30, sizeof(meta->title) - 1));
 
       MF_EXEC(MediaFile_Seek(mfile, 30));
-      strncpy(mfile->meta.artist, (char *) mfile->file_buf,
-              MIN(30, sizeof(mfile->meta.artist) - 1));
+      strncpy(meta->artist, (char *) mfile->file_buf,
+              MIN(30, sizeof(meta->artist) - 1));
 
       MF_EXEC(MediaFile_Seek(mfile, 30));
-      strncpy(mfile->meta.album, (char *) mfile->file_buf,
-              MIN(30, sizeof(mfile->meta.album) - 1));
+      strncpy(meta->album, (char *) mfile->file_buf,
+              MIN(30, sizeof(meta->album) - 1));
     }
     else
     {
@@ -264,52 +451,65 @@ FuncResult MP3_ReadMetadata(MediaFile_Typedef *mfile)
     //    and corresponding Byte in file is then approximately at:
     //    (TOC[25]/256) * 5000000
   }
-  mfile->meta.mstime_curr = 0;
-  mfile->meta.mstime_max = mfile->maxframe * MP3_FRAME_MSTIME;
+  meta->mstime_curr = 0;
+  meta->mstime_max = mfile->maxframe * MP3_FRAME_MSTIME;
 
-  //
+  SyncVariable(VAR_PlayerState);
 
   return FUNC_SUCCESS;
 }
 
-FuncResult MP3_TryFile(MediaFile_Typedef *mfile)
+void MP3_LoadFile(char *filepath)
 {
-  //  EXEC_ERROR_STATUS(Play
+  mfile = (MediaFile_Typedef *) user_zalloc(sizeof(MediaFile_Typedef));
+
+  MediaFile_Open(mfile, filepath);
+
   if (MP3_ReadMetadata(mfile) == FUNC_ERROR)
-    return FUNC_ERROR;
+  {
+    return Player_AudioFileError("Invalid MP3 metadata format");
+  }
 
-  MP3_Init();
-
-  return FUNC_SUCCESS;
+  pMP3Decoder = MP3InitDecoder();
+  assert_param(pMP3Decoder);
 }
 
-FuncResult MP3_FastFileCheck(const char *fname)
-{
-  return MediaFile_CheckExtension(fname, "mp3");
-}
-
-FuncResult MP3_Decode(MediaFile_Typedef *mfile, AudioBuffer_Typedef *audio_buf)
+void MP3_MainThread(void)
 {
   int offset, bytesLeft, err;
   u8 *f_buffer;
 
+  if (mfile->state == MFS_EOF) /*XXX ???*/
+  {
+    PlayerStatus = PS_EOF;
+  }
+
+  AudioBuffer_Typedef *audio_buf;
+  if (!(audio_buf = AudioBuffer_TryGetProducer()))
+  {
+    return;
+  }
+
+  Metadata_TypeDef *meta = &(Player_GetState()->metadata);
+
   assert_param(audio_buf->size == 0);
 
-  MF_EXEC(MediaFile_ReFill(mfile));
+  if (MediaFile_ReFill(mfile) != FUNC_SUCCESS)
+    return;
 
   offset = MP3FindSyncWord(&FILE_BUF(mfile, 0), mfile->bytes_in_buf);
   if (offset < 0)
   {
     /* 2-byte sync word */
 
-    MF_EXEC(MediaFile_Seek(mfile, mfile->bytes_in_buf - 2));
-
-    return FUNC_ERROR;
+    MediaFile_Seek(mfile, mfile->bytes_in_buf - 2);
+    return;
   }
 
   if (offset > 0)
   {
-    MF_EXEC(MediaFile_Seek(mfile, offset));
+    if (MediaFile_Seek(mfile, offset) != FUNC_SUCCESS)
+	    return;
   }
 
   memset(&mp3FrameInfo, 0, sizeof(mp3FrameInfo));
@@ -319,8 +519,8 @@ FuncResult MP3_Decode(MediaFile_Typedef *mfile, AudioBuffer_Typedef *audio_buf)
           && mp3FrameInfo.bitsPerSample))
   {
     // advance data pointer
-    MF_EXEC(MediaFile_Seek(mfile, 1));
-    return FUNC_ERROR;
+    MediaFile_Seek(mfile, 1);
+    return;
   }
 
   bytesLeft = mfile->bytes_in_buf;
@@ -340,25 +540,27 @@ FuncResult MP3_Decode(MediaFile_Typedef *mfile, AudioBuffer_Typedef *audio_buf)
       case ERR_MP3_MAINDATA_UNDERFLOW:
         if (mfile->state == MFS_EOF) /*XXX ???*/
         {
-          return FUNC_ERROR;
+          PlayerStatus = PS_EOF;
+          return;
         }
         else
         {
           /*XXX ???*/
 
-          MF_EXEC(MediaFile_Seek(mfile, MAX(1, mfile->bytes_in_buf - bytesLeft)));
+          MediaFile_Seek(mfile, MAX(1, mfile->bytes_in_buf - bytesLeft));
         }
         break;
 
       default:
-        MF_EXEC(MediaFile_Seek(mfile, MAX(1, mfile->bytes_in_buf - bytesLeft)));
+        MediaFile_Seek(mfile, MAX(1, mfile->bytes_in_buf - bytesLeft));
         break;
     }
 
-    return FUNC_ERROR;
+    return;
   }
 
-  MF_EXEC(MediaFile_Seek(mfile, mfile->bytes_in_buf - bytesLeft));
+  MediaFile_Seek(mfile, mfile->bytes_in_buf - bytesLeft);
+
   /* no error */
 
   memset(&mp3FrameInfo, 0, sizeof(mp3FrameInfo));
@@ -367,8 +569,8 @@ FuncResult MP3_Decode(MediaFile_Typedef *mfile, AudioBuffer_Typedef *audio_buf)
           && mp3FrameInfo.samprate && mp3FrameInfo.bitsPerSample))
   {
     // advance data pointer
-    MF_EXEC(MediaFile_Seek(mfile, 1));
-    return FUNC_ERROR;
+    MediaFile_Seek(mfile, 1);
+    return;
   }
 
   assert_param(mp3FrameInfo.outputSamps <= AUDIO_BUFFER_MAX_SIZE);
@@ -377,8 +579,8 @@ FuncResult MP3_Decode(MediaFile_Typedef *mfile, AudioBuffer_Typedef *audio_buf)
   audio_buf->size = mp3FrameInfo.outputSamps;
   audio_buf->sampling_freq = mp3FrameInfo.samprate;
 
-  SetVariable(VAR_media_channel_count, mfile->meta.channel_count, mp3FrameInfo.nChans);
-  SetVariable(VAR_media_bitrate, mfile->meta.bitrate, mp3FrameInfo.bitrate);
+  SetVariable(VAR_AudioStatus, meta->channel_count, mp3FrameInfo.nChans);
+  SetVariable(VAR_AudioStatus, meta->bitrate, mp3FrameInfo.bitrate);
 
   if (mp3FrameInfo.nChans == 1)
   {
@@ -391,59 +593,35 @@ FuncResult MP3_Decode(MediaFile_Typedef *mfile, AudioBuffer_Typedef *audio_buf)
     audio_buf->size *= 2;
   }
 
-  mfile->meta.mstime_curr += MP3_FRAME_MSTIME;
+  meta->mstime_curr += MP3_FRAME_MSTIME;
 
   AudioBuffer_MoveProducer();
 
-  return FUNC_SUCCESS;
+  return;
 }
 
-FuncResult MP3_Seek(MediaFile_Typedef *mfile, s32 msec)
+void MP3_Seek(u32 msec)
 {
-  //fixme file pos <-> audio stream pos relation
+  Metadata_TypeDef *meta = &(Player_GetState()->metadata);
+
+  if (msec > meta->mstime_max)
+    return;
 
   if (vbr) //todo
-    return FUNC_SUCCESS;
+    return;
 
-  s32 delta_data = msec / MP3_FRAME_MSTIME;
-  s32 delta_time = delta_data * MP3_FRAME_MSTIME;
+  u32 delta_data = msec / MP3_FRAME_MSTIME;
+  u32 delta_time = delta_data * MP3_FRAME_MSTIME;
 
-  if (mfile->meta.mstime_curr + delta_time > mfile->meta.mstime_max)
-  {
-    Playlist_LoadNext(); //fixme
-    return FUNC_SUCCESS;
-  }
-
-  if ((s32) mfile->meta.mstime_curr + delta_time < 0)
-  {
-    Playlist_LoadPrev();
-    return FUNC_SUCCESS;
-  }
-
-  mfile->meta.mstime_curr += delta_time;
+  meta->mstime_curr = delta_time;
 
   delta_data *= mfile->framesize;
-  MF_EXEC(MediaFile_Seek(mfile, delta_data));
+  MediaFile_FillFromFile(mfile, delta_data);
 
-  return FUNC_SUCCESS;
+  return;
 }
 
-void MP3_Init()
+void MP3_Stop(void)
 {
-  if (!pMP3Decoder)
-  {
-    pMP3Decoder = MP3InitDecoder();
-    assert_param(pMP3Decoder);
-  }
-}
-
-void MP3_DeInit()
-{
-  /* todo: call me! */
-
-  if (pMP3Decoder)
-  {
-    MP3FreeDecoder(pMP3Decoder);
-    pMP3Decoder = 0;
-  }
+  MediaFile_Close(mfile);
 }

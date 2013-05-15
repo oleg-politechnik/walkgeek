@@ -34,6 +34,7 @@
 
 /* Exported defines ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 #define ASSERT assert_param
+#define assert assert_param
 
 /* Exported macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 #ifdef  USE_FULL_ASSERT
@@ -49,7 +50,7 @@
 /* Exported functions ------------------------------------------------------- */
 void assert_failed(uint8_t* file, uint32_t line, uint8_t* expr);
 #else
-#define assert_param(expr) ((void)0)
+#define assert_param(expr) ((void)(expr))
 #endif /* USE_FULL_ASSERT */
 
 /* Exported types ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/

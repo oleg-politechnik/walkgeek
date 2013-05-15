@@ -43,7 +43,7 @@
 #ifndef OVERRIDE_OPUS_ALLOC
 static inline void *opus_alloc (size_t size)
 {
-   return malloc(size);
+   return user_malloc(size);
 }
 #endif
 
@@ -60,7 +60,7 @@ static inline void *opus_alloc_scratch (size_t size)
 #ifndef OVERRIDE_OPUS_FREE
 static inline void opus_free (void *ptr)
 {
-   free(ptr);
+  user_free(ptr);
 }
 #endif
 

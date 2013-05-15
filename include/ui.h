@@ -31,8 +31,14 @@
 
 /* Includes ------------------------------------------------------------------*/
 /* Exported constants --------------------------------------------------------*/
-#define KEY_PREV      KEY_1
-#define KEY_NEXT      KEY_3
+#define KEY_PREV        KEY_1
+#define KEY_NEXT        KEY_3
+
+#define KEY_PREV_DIR    KEY_4
+#define KEY_NEXT_DIR    KEY_6
+
+#define KEY_APP_PLAYER  KEY_7
+#define KEY_APP_MSC     KEY_8
 
 /* Exported types ------------------------------------------------------------*/
 typedef enum

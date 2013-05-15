@@ -1,7 +1,7 @@
 /*
  * player.c
  *
- * Copyright (c) 2012, Oleg Tsaregorodtsev
+ * Copyright (c) 2013, Oleg Tsaregorodtsev
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,127 +25,280 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* Includes ------------------------------------------------------------------*/
-#include <string.h>
-
+/* Includes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 #include "player.h"
-#include "system.h"
-#include "ui.h"
-#include "mediafile.h"
 #include "audio_if.h"
-#include "playlist.h"
-//#include "utf8.h"
-#include <stdio.h>
-#include "decoder.h"
+#include "navigator.h"
 
-extern Decoder_TypeDef decoders[];
-AudioBuffer_Typedef *AudioBuffer_TryGetProducer(void);
+#include "opus_decoder.h"
+#include "mp3_decoder.h"
+#include "minIni.h"
 
-/* Private typedef -----------------------------------------------------------*/
-/* Private define ------------------------------------------------------------*/
-/* Private macro -------------------------------------------------------------*/
-/* Private variables ---------------------------------------------------------*/
-static volatile u32 PlayerCommand = PC_EMPTY;
+/* Imported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+/* Private define ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+/* Private typedef ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+typedef struct
+{
+//  bool IsSingleDirPlayback;
+} PlayerSettings_Typedef;
+
+/* Private macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+/* Private function prototypes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+/* Private variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+static Decoder_Typedef
+        decoders[] =
+                {
+#ifdef USE_MP3
+# ifdef SIMULATOR
+                        { .LoadFile = 0, .MainThread = 0, .Seek = 0, .Stop = 0 },
+# else
+                        { .LoadFile = MP3_LoadFile, .MainThread = MP3_MainThread, .Seek = MP3_Seek, .Stop = MP3_Stop},
+# endif
+#endif
+                        { .LoadFile = OPUS_LoadFile, .MainThread =
+                                OPUS_MainThread, .Seek = OPUS_Seek, .Stop =
+                                OPUS_Stop },
+                        { .LoadFile = 0, .MainThread = 0, .Seek = 0, .Stop = 0 } };
+
+static char *suffixes_white_list[] =
+{
+#ifdef USE_MP3
+        "mp3",
+#endif
+        "opus", 0 };
+
+PlayerStatus_Typedef PlayerStatus;
+PlayerState_Typedef PlayerState;
+
+static Decoder_Typedef *decoder;
+
+static NavigatorContext_Typedef PlayerContext;
+
+static volatile u32 PlayerCommand = PC_DUMMY;
 static volatile s32 PlayerCommandArg;
-static PlayerState_Typedef PlayerState = PS_INACTIVE;
 
-static Decoder_TypeDef *decoder = NULL;
+static char PlayerErrorString[128];
 
-static char PlayerErrorString[80];
+/* Private functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+FuncResult Player_RestoreSettings();
+FuncResult Player_StoreSettings();
 
-static FATFS fatfs;
-
-static MediaFile_Typedef mfile;
-
-/* Private function prototypes -----------------------------------------------*/
-static void Player_Next(void);
-static void Player_Prev(void);
-static void Player_ChangeVolume(int8_t delta);
-static void Player_SetVolume(u8 vol);
-
-FuncResult Player_TryFile(MediaFile_Typedef *file);
-static FuncResult Player_RestoreSettings(void);
-static FuncResult Player_StoreSettings(void);
-
-FuncResult Playlist_Init(void);
-void Playlist_LoadNext(void);
-void Playlist_LoadPrev(void);
-FuncResult Playlist_TryLoadCurrentTrack(void);
-FuncResult Playlist_SetCurrentTrack(TCHAR *file_name);
-
-/* Private functions ---------------------------------------------------------*/
-static void Player_SetState(PlayerState_Typedef state)
+void Player_Init(void)
 {
-  SetVariable(VAR_ApplicationState, PlayerState, state);
-}
+  Navigator_Init();
 
-void Player_Init()
-{
-  if (PlayerState != PS_INACTIVE)
-    return;
+//  long int volume = ini_getl("", "volume", PLAYER_DEFAULT_VOLUME,
+//          PLAYER_INI_FILE);
+//  Audio_SetVolume(volume);
 
-  trace("[init] Player Application\r\n");
+  Navigator_InitRoot(&PlayerContext, suffixes_white_list);
+#if 0
+  char buf[256];
 
-  Player_SetState(PS_STOPPED);
-
-  if (Playlist_Init() != FUNC_SUCCESS)
+  //todo len???, null-terminated???
+  int len;
+  len = ini_gets("file", "path", "", buf, sizeof(buf), PLAYER_INI_FILE);
+  if (len)
   {
-    Player_SetState(PS_ERROR);
+    if (Navigator_Cd(&PlayerContext, buf))
+      trace("settings: restored last dir (%s)\n", PlayerContext.dir_path);
+  }
+
+  len = ini_gets("file", "name", "", buf, sizeof(buf), PLAYER_INI_FILE);
+  if (len)
+  {
+    if (Navigator_TryFile(&PlayerContext, buf))
+      trace("settings: restored last file (%s)\n", PlayerContext.fname);
+  }
+
+  if (PlayerContext.fname)
+  {
+    Player_Play();
+
+    if (PlayerStatus == PS_PLAYING)
+    {
+      unsigned int mstime = ini_getl("file", "mstime", 0, PLAYER_INI_FILE);
+
+      trace("settings: read last file position (%u:%02u:%02u.%03u)\n",
+	  (mstime / 1000 / 60 / 60), (mstime / 1000 / 60) % 60,
+	  (mstime / 1000) % 60, mstime % 1000);
+
+      if (mstime < PlayerState.metadata.mstime_max)
+      {
+	Player_AsyncCommand(PC_SEEK, mstime);
+      }
+    }
+  }
+  else
+#endif
+
+  if (Player_RestoreSettings() == FUNC_SUCCESS)
+  {
+  }
+  else
+  {
+    if (!PlayerContext.fname)
+    {
+      Navigator_NextFile(&PlayerContext);
+    }
+
+    if (PlayerContext.fname)
+    {
+      Player_Play();
+    }
+    else
+    {
+      Player_AudioFileError("player: no file to play"); /*todo stderr */
+    }
   }
 }
 
-void Player_DeInit()
+void Player_DeInit(void)
 {
-  if (PlayerState == PS_INACTIVE)
-    return;
+  Player_Stop();
 
-  Audio_Command(AC_STOP);
+//  ini_putl("", "volume", Audio_GetVolume(), PLAYER_INI_FILE);
+//
+//  if (Navigator_IsOnline())
+//  {
+//#ifdef SIMULATOR
+//    ini_puts("file", "path", PlayerContext.dir_path, PLAYER_INI_FILE);
+//    if (PlayerStatus == PS_PLAYING && PlayerContext.fname)
+//    {
+//      ini_puts("file", "name", PlayerContext.fname, PLAYER_INI_FILE);
+//      ini_putl("file", "mstime", PlayerState.metadata.mstime_curr,
+//              PLAYER_INI_FILE);
+//    }
+//#endif
+//
+//  }
 
   Player_StoreSettings();
 
-  MediaFile_Close(&mfile);
-
-  f_mount(0, NULL);
-
-  Player_SetState(PS_INACTIVE);
+  Navigator_DeInit();
 }
 
-/*
- * Safe to call from an ISR
- */
+void Player_Play(void)
+{
+  CPU_InitUserHeap();
+
+  char filepath[512];
+
+  PlayerCommand = PC_DUMMY;
+
+  if (PlayerContext.fname)
+  {
+    assert_param(
+            (PlayerContext.suffix_ix >= 0)
+                    && ((unsigned) PlayerContext.suffix_ix < SIZE_OF(decoders)
+                            - 1));
+
+#ifndef SIMULATOR
+    decoder = &decoders[PlayerContext.suffix_ix];
+#endif
+
+    snprintf(filepath, sizeof(filepath), "%s/%s", PlayerContext.dir_path,
+            PlayerContext.fname);
+
+    trace("player: loading %s...\n", filepath);
+
+    PlayerStatus = PS_PLAYING;
+    memset(&PlayerState, 0, sizeof(PlayerState));
+#ifndef SIMULATOR
+    decoder->LoadFile(filepath);
+#endif
+
+    if (PlayerStatus == PS_PLAYING)
+    {
+      Audio_CommandSync(AC_PLAY);
+    }
+  }
+}
+
+void Player_Stop(void)
+{
+  if (decoder)
+  {
+    decoder->Stop();
+  }
+
+  /*
+   * todo: call AC_STOP after some idle in the paused state
+   *
+   */
+
+  //trace("player: stopped\n");
+
+  Audio_CommandSync(AC_STOP);
+
+  SetVariable(VAR_PlayerState, PlayerStatus, PS_STOPPED);
+}
+
 void Player_AsyncCommand(PlayerCommand_Typedef cmd, s32 arg)
 {
-  PlayerCommand = cmd;
-  PlayerCommandArg = arg;
+  CPU_DisableInterrupts();
+  {
+    PlayerCommand = cmd;
+    PlayerCommandArg = arg;
+  }
+  CPU_RestoreInterrupts();
 }
 
-PlayerState_Typedef Player_GetState(void)
+static void Player_Next(void)
 {
-  return PlayerState;
+  Player_Stop();
+
+  trace("player: next\n");
+
+  Navigator_NextFile(&PlayerContext);
+  if (PlayerContext.fname)
+  {
+    Player_Play();
+  }
+  else
+  {
+    Audio_CommandSync(AC_PAUSE);
+    trace("Player: Cannot switch to the next file\n");
+  }
 }
 
-void Player_SyncCommand(void)
+static void Player_Prev(void)
+{
+  Player_Stop();
+
+  trace("player: prev\n");
+
+  Navigator_PrevFile(&PlayerContext);
+  if (PlayerContext.fname)
+  {
+    trace("Player: Trying previous file %s\n", PlayerContext.fname);
+
+    Player_Play();
+  }
+  else
+  {
+    trace("Player: Cannot switch to the previous file\n");
+  }
+}
+
+static void Player_SyncCommand(void)
 {
   u32 PlayerCommand_Cached;
+  s32 PlayerCommandArg_Cached;
 
-  while (PlayerCommand != PC_EMPTY)
+  while (PlayerCommand != PC_DUMMY)
   {
-    PlayerCommand_Cached = PlayerCommand;
-    CPU_CompareExchange(&PlayerCommand, PlayerCommand_Cached, PC_EMPTY);
+    CPU_DisableInterrupts();
+    {
+      PlayerCommand_Cached = PlayerCommand;
+      PlayerCommandArg_Cached = PlayerCommandArg;
+    }
+    CPU_RestoreInterrupts();
+
+    CPU_CompareExchange(&PlayerCommand, PlayerCommand_Cached, PC_DUMMY);
 
     switch (PlayerCommand_Cached)
     {
-      case PC_PLAY:
-        /* TODO Pick a file, if no */
-        Player_SetState(PS_PLAYING);
-        Audio_Command(AC_PLAY);
-        break;
-
-      case PC_PAUSE:
-        Player_SetState(PS_PAUSED);
-        Audio_Command(AC_PAUSE);
-        break;
-
       case PC_NEXT:
         Player_Next();
         break;
@@ -154,34 +307,68 @@ void Player_SyncCommand(void)
         Player_Prev();
         break;
 
-      case PC_SEEK:
-        //todo is file->meta loaded
-        if (PlayerCommandArg == 0)
+      case PC_NEXT_DIR:
+	trace("player: next dir\n");
+        if (Navigator_CdUp(&PlayerContext))
         {
-          Player_SetState(PS_PLAYING);
-          Audio_Command(AC_PLAY);
-          break;
-        }
-
-        Player_SetState(PS_SEEKING);
-        Audio_Command(AC_RESET_BUFFERS);
-        assert_param(decoder);
-        assert_param(decoder->SeekFunc);
-        if ((*decoder->SeekFunc)(&mfile, PlayerCommandArg * 1000) == FUNC_ERROR)
-        {
-          //          if (PlayerCommandArg < 0)
-          //          {
-          //            Player_Prev();
-          //          }
-          //          else
-          //          {
-          //            Player_Next();
-          //          }
+          Player_Next();
         }
         break;
 
-      case PC_CHANGE_VOLUME:
-        Player_ChangeVolume(PlayerCommandArg);
+      case PC_PREV_DIR:
+	trace("player: prev dir\n");
+        if (Navigator_CdUp(&PlayerContext))
+        {
+          Player_Prev();
+        }
+        break;
+
+      case PC_SEEK:
+        if (PlayerStatus < PS_PLAYING)
+          break;
+
+        assert_param(decoder->Seek);
+
+        if (PlayerCommandArg_Cached == 0)
+        {
+          Audio_CommandSync(AC_PLAY);
+          PlayerStatus = PS_PLAYING;
+          break;
+        }
+
+        PlayerStatus = PS_SEEKING;
+        Audio_CommandSync(AC_PAUSE);
+        Audio_CommandSync(AC_RESET_BUFFERS);
+
+        if (PlayerCommandArg_Cached > 0)
+        {
+          if (PlayerState.metadata.mstime_curr + PlayerCommandArg_Cached
+                  > PlayerState.metadata.mstime_max)
+          {
+            Player_Next();
+            break;
+          }
+        }
+        else if (PlayerCommandArg_Cached < 0)
+        {
+          if (PlayerState.metadata.mstime_curr < (u32) -PlayerCommandArg_Cached)
+          {
+            PlayerCommandArg_Cached += (PlayerState.metadata.mstime_curr);
+
+            Player_Prev();
+
+            if (PlayerStatus == PS_PLAYING)
+            {
+              Player_AsyncCommand(PC_SEEK,
+                      PlayerState.metadata.mstime_max + PlayerCommandArg_Cached);
+            }
+
+            break;
+          }
+        }
+
+        decoder->Seek(
+                PlayerState.metadata.mstime_curr + PlayerCommandArg_Cached);
         break;
 
       default:
@@ -190,142 +377,54 @@ void Player_SyncCommand(void)
   }
 }
 
-void Player_MainCycle(void)
+void Player_MainThread(void)
 {
-  assert_param(SystemState == SS_PLAYER);
-
   Player_SyncCommand();
 
-  if (PlayerState != PS_PLAYING && PlayerState != PS_PAUSED && PlayerState
-          != PS_SEEKING)
+#ifndef SIMULATOR
+  if (PlayerStatus == PS_PLAYING)
   {
-    return;
+    decoder->MainThread();
+
+    Audio_PeriodicKick();
   }
 
-  while (PlayerState != PS_SEEKING && mfile.state == MFS_PLAYABLE)
+  if (PlayerStatus == PS_EOF)
   {
-    AudioBuffer_Typedef *buffer;
-    buffer = AudioBuffer_TryGetProducer();
-    if (buffer)
+    Player_AsyncCommand(PC_NEXT, 0);
+  }
+#endif
+
+  if (PlayerStatus == PS_PLAYING || PlayerStatus == PS_SEEKING)
+  {
+    if (PlayerState.metadata.time_curr != PlayerState.metadata.mstime_curr
+	/ 1000)
     {
-      assert_param(decoder);
-      if ((*decoder->DecodeFunc)(&mfile, buffer) != FUNC_SUCCESS)
-      {
-        if (mfile.state == MFS_ERROR)
-        {
-          Player_SetState(PS_FILE_ERROR);
-          snprintf(PlayerErrorString, sizeof(PlayerErrorString),
-                  "Decoding error: %s", mfile.meta.file_name);
-          return;
-        }
-      }
+      SetVariable(VAR_AudioPosition, PlayerState.metadata.time_curr,
+	  PlayerState.metadata.mstime_curr / 1000);
 
-      Audio_PeriodicKick(); /* kick the codec's DMA */
-    }
-    else
-    {
-      break;
-    }
-  }
+      /*Display a progress spinner while decoding.*/
+      static const char spinner[] = "|/-\\";
+      static size_t last_spin;
 
-  if (PlayerState == PS_PLAYING || PlayerState == PS_SEEKING)
-  {
-    SetVariable(VAR_media_time_curr, mfile.meta.time_curr,
-            mfile.meta.mstime_curr / 1000);
-  }
-
-  if (PlayerState == PS_PLAYING && mfile.state == MFS_EOF)
-  {
-    Player_Next();
-    return;
-  }
-
-  Audio_PeriodicKick(); /* kick the codec's DMA */
-}
-
-FuncResult Player_TryFile(MediaFile_Typedef *file)
-{
-  int i = 0;
-
-  //assert_param(FILE_IS_LOADED);
-
-  decoder = NULL;
-
-  //todo metadata -> for a player
-  file->meta.title[0] = 0;
-  file->meta.artist[0] = 0;
-  file->meta.album[0] = 0;
-  file->meta.notes[0] = 0;
-  file->meta.year[0] = 0; //todo finite playlist
-
-  while (1)
-  {
-    decoder = &decoders[i];
-    if (!decoder->LoadFileFunc)
-      break;
-
-    if ((*decoder->LoadFileFunc)(&mfile) == FUNC_ERROR)
-    {
-      i++;
-      continue;
-    }
-
-    SyncVariable(VAR_media_file_name);
-
-    SyncVariable(VAR_media_album);
-    SyncVariable(VAR_media_artist);
-    SyncVariable(VAR_media_genre);
-    SyncVariable(VAR_media_time_curr);
-    SyncVariable(VAR_media_mstime_max);
-    SyncVariable(VAR_media_title);
-    SyncVariable(VAR_media_year);
-
-    mfile.state = MFS_PLAYABLE;
-
-    return FUNC_SUCCESS;
-  }
-
-  //  Player_AsyncCommand(PC_NEXT, 0);//SetStatus(PS_PLAYING);
-  MediaFile_Close(&mfile); //XXX???never can get there
-  return FUNC_ERROR;
-}
-
-void Player_Next(void)//
-{
-  mfile.meta.mstime_curr = 0;//todo =0 -- when???
-  Playlist_LoadNext();
-}
-
-void Player_Prev(void)//
-{
-  Playlist_LoadPrev();
-}
-
-void Player_SetVolume(u8 vol)
-{
-  Audio_SetVolume(vol);
-}
-
-void Player_ChangeVolume(int8_t delta)
-{
-  int16_t new_volume = Audio_GetVolume() + delta;
-
-  if (delta > 0)
-  {
-    if (new_volume > DEFAULT_VOLMAX)
-    {
-      new_volume = DEFAULT_VOLMAX;
+      trace("\r[%c] %02d:%02d:%02d", spinner[last_spin & 3],
+	  (int) (PlayerState.metadata.time_curr / 3600),
+	  (int) (PlayerState.metadata.time_curr / 60) % 60,
+	  (int) (PlayerState.metadata.time_curr) % 60);
+      fflush(stdout);
+      last_spin++;
     }
   }
-  else
-  {
-    if (new_volume < DEFAULT_VOLMIN)
-    {
-      new_volume = DEFAULT_VOLMIN;
-    }
-  }
+}
 
-  Player_SetVolume(new_volume);
+PlayerState_Typedef *Player_GetState(void)
+{
+  return &PlayerState;
+}
+
+PlayerStatus_Typedef Player_GetStatus(void)
+{
+  return PlayerStatus;
 }
 
 /* Utils **********************************************************************/
@@ -335,31 +434,21 @@ void Player_ChangeVolume(int8_t delta)
   FS_EXEC(f_close(&fil)); } while (0)
 
 #define OPEN_WRITE(fil, name) do { \
-  u8_towc(f_name_buf, SIZE_OF(f_name_buf), name); \
-  FS_EXEC(f_open(&fil, f_name_buf, FA_WRITE | FA_CREATE_ALWAYS)); } while (0)
+  FS_EXEC(f_open(&fil, name, FA_WRITE | FA_CREATE_ALWAYS)); } while (0)
+//
+//extern PlaylistEntry_Typedef plist[PLAYLIST_MAX_ENTRIES];
+//extern int plist_curr;
 
-extern PlaylistEntry_Typedef plist[PLAYLIST_MAX_ENTRIES];
-extern int plist_curr;
+FIL fil;
 
 FuncResult Player_StoreSettings()
 {
-  FIL fil;
   UINT bytes_to_write, bytes_written;
 
   TCHAR f_name_buf[255];
 
   //  TCHAR file_name[255];
   u8 volume;
-
-  if (PlayerState <= PS_STOPPED)
-  {
-    return FUNC_ERROR;
-  }
-
-  if (mfile.state != MFS_PLAYABLE)
-  {
-    return FUNC_ERROR;
-  }
 
   //  if (!MEDIA_FILE_IS_LOADED) //todo error + is mounted
   //    return;
@@ -369,22 +458,21 @@ FuncResult Player_StoreSettings()
   FS_EXEC(f_write(&fil, &volume, bytes_to_write, &bytes_written));
   CLOSE(fil);
 
-  OPEN_WRITE(fil, "file.fname");
-  f_puts(plist[plist_curr].fname, &fil);
-  CLOSE(fil);
+  if (PlayerContext.fname)
+  {
+    OPEN_WRITE(fil, "file.dir_path");
+    f_puts(PlayerContext.dir_path, &fil);
+    CLOSE(fil);
 
-  //
-  OPEN_WRITE(fil, "file.fptr");
-  bytes_to_write = sizeof(mfile.file.fptr);
-  FS_EXEC(f_write(&fil, &mfile.file.fptr, bytes_to_write, &bytes_written));
-  CLOSE(fil);
+    OPEN_WRITE(fil, "file.fname");
+    f_puts(PlayerContext.fname, &fil);
+    CLOSE(fil);
 
-  OPEN_WRITE(fil, "file.meta.mstime_curr");
-  bytes_to_write = sizeof(mfile.meta.mstime_curr);
-  FS_EXEC(f_write(&fil, &mfile.meta.mstime_curr, bytes_to_write, &bytes_written));
-  CLOSE(fil);
-
-  MediaFile_Close(&mfile);//todo playlist
+    OPEN_WRITE(fil, "file.mstime_curr");
+    bytes_to_write = sizeof(PlayerState.metadata.mstime_curr);
+    FS_EXEC(f_write(&fil, &PlayerState.metadata.mstime_curr, bytes_to_write, &bytes_written));
+    CLOSE(fil);
+  }
 
   return FUNC_SUCCESS;
 }
@@ -392,15 +480,15 @@ FuncResult Player_StoreSettings()
 FuncResult Player_RestoreSettings()
 {
   FRESULT res;
-  FIL fil;
   UINT bytes_to_read, bytes_read;
   u8 volume;
   u32 fptr, mstime_curr;
   TCHAR file_name[100];
   TCHAR f_name_buf[100];
 
-  u8_towc(f_name_buf, SIZE_OF(f_name_buf), "volume");
-  res = f_open(&fil, f_name_buf, FA_READ);
+  Audio_SetVolume(PLAYER_DEFAULT_VOLUME);
+
+  res = f_open(&fil, "volume", FA_READ);
   if (res == FR_OK)
   {
     bytes_to_read = sizeof(volume);
@@ -411,268 +499,92 @@ FuncResult Player_RestoreSettings()
 
     if (bytes_to_read == bytes_read)
     {
-      Player_SetVolume(volume);
+      Audio_SetVolume(volume);
     }
   }
 
   //
 
-  u8_towc(f_name_buf, SIZE_OF(f_name_buf), "file.fname");
-  res = f_open(&fil, f_name_buf, FA_READ);
+  char buf[256];
+
+  res = f_open(&fil, "file.dir_path", FA_READ);
   if (res != FR_OK)
     return FUNC_ERROR;
 
-  f_gets(file_name, SIZE_OF(file_name), &fil);
+  f_gets(buf, SIZE_OF(buf), &fil);
   FS_EXEC(f_close(&fil));
 
-  //
-
-  if (Playlist_SetCurrentTrack(file_name) != FUNC_SUCCESS)
   {
-    return FUNC_ERROR;
-  }
-
-  //
-
-  u8_towc(f_name_buf, SIZE_OF(f_name_buf), "file.fptr");
-  res = f_open(&fil, f_name_buf, FA_READ);
-  if (res != FR_OK)
-    return FUNC_ERROR;
-
-  bytes_to_read = sizeof(fptr);
-  FS_EXEC(f_read(&fil, &fptr, bytes_to_read, &bytes_read));
-  FS_EXEC(f_close(&fil));
-
-  if (!(bytes_to_read == bytes_read && fptr < mfile.file.fsize))
-  {
-    return FUNC_SUCCESS;
-  }
-
-  //
-
-  u8_towc(f_name_buf, SIZE_OF(f_name_buf), "file.meta.mstime_curr");
-  res = f_open(&fil, f_name_buf, FA_READ);
-  if (res != FR_OK)
-    return FUNC_ERROR;
-
-  bytes_to_read = sizeof(mstime_curr);
-  FS_EXEC(f_read(&fil, &mstime_curr, bytes_to_read, &bytes_read));
-  FS_EXEC(f_close(&fil));
-
-  if (!(bytes_to_read == bytes_read && mstime_curr < mfile.meta.mstime_max))
-  {
-    return FUNC_SUCCESS;
-  }
-
-  //
-  MF_EXEC(MediaFile_FillFromFile(&mfile, fptr));
-  mfile.meta.mstime_curr = mstime_curr;
-
-  return FUNC_SUCCESS;
-}
-
-FuncResult MediaFile_CheckExtension(const char *fname, const char *ext)
-{
-  assert_param(fname);
-
-  int len = strlen(fname);
-  int ext_len = strlen(ext) + 1;
-  const char *ext_begin = &fname[len - ext_len];
-  int ret;
-
-  if (len < ext_len)
-  {
-    return FUNC_ERROR;
-  }
-
-  if (ext_begin[0] != '.')
-  {
-    return FUNC_ERROR;
-  }
-
-  ret = strcasecmp(&ext_begin[1], ext);
-  if (ret != 0)
-  {
-    return FUNC_ERROR;
-  }
-
-  return FUNC_SUCCESS;
-}
-
-/* Includes ------------------------------------------------------------------*/
-#include "player.h"
-#include <string.h>
-
-/* Private typedef -----------------------------------------------------------*/
-/* Private define ------------------------------------------------------------*/
-/* Private macro -------------------------------------------------------------*/
-/* Private variables ---------------------------------------------------------*/
-PlaylistEntry_Typedef plist[PLAYLIST_MAX_ENTRIES];
-int plist_cnt;
-int plist_curr;
-
-static TCHAR root[] =
-{ '0', ':', '/', 0 };
-
-/* Private function prototypes -----------------------------------------------*/
-/* Private functions ---------------------------------------------------------*/
-FuncResult Playlist_Init(void)
-{
-  DIR dir;
-  FILINFO file_info;
-  int f_index = 0;
-
-  plist_cnt = 0;
-  plist_curr = 0;
-
-  file_info.lfname = 0;
-  file_info.lfsize = 0;
-
-  char fname_u8_buf[26];
-
-  //
-  FS_EXEC(f_mount(0, &fatfs));
-
-  FS_EXEC(f_opendir(&dir, root));
-  FS_EXEC(f_readdir(&dir, 0));
-
-  trace("playlist:\r\n");
-
-  while (plist_cnt < PLAYLIST_MAX_ENTRIES)
-  {
-    FS_EXEC(f_readdir(&dir, &file_info));
-    f_index++;
-
-    if (file_info.fname[0] == 0)
+    if (Navigator_Cd(&PlayerContext, buf))
     {
-      //ret next dir
-      break;
-    }
-
-    if (file_info.fname[0] == '.')
-      continue; /* Ignore dot entry */
-
-    if (file_info.fattrib & AM_DIR)
-      continue; /* It is a directory */
-
-    wc_toutf8(fname_u8_buf, SIZE_OF(fname_u8_buf), file_info.fname);
-
-    if (MediaFile_CheckExtension(fname_u8_buf, "mp3") == FUNC_SUCCESS
-            || MediaFile_CheckExtension(fname_u8_buf, "wav") == FUNC_SUCCESS)//fixme
-    {
-      memcpy(plist[plist_cnt].fname, file_info.fname,
-              sizeof(plist[plist_cnt].fname));
-      plist[plist_cnt].f_index = f_index;
-
-      trace("%s\r\n", fname_u8_buf);
-
-      plist_cnt++;
+      trace("settings: restored last dir (%s)\n", PlayerContext.dir_path);
     }
   }
 
-  if (Player_RestoreSettings() != FUNC_SUCCESS)
+  //
+
+  res = f_open(&fil, "file.fname", FA_READ);
+  if (res != FR_OK)
+    return FUNC_ERROR;
+
+  f_gets(buf, SIZE_OF(buf), &fil);
+  FS_EXEC(f_close(&fil));
+
   {
-    Player_Next(); //first
-    //Player_Pause(); //fixme 1st entry -> play?
-  }
-
-  if (mfile.state == MFS_PLAYABLE)
-  {
-    Player_AsyncCommand(PC_PLAY, 0);
-    return FUNC_SUCCESS;
-  }
-
-  return FUNC_NOT_SUCCESS;
-}
-
-void Playlist_LoadNext()
-{
-  do
-  {
-    plist_curr = (plist_curr + 1) % plist_cnt;
-  } while (Playlist_TryLoadCurrentTrack() == FUNC_ERROR);
-}
-
-void Playlist_LoadPrev()
-{
-  do
-  {
-    plist_curr = (plist_curr - 1 < 0) ? (plist_cnt - 1) : (plist_curr - 1);
-  } while (Playlist_TryLoadCurrentTrack() == FUNC_ERROR);
-}
-
-FuncResult Playlist_SetCurrentTrack(TCHAR *file_name) //fixme+dir
-{
-  assert_param(file_name);
-
-  MediaFile_Close(&mfile);
-
-  for (int i = 0; i < plist_cnt; ++i)
-  {
-    if (strcmp_wc(plist[i].fname, file_name) == 0) //fixme store settings inside the playlist
+    if (Navigator_TryFile(&PlayerContext, buf))
     {
-      plist_curr = i;
+      trace("settings: restored last file (%s)\n", PlayerContext.fname);
+    }
+  }
 
-      if (Playlist_TryLoadCurrentTrack() == FUNC_SUCCESS)
+  //
+
+  if (PlayerContext.fname)
+  {
+    Player_Play();
+
+    if (PlayerStatus == PS_PLAYING)
+    {
+      res = f_open(&fil, "file.mstime_curr", FA_READ);
+      if (res != FR_OK)
+        return FUNC_SUCCESS;
+
+      unsigned int mstime;
+
+      bytes_to_read = sizeof(mstime);
+      FS_EXEC(f_read(&fil, &mstime, bytes_to_read, &bytes_read));
+      FS_EXEC(f_close(&fil));
+
+      if (!(bytes_to_read == bytes_read))
       {
         return FUNC_SUCCESS;
       }
 
-      return FUNC_ERROR;
+      trace("settings: read last file position (%u:%02u:%02u.%03u)\n",
+              (mstime / 1000 / 60 / 60), (mstime / 1000 / 60) % 60,
+              (mstime / 1000) % 60, mstime % 1000);
+
+      if (mstime < PlayerState.metadata.mstime_max)
+      {
+        Player_AsyncCommand(PC_SEEK, mstime);
+        Player_SyncCommand();
+        Player_AsyncCommand(PC_SEEK, 0);
+        Player_SyncCommand();
+      }
     }
   }
-  //todo if not in the plist -> load
 
-  return FUNC_ERROR;
+  return FUNC_SUCCESS;
 }
 
-FuncResult Playlist_TryLoadCurrentTrack()
+void Player_AudioFileError(char *error)
 {
-  int f_index;
-  DIR dir;
-  FILINFO file_info;
+  strncpy(PlayerErrorString, error, sizeof(PlayerErrorString));
 
-  TCHAR lfn_buf[255];
-  file_info.lfname = lfn_buf;
-  file_info.lfsize = SIZE_OF(lfn_buf);
-
-  if (plist_cnt < 1)
-    return FUNC_ERROR;
-
-  assert_param(plist_curr < plist_cnt);
-
-  f_index = plist[plist_curr].f_index;
-
-  //
-
-  //#if _LFN_UNICODE == 1
-  //  char file_name_u8_buf[512];
-  //#else
-  //  char *file_name_u8_buf;
-  //#endif
-
-  MediaFile_Close(&mfile);
-
-  //
-  FS_EXEC(f_opendir(&dir, root)); //todo dir
-  FS_EXEC(f_readdir(&dir, 0));
-
-  while (f_index--)
-  {
-    FS_EXEC(f_readdir(&dir, &file_info));
-  }
-
-  assert_param(strcmp_wc(file_info.fname, plist[plist_curr].fname) == 0);
-
-  MF_EXEC(MediaFile_Open(&mfile, plist[plist_curr].fname));
-
-  wc_toutf8(mfile.meta.file_name, SIZE_OF(mfile.meta.file_name),
-          file_info.lfname[0] ? file_info.lfname : file_info.fname);
-
-  return Player_TryFile(&mfile);
+  SetVariable(VAR_PlayerState, PlayerStatus, PS_ERROR_FILE);
 }
 
-MediaFile_Typedef *Player_CurrentFile(void)
+char *Player_GetErrorString(void)
 {
-  return &mfile;
+  return PlayerErrorString;
 }

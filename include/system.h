@@ -62,14 +62,16 @@ void RAM_FUNC System_SysTickHandler(void);
 void System_VbusApplied(void);
 void System_VbusDetached(void);
 
-void USB_MSC_Init(void);
-void USB_Audio_Init(void);
 void USB_CDC_Init(void);
+void USB_MSC_Init(void);
+void USB_DeInit(void);
 
 /* Exported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 extern SystemState_Typedef SystemState;
-extern __IO u32 msDelay;
+extern u32 msDelay;
 extern u32 MSC_RxSpeed, MSC_TxSpeed;
+
+extern u32 SysMsCounter;
 
 /* Exported static inline functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 

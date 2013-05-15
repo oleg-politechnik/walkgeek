@@ -29,7 +29,6 @@
 #include "powermanager.h"
 #include "scheduler.h"
 #include "system.h"
-#include "disp_1100.h"
 #include "nestedfilter.h"
 
 /* Imported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -38,23 +37,22 @@
 /* Private macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 static PowerManagerState_Typedef PowerManagerState;
-static ADC_Source_Typedef ADC_Source;
 static NestedFilterSet_Typedef *BatteryVoltageFilter = NULL;
 static NestedFilterSet_Typedef *ChargeCurrentFilter = NULL;
 
-/* Private function prototypes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-static void RAM_FUNC PowerManager_PeriodicCallback(void);
+uint16_t mV[ADCS_MAX];
 
+/* Private function prototypes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void PowerManager_Init(void)
 {
+  BSP_InitPowerSourcesSense();
+
   PowerManagerState = PM_OFFLINE;
 
   /* results in 2^9=512 effective window size averaging filter */
   BatteryVoltageFilter = NestedFilter_Init(3, 3);
   ChargeCurrentFilter = NestedFilter_Init(3, 3);
-
-  Scheduler_PutTask(100, PowerManager_PeriodicCallback, REPEAT);
 
   BSP_InitPowerManager();
 }
@@ -65,8 +63,6 @@ void PowerManager_MainThread(void)
   {
     /* Display charging indication when the power is attached */
     /* Other power-consuming modules can be enabled here */
-    System_PowerEnable();
-    //System_SetState(SS_PLAYER); /* TODO */
     PowerManagerState = PM_ONLINE;
 
     System_VbusApplied();
@@ -79,46 +75,32 @@ void PowerManager_MainThread(void)
   }
 }
 
-void RAM_FUNC PowerManager_PeriodicCallback(void)
+void PowerManager_ValuesReady(void)
 {
-  switch (ADC_Source)
-  {
-    case ADCS_BATTERY_VOLTAGE:
-      NestedFilter_AddMeasure(BatteryVoltageFilter,
-              BSP_GetLast_ADC_Result_mV(), VAR_BatteryVoltage);
-      ADC_Source = ADCS_CHARGE_CURRENT;
-      break;
+//  trace("%1u.%03u %1u.%03u %u\n", NestedFilter_GetValue(BatteryVoltageFilter) / 1000,
+//          NestedFilter_GetValue(BatteryVoltageFilter) % 1000,
+//          NestedFilter_GetValue(ChargeCurrentFilter) / 1000,
+//          NestedFilter_GetValue(ChargeCurrentFilter) % 1000,
+//          mV[2]
+//  );
 
-    case ADCS_CHARGE_CURRENT:
-      NestedFilter_AddMeasure(ChargeCurrentFilter, BSP_GetLast_ADC_Result_mV(),
-              VAR_BatteryVoltage);
-      ADC_Source = ADCS_BATTERY_VOLTAGE;
-      break;
-
-    default:
-      ADC_Source = ADCS_BATTERY_VOLTAGE;
-      break;
-  }
-
-  if (PowerManagerState == PM_OFFLINE)
-  {
-    ADC_Source = ADCS_BATTERY_VOLTAGE;
-  }
-
-  BSP_StartPowerManagerADC(ADC_Source);
+  NestedFilter_AddMeasure(BatteryVoltageFilter, mV[ADCS_BATTERY_VOLTAGE],
+          VAR_BatteryState);
+  NestedFilter_AddMeasure(ChargeCurrentFilter, mV[ADCS_CHARGE_CURRENT],
+          VAR_BatteryState);
 }
 
 float PowerManager_GetBatteryVoltage(void)
 {
-  return (float) NestedFilter_GetValue(BatteryVoltageFilter) / 1000;
+  return 2.f * NestedFilter_GetValue(BatteryVoltageFilter) / 1000;
 }
 
 float PowerManager_GetChargingCurrent(void)
 {
   /* XXX this is incorrect value -> needs a const coefficient */
-#define RPROG_OHM (1600+270)
+#define RPROG_OHM (1600)
 
-  return (float) (NestedFilter_GetValue(ChargeCurrentFilter) / 1000) * RPROG_OHM / 1000;
+  return ((float) NestedFilter_GetValue(ChargeCurrentFilter) / 1000) * RPROG_OHM / 1000;
 }
 
 PowerManagerState_Typedef PowerManager_GetState(void)

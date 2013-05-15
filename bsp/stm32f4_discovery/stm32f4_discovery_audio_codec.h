@@ -65,15 +65,6 @@
 /** @defgroup STM32F4_DISCOVERY_AUDIO_CODEC_Exported_Functions
   * @{
   */
-void EVAL_AUDIO_SetAudioInterface(uint32_t Interface);
-uint32_t EVAL_AUDIO_Init(uint16_t OutputDevice, uint8_t Volume, uint32_t AudioFreq);
-uint32_t EVAL_AUDIO_DeInit(void);
-uint32_t EVAL_AUDIO_Play(uint16_t* pBuffer, uint32_t Size);
-uint32_t EVAL_AUDIO_PauseResume(uint32_t Cmd);
-uint32_t EVAL_AUDIO_Stop(uint32_t CodecPowerDown_Mode);
-uint32_t EVAL_AUDIO_VolumeCtl(uint8_t Volume);
-uint32_t EVAL_AUDIO_Mute(uint32_t Command);
-void Audio_MAL_Play(uint32_t Addr, uint32_t Size);
 void DAC_Config(void);
 
 void Codec_AudioInterface_Init(uint32_t AudioFreq);
@@ -88,7 +79,7 @@ uint16_t EVAL_AUDIO_GetSampleCallBack(void);
    is called at the end of the whole audio file.
    In circular mode (when  the define AUDIO_MAL_MODE_CIRCULAR is enabled) this
    function is called at the end of the current buffer transmission. */
-void EVAL_AUDIO_TransferComplete_CallBack(uint32_t pBuffer, uint32_t Size);
+void EVAL_AUDIO_TransferComplete_CallBack(uint32_t pBuffer, uint32_t Size) RAM_FUNC;
 
 /* This function is called when half of the requested buffer has been transferred
    This callback is useful in Circular mode only (when AUDIO_MAL_MODE_CIRCULAR
