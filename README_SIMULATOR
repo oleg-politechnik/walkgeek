@@ -1,5 +1,5 @@
-dd if=/dev/zero of=sd_card.bin bs=128 count=131072
-/sbin/mkdosfs -F 16 sd_card.bin
-mkdir ~/fatmount
-sudo mount -t vfat -o umask=0000 -o loop sd_card.bin ~/fatmount
-sudo umount fatmount
+$ dd if=/dev/zero of=sd_card.bin bs=128 count=131072
+$ /sbin/mkdosfs -F 16 sd_card.bin
+$ mkdir ~/fatmount
+$ sudo mount -t vfat -o umask=0000 -o loop sd_card.bin ~/fatmount
+$ sudo umount fatmount

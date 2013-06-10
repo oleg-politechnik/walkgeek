@@ -18,6 +18,8 @@
  Ross Williams (ross@guest.adelaide.edu.au).  See docs/framing.html
  for details.
 
+ minogg implementation: 2013, otsaregorodtsev
+
  ********************************************************************/
 
 #include <stdlib.h>

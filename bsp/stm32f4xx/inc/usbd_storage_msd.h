@@ -1,10 +1,3 @@
-/*
- * usbd_storage_msd.h
- *
- *  Created on: 11 Apr 2012
- *      Author: User
- */
-
 /* Define to prevent recursive inclusion -------------------------------------*/
 #ifndef USBD_STORAGE_MSD_H_
 #define USBD_STORAGE_MSD_H_

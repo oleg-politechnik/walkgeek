@@ -82,6 +82,7 @@ bool Navigator_IsOnline(void);
 
 void Navigator_NextFile(NavigatorContext_Typedef *ctx);
 void Navigator_PrevFile(NavigatorContext_Typedef *ctx);
+void Navigator_LastFileCurrentDir(NavigatorContext_Typedef *ctx);
 
 /* Exported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Exported static inline functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/

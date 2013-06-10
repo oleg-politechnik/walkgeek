@@ -55,8 +55,10 @@ typedef enum
   PC_NEXT,
   PC_PREV,
 
-  PC_NEXT_DIR,
-  PC_PREV_DIR,
+  PC_DIR_START,
+  PC_DIR_END,
+
+  PC_SAVE_CURRENT_DIR,
 
   PC_SEEK
 } PlayerCommand_Typedef;

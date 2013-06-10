@@ -307,21 +307,29 @@ static void Player_SyncCommand(void)
         Player_Prev();
         break;
 
-      case PC_NEXT_DIR:
-	trace("player: next dir\n");
-        if (Navigator_CdUp(&PlayerContext))
-        {
-          Player_Next();
-        }
+      case PC_DIR_START:
+	trace("player: first track in current dir\n");
+        Navigator_Cd(&PlayerContext, PlayerContext.dir_path);
+        Player_Next();
         break;
 
-      case PC_PREV_DIR:
-	trace("player: prev dir\n");
-        if (Navigator_CdUp(&PlayerContext))
-        {
-          Player_Prev();
-        }
-        break;
+      case PC_DIR_END:
+	Player_Stop();
+	trace("player: last track in current dir\n");
+
+	Navigator_LastFileCurrentDir(&PlayerContext);
+
+	if (PlayerContext.fname)
+	{
+	  trace("Player: Trying file %s\n", PlayerContext.fname);
+
+	  Player_Play();
+	}
+	else
+	{
+	  trace("Player: Cannot switch to the last file\n");
+	}
+	break;
 
       case PC_SEEK:
         if (PlayerStatus < PS_PLAYING)
@@ -572,9 +580,10 @@ FuncResult Player_RestoreSettings()
         Player_SyncCommand();
       }
     }
+    return FUNC_SUCCESS;
   }
 
-  return FUNC_SUCCESS;
+  return FUNC_ERROR;
 }
 
 void Player_AudioFileError(char *error)

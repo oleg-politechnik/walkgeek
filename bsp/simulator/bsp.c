@@ -99,8 +99,14 @@ void CPU_EnableSysTick(u16 n)
 {
   trace("This is walkgeek SIMULATOR\n");
   trace("You can use keyboard to control it\n");
-  trace("'p' = previous track\n");
-  trace("'n' = next track\n");
+  trace("(p)     (u)\n");
+  trace("    (-)    \n");
+  trace("(c)     (d)\n");
+  trace("(1) (2) (3)\n");
+  trace("(4) (5) (6)\n");
+  trace("(7) (8) (9)\n");
+  trace("(*) (0) (#)\n");
+  trace("Press the key and hit ENTER\n");
   int rc = pthread_create(&thread, NULL, systick_thread, 0);
   if (rc)
   {
@@ -185,6 +191,8 @@ void Keypad_1msScan(void)
 {
   char buf;
   int cnt = fread(&buf, 1, 1, stdin);
+  KEY_Typedef key = _KEY_DUMMY;
+
 
   if (cnt > 0)
   {
@@ -194,26 +202,80 @@ void Keypad_1msScan(void)
       System_SetState(SS_SHUTDOWN);
       break;
 
-    case 'n':
-      Keypad_KeyPressedCallback(KEY_NEXT);
-      Keypad_KeyReleasedCallback(KEY_NEXT);
+    case 'p':
+      key = KEY_PPP;
       break;
 
-    case 'p':
-      Keypad_KeyPressedCallback(KEY_PREV);
-      Keypad_KeyReleasedCallback(KEY_PREV);
+    case 'c':
+      key = KEY_C;
+      break;
+
+    case '-':
+      key = KEY_SEL;
+      break;
+
+    case 'u':
+      key = KEY_UP;
+      break;
+
+    case 'd':
+      key = KEY_DOWN;
+      break;
+
+    case '1':
+      key = KEY_1;
+      break;
+
+    case '2':
+      key = KEY_2;
+      break;
+
+    case '3':
+      key = KEY_3;
       break;
 
     case '4':
-      Keypad_KeyPressedCallback(KEY_PREV_DIR);
-      Keypad_KeyReleasedCallback(KEY_PREV_DIR);
+      key = KEY_4;
+      break;
+
+    case '5':
+      key = KEY_5;
       break;
 
     case '6':
-      Keypad_KeyPressedCallback(KEY_NEXT_DIR);
-      Keypad_KeyReleasedCallback(KEY_NEXT_DIR);
+      key = KEY_6;
       break;
+
+    case '7':
+      key = KEY_7;
+      break;
+
+    case '8':
+      key = KEY_8;
+      break;
+
+    case '9':
+      key = KEY_9;
+      break;
+
+    case '*':
+      key = KEY_ASTERICK;
+      break;
+
+    case '0':
+      key = KEY_0;
+      break;
+
+    case '#':
+      key = KEY_POUND;
+      break;
+
+    default:
+      return;
     }
+
+    Keypad_KeyPressedCallback(key);
+    Keypad_KeyReleasedCallback(key);
   }
 }
 
@@ -229,35 +291,6 @@ bool BSP_Keypad_GetKeyStatus(KEY_Typedef key)
 {
   return false;
 }
-
-/* vibrator ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-//void Vibrator_Init(void)
-//{
-//  GPIO_InitTypeDef GPIO_InitStructure;
-//
-//  RCC_AHB1PeriphClockCmd(VIBRATOR_RCC_AHB1Periph_GPIO, ENABLE);
-//
-//  GPIO_InitStructure.GPIO_Pin = VIBRATOR_PIN;
-//  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
-//  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
-//  GPIO_InitStructure.GPIO_OType = GPIO_OType_OD;
-//  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-//  GPIO_Init(VIBRATOR_GPIO, &GPIO_InitStructure);
-//
-//  Vibrator_Disable();
-//}
-//
-//void Vibrator_Disable(void)
-//{
-//  GPIO_SetBits(VIBRATOR_GPIO, VIBRATOR_PIN);
-//}
-//
-//
-//void Vibrator_Enable(void)
-//{
-//  GPIO_ResetBits(VIBRATOR_GPIO, VIBRATOR_PIN);
-//}
 
 #ifdef  USE_FULL_ASSERT
 void assert_failed(uint8_t* file, uint32_t line, uint8_t* expr)
@@ -327,3 +360,4 @@ int Audio_GetVolume(void)
 {
   return FUNC_SUCCESS;
 }
+

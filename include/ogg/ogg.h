@@ -11,7 +11,9 @@
  ********************************************************************
 
  function: toplevel libogg include
- last mod: $Id: ogg.h 18044 2011-08-01 17:55:20Z gmaxwell $
+ last mod: $Id: ogg.h 18044 2011-08-01 17:55:20Z otsaregorodtsev $
+
+ minogg implementation: 2013, otsaregorodtsev
 
  ********************************************************************/
 #ifndef _OGG_H

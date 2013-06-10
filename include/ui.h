@@ -34,8 +34,8 @@
 #define KEY_PREV        KEY_1
 #define KEY_NEXT        KEY_3
 
-#define KEY_PREV_DIR    KEY_4
-#define KEY_NEXT_DIR    KEY_6
+#define KEY_DIR_START   KEY_4
+#define KEY_DIR_END     KEY_6
 
 #define KEY_APP_PLAYER  KEY_7
 #define KEY_APP_MSC     KEY_8
@@ -46,9 +46,6 @@ typedef enum
   UIM_Init,
 
   UIM_Player,
-//  UIM_Player_PoweringOn, //fixme
-//  UIM_Player_PoweringOff,
-//  UIM_Player_ChangingVolume,
   UIM_Player_Seeking,
 
   UIM_Player_HalfLocked,

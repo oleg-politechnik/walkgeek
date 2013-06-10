@@ -457,12 +457,12 @@ void Keypad_KeyPressedCallback(KEY_Typedef key)
       Scheduler_PutTask(1000, &Keypad_HoldTimeoutCallback, NO_REPEAT);
       break;
 
-    case KEY_PREV_DIR:
-      Player_AsyncCommand(PC_PREV_DIR, 0);
+    case KEY_DIR_START:
+      Player_AsyncCommand(PC_DIR_START, 0);
       break;
 
-    case KEY_NEXT_DIR:
-      Player_AsyncCommand(PC_NEXT_DIR, 0);
+    case KEY_DIR_END:
+      Player_AsyncCommand(PC_DIR_END, 0);
       break;
 
     case KEY_UP:

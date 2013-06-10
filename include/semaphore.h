@@ -1,13 +1,5 @@
-/*
- * semaphore.h
- *
- *  Created on: Apr 29, 2013
- *      Author: otsaregorodtsev
- */
-
 #ifndef SEMAPHORE_H_
 #define SEMAPHORE_H_
-
 
 /* Includes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Public defines ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
