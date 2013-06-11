@@ -28,7 +28,8 @@ set (LIBS_SOURCES
     ogg/framing.c
 )
 
-IF(USE_MP3)
+if(USE_MP3)
+  add_definitions(-DUSE_MP3)
   set (MP3_SOURCES
       mp3-fixpt-helix/real/stproc.c
       mp3-fixpt-helix/real/dct32.c
@@ -46,11 +47,9 @@ IF(USE_MP3)
       mp3-fixpt-helix/mp3dec.c
       mp3-fixpt-helix/mp3tabs.c
   )
-  
   set_source_files_properties(${MP3_SOURCES} PROPERTIES COMPILE_FLAGS
       "-Wno-unused-but-set-variable ${LIBS_FLAGS}" )
-  add_definitions(-DUSE_MP3)
-ENDIF()
+endif()
 
 #set (LIBS_SOURCES ${LIBS_SOURCES} ${MP3_SOURCES})
 

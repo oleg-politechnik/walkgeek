@@ -150,6 +150,9 @@
 // #define TX3_FIFO_HS_SIZE_AUDIO                     0
 // #define TX4_FIFO_HS_SIZE_AUDIO                     0
 // #define TX5_FIFO_HS_SIZE_AUDIO                     0
+
+// #define TXH_NP_HS_FIFOSIZ                        256
+// #define TXH_P_HS_FIFOSIZ                         256
 //
 //// #define USB_OTG_HS_LOW_PWR_MGMT_SUPPORT
 //// #define USB_OTG_HS_SOF_OUTPUT_ENABLED
@@ -167,30 +170,40 @@
 // #endif
 // #define USB_OTG_HS_INTERNAL_DMA_ENABLED
 // #define USB_OTG_HS_DEDICATED_EP1_ENABLED
+// #define USB_OTG_HS_INTERNAL_DMA_ENABLED
+//  #define USB_OTG_EXTERNAL_VBUS_ENABLED
 //#endif
 
 /****************** USB OTG FS CONFIGURATION **********************************/
 #ifdef USB_OTG_FS_CORE
- #define RX_FIFO_FS_SIZE_MSC                      128
- #define TX0_FIFO_FS_SIZE_MSC                      64
- #define TX1_FIFO_FS_SIZE_MSC                     128
- #define TX2_FIFO_FS_SIZE_MSC                      0
- #define TX3_FIFO_FS_SIZE_MSC                      0
+#ifdef USE_DEVICE_MODE
+  #define RX_FIFO_FS_SIZE_MSC                      128
+  #define TX0_FIFO_FS_SIZE_MSC                      64
+  #define TX1_FIFO_FS_SIZE_MSC                     128
+  #define TX2_FIFO_FS_SIZE_MSC                      0
+  #define TX3_FIFO_FS_SIZE_MSC                      0
 
- #define RX_FIFO_FS_SIZE_CDC                      128
- #define TX0_FIFO_FS_SIZE_CDC                      32
- #define TX1_FIFO_FS_SIZE_CDC                     128
- #define TX2_FIFO_FS_SIZE_CDC                      32
- #define TX3_FIFO_FS_SIZE_CDC                       0
+  #define RX_FIFO_FS_SIZE_CDC                      128
+  #define TX0_FIFO_FS_SIZE_CDC                      32
+  #define TX1_FIFO_FS_SIZE_CDC                     128
+  #define TX2_FIFO_FS_SIZE_CDC                      32
+  #define TX3_FIFO_FS_SIZE_CDC                       0
 
-// #define USB_OTG_FS_LOW_PWR_MGMT_SUPPORT
-// #define USB_OTG_FS_SOF_OUTPUT_ENABLED
+ // #define USB_OTG_FS_LOW_PWR_MGMT_SUPPORT
+ // #define USB_OTG_FS_SOF_OUTPUT_ENABLED
 
- extern __IO uint16_t RX_FIFO_FS_SIZE;
- extern __IO uint16_t TX0_FIFO_FS_SIZE;
- extern __IO uint16_t TX1_FIFO_FS_SIZE;
- extern __IO uint16_t TX2_FIFO_FS_SIZE;
- extern __IO uint16_t TX3_FIFO_FS_SIZE;
+  extern __IO uint16_t RX_FIFO_FS_SIZE;
+  extern __IO uint16_t TX0_FIFO_FS_SIZE;
+  extern __IO uint16_t TX1_FIFO_FS_SIZE;
+  extern __IO uint16_t TX2_FIFO_FS_SIZE;
+  extern __IO uint16_t TX3_FIFO_FS_SIZE;
+ #endif
+
+#ifdef USE_HOST_MODE
+  #define RX_FIFO_FS_SIZE                          128
+  #define TXH_NP_FS_FIFOSIZ                         96
+  #define TXH_P_FS_FIFOSIZ                          96
+#endif
 #endif
 
 /****************** USB OTG MISC CONFIGURATION ********************************/

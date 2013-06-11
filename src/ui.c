@@ -356,6 +356,7 @@ void UI_VariableChangedHandler(VAR_Index var)
     break;
 
   case VAR_BatteryState:
+#ifdef HAS_BATTERY
     if (PowerManager_GetState() == PM_ONLINE)
     {
       sprintf(str_buf, F1_2"C ",
@@ -367,6 +368,7 @@ void UI_VariableChangedHandler(VAR_Index var)
     }
     DISP_ALIGN_LEFT(0, str_buf);//region
     break;
+#endif
 
   default:
     break;

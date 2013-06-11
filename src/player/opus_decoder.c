@@ -102,6 +102,7 @@ static int gran_offset;
 static int has_opus_stream;
 static ogg_int32_t opus_serialno;
 static int proceeding_page;
+static int seeking;
 
 static opus_int64 maxout;
 
@@ -184,7 +185,6 @@ static void print_comments(char *comments, int length)
 
     c += len;
     length -= len;
-    fprintf(stderr, "\n");
   }
 
   SyncVariable(VAR_PlayerState);
@@ -332,7 +332,7 @@ opus_int64 audio_write(opus_int16 *pcm, int channels, int frame_size,
     ret = (out_len < maxout ? out_len : maxout);
     int to_out = ret;
 
-#if !PROFILING
+#ifndef PROFILING
     AudioBuffer_Typedef *buffer;
     while (!(buffer = AudioBuffer_TryGetProducer()))
       Audio_PeriodicKick();
@@ -378,6 +378,7 @@ void OPUS_LoadFile(char *filepath)
   maxout = 0;
 
   proceeding_page = 0;
+  seeking = 0;
 
   og = user_zalloc(sizeof(ogg_page));
   op = user_zalloc(sizeof(ogg_packet));
@@ -650,7 +651,7 @@ void OPUS_MainThread(void)
 
           break;
 
-#if PROFILING
+#ifdef PROFILING
           //if (Profiler_GetResult(PF_TOTAL) > 10*1000000)
 
           {
@@ -669,24 +670,31 @@ void OPUS_MainThread(void)
 
 void OPUS_Seek(u32 msec)
 {
-//  ogg_int64_t granule;
-//
-//  assert_param(msec < PlayerState.metadata.mstime_max);
-//
-//  os->oy.nextpage_pos = (double) os->oy.fsize /
-//      ((double) PlayerState.metadata.mstime_max / msec);
-//
-//  minogg_sync_pageout(&os->oy, og);
-//
-//  granule = ogg_page_granulepos(og);
-//
-//  {
-//    trace("ogg seek: fpos=%u/%u vs granule=%u",
-//	minogg_impl_ftell(&os->oy), minogg_impl_fsize(&os->oy),
-//	granule, end_granule);
-//  }
-//
-//  opus_decoder_ctl(st, OPUS_RESET_STATE);
+  assert_param(msec < PlayerState.metadata.mstime_max);
+
+  trace("Opus: trying to seek to %us... ", msec / 1000);
+  fflush(stdout);
+
+  proceeding_page = 0;
+  frame_size = 0;
+
+  //opus_decoder_ctl(st, OPUS_RESET_STATE);
+
+  {
+    os->oy.nextpage_pos = (double) os->oy.fsize /
+	((double) PlayerState.metadata.mstime_max / msec);
+
+    if (minogg_sync_pageout(&os->oy, og) != MINOGG_OK)
+      return;
+
+    page_granule = ogg_page_granulepos(og);
+  }
+
+  PlayerState.metadata.mstime_curr = page_granule - gran_offset;
+
+  audio_size = PlayerState.metadata.mstime_curr * (rate / 1000);
+
+  trace("got %us\n", PlayerState.metadata.mstime_curr / 1000);
 }
 
 void OPUS_Stop(void)

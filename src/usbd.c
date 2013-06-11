@@ -25,6 +25,8 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifdef USE_DEVICE_MODE
+
 /* Includes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 #include "system.h"
 
@@ -73,9 +75,10 @@ void USB_MSC_Init(void)
 
 void USB_CDC_Init(void)
 {
+#ifdef ENABLE_TRACE
   trace("usb: CDC mode activated\n");
-
   BSP_USBD_CDC_Init();
+#endif
 }
 
 void USB_DeInit(void)
@@ -84,3 +87,5 @@ void USB_DeInit(void)
 
   BSP_USBD_DeInit();
 }
+
+#endif

@@ -30,6 +30,7 @@
 #include "powermanager.h"
 #include "disp_1100.h"
 #include "bsp.h"
+#include "audio_if.h"
 
 /* Imported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 static u32 LastADC_Value_mV;
@@ -45,19 +46,27 @@ typedef enum
 
 /* Private macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+#ifdef HAS_BATTERY
 static uint16_t adc_buff[128];
 extern uint16_t mV[ADCS_MAX];
 
 static ADC_Source_Typedef ADC_Source = ADCS_MAX;
+#endif
 
+#ifdef HAS_HEADSET
 static HeadsetStatus_Typedef HeadsetStatus;
+#endif
+
 static bool HeadsetButtonPressed;
 
 /* Private function prototypes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-/* Private functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-static void UpdateHandsetStatus(void);
+#ifdef HAS_HEADSET
+static void UpdateHeadsetStatus(void);
+#endif
 
+/* Private functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Power monitoring --------------------------------------------------------- */
+#ifdef HAS_BATTERY
 static void RunADC(void)
 {
   uint8_t ADC_Channel;
@@ -78,7 +87,7 @@ static void RunADC(void)
 
     default:
       PowerManager_ValuesReady();
-      UpdateHandsetStatus();
+      UpdateHeadsetStatus();
       return;
   }
 
@@ -218,18 +227,22 @@ static void BSP_StartADC(void)
 
   RunADC();
 }
+#endif
 
 void BSP_InitPowerManager(void)
 {
+#ifdef HAS_BATTERY
   ADC_GPIO_Config();
 
   ADC_DMA_Config();
 
   Scheduler_PutTask(10, BSP_StartADC, REPEAT);
+#endif
 }
 
 void BSP_InitPowerSourcesSense(void)
 {
+#ifdef HAS_BATTERY
   GPIO_InitTypeDef GPIO_InitStructure;
 
   RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
@@ -240,15 +253,26 @@ void BSP_InitPowerSourcesSense(void)
   GPIO_InitStructure.GPIO_OType = GPIO_OType_OD;
   GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
   GPIO_Init(GPIOA, &GPIO_InitStructure);
+#endif
 }
 
 bool BSP_IsPowerSourceConnected(void)
 {
+#ifdef HAS_BATTERY
   return GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_9);
+#endif
+
+  return true;
 }
 
 void BSP_PowerEnable(void)
 {
+#ifdef USE_HOST_MODE
+  /* Init Host Library */
+  //USBH_Init(&USB_OTG_Core, USB_OTG_FS_CORE_ID, &USB_Host, &USBH_MSC_cb, &USR_Callbacks);
+#endif
+
+#ifdef HAS_BATTERY
   GPIO_InitTypeDef GPIO_InitStructure;
 
   RCC_AHB1PeriphClockCmd(PWR_EN_AHB1_CLK, ENABLE);
@@ -261,6 +285,7 @@ void BSP_PowerEnable(void)
   GPIO_Init(PWR_EN_GPIO, &GPIO_InitStructure);
 
   GPIO_SetBits(PWR_EN_GPIO, PWR_EN_PIN);
+#endif
 }
 
 void BSP_PowerDisable(void)
@@ -347,8 +372,8 @@ void Disp_SetRST(FunctionalState enabled)
 }
 
 /* sdio ----------------------------------------------------------------------*/
+#ifdef HAS_SDIO
 #include "stm324xg_eval_sdio_sd.h"
-#include "audio_if.h"
 
 /**
  * @brief  DeInitializes the SDIO interface.
@@ -462,6 +487,7 @@ uint8_t SD_Detect(void)
 //  }
   return status;
 }
+#endif
 
 /* keyboard ------------------------------------------------------------------*/
 static KeyPin_Typedef KeyPins[] =
@@ -480,6 +506,16 @@ void BSP_Keypad_Init(void)
 
   for (key = 0; key < KEY_MAX_GPIO; key++)
   {
+    if (!KeyPins[key].GPIOx)
+      continue;
+
+#ifdef F4DISCOVERY
+    if (key == KEY_3)
+    {
+      continue;
+    }
+#endif
+
     RCC_AHB1PeriphClockCmd(KeyPins[key].RCC_AHB1Periph_GPIOx, ENABLE);
     GPIO_InitStructure.GPIO_Pin = (1 << KeyPins[key].GPIO_PinSourcex);
     GPIO_Init(KeyPins[key].GPIOx, &GPIO_InitStructure);
@@ -493,9 +529,22 @@ bool BSP_Keypad_GetKeyStatus(KEY_Typedef key)
     return HeadsetButtonPressed;
   }
 
+  assert_param(key < KEY_MAX_GPIO);
+
+  if (!KeyPins[key].GPIOx)
+    return false;
+
+#ifdef F4DISCOVERY
+  if (key == KEY_3)
+  {
+    return GPIO_ReadInputDataBit(KeyPins[key].GPIOx, (1 << KeyPins[key].GPIO_PinSourcex));
+  }
+#endif
+
   return !GPIO_ReadInputDataBit(KeyPins[key].GPIOx, (1 << KeyPins[key].GPIO_PinSourcex));
 }
 
+#ifdef HAS_HEADSET
 void CheckHeadsetInserted(void)
 {
   u16 head_mV = mV[ADCS_HEADSET_STATE];
@@ -510,7 +559,7 @@ void CheckHeadsetInserted(void)
   }
 }
 
-void UpdateHandsetStatus(void)
+void UpdateHeadsetStatus(void)
 {
   if (HeadsetStatus == HS_QUALIFYING)
     return;
@@ -544,6 +593,7 @@ void UpdateHandsetStatus(void)
     }
   }
 }
+#endif
 
 /**
  * @brief  Codec_TIMEOUT_UserCallback
@@ -593,6 +643,7 @@ uint16_t EVAL_AUDIO_GetSampleCallBack(void)
 
 void Vibrator_Init(void)
 {
+#ifdef HAS_VIBRATOR
   GPIO_InitTypeDef GPIO_InitStructure;
 
   RCC_AHB1PeriphClockCmd(VIBRATOR_RCC_AHB1Periph_GPIO, ENABLE);
@@ -605,17 +656,22 @@ void Vibrator_Init(void)
   GPIO_Init(VIBRATOR_GPIO, &GPIO_InitStructure);
 
   Vibrator_Disable();
+#endif
 }
 
 void Vibrator_Disable(void)
 {
+#ifdef HAS_VIBRATOR
   GPIO_SetBits(VIBRATOR_GPIO, VIBRATOR_PIN);
+#endif
 }
 
 
 void Vibrator_Enable(void)
 {
+#ifdef HAS_VIBRATOR
   GPIO_ResetBits(VIBRATOR_GPIO, VIBRATOR_PIN);
+#endif
 }
 
 

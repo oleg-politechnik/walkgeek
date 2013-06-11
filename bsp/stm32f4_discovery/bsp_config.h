@@ -34,9 +34,11 @@
 #include "usbd_storage_msd.h"
 
 /* Exported defines ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-#define PWR_EN_GPIO                 GPIOB
-#define PWR_EN_AHB1_CLK             RCC_AHB1Periph_GPIOB
-#define PWR_EN_PIN                  GPIO_Pin_2
+#ifdef HAS_BATTERY
+# define PWR_EN_GPIO                 GPIOB
+# define PWR_EN_AHB1_CLK             RCC_AHB1Periph_GPIOB
+# define PWR_EN_PIN                  GPIO_Pin_2
+#endif
 
 /* disp_1100 -----------------------------------------------------------------*/
 #define DISP_GPIO                   GPIOA
@@ -46,7 +48,12 @@
 #define DISP_PinSrc_BKL             GPIO_PinSource3
 #define DISP_Pin_RST                GPIO_Pin_2
 #define DISP_Pin_BKL                GPIO_Pin_3
-#define DISP_Pin_CS                 GPIO_Pin_4
+
+#ifdef N1100
+# define DISP_Pin_CS                 GPIO_Pin_4
+#elif F4DISCOVERY
+# define DISP_Pin_CS                 GPIO_Pin_1
+#endif
 
 #define DISP_Pin_SCK                GPIO_Pin_5
 #define DISP_Pin_MOSI               GPIO_Pin_7
@@ -72,7 +79,7 @@ typedef struct {
 #include "keypad.h"
 
 /* Keep this in sync with KEY_Typedef */
-
+#ifdef N1100
 #define KEY_PIN_TYPEDEFS \
   { /* KEY_PPP      */ GPIOA, GPIO_PinSource0,  RCC_AHB1Periph_GPIOA}, \
   { /* KEY_C        */ GPIOC, GPIO_PinSource15, RCC_AHB1Periph_GPIOC}, \
@@ -91,13 +98,38 @@ typedef struct {
   { /* KEY_ASTERICK */ GPIOE, GPIO_PinSource13, RCC_AHB1Periph_GPIOE}, \
   { /* KEY_0        */ GPIOA, GPIO_PinSource8,  RCC_AHB1Periph_GPIOA}, \
   { /* KEY_POUND    */ GPIOE, GPIO_PinSource7,  RCC_AHB1Periph_GPIOE}
+#endif
+
+#ifdef F4DISCOVERY
+#define KEY_PIN_TYPEDEFS \
+  { /* KEY_PPP      */ GPIOE, GPIO_PinSource3 , RCC_AHB1Periph_GPIOE}, \
+  { /* KEY_C        */ 0, 0, 0}, \
+  { /* KEY_SEL      */ GPIOE, GPIO_PinSource4 , RCC_AHB1Periph_GPIOE}, \
+  { /* KEY_UP       */ GPIOE, GPIO_PinSource5 , RCC_AHB1Periph_GPIOE}, \
+  { /* KEY_DOWN     */ GPIOE, GPIO_PinSource6 , RCC_AHB1Periph_GPIOE}, \
+  { /* KEY_1        */ GPIOE, GPIO_PinSource7 , RCC_AHB1Periph_GPIOE}, \
+  { /* KEY_2        */ GPIOE, GPIO_PinSource8 , RCC_AHB1Periph_GPIOE}, \
+  { /* KEY_3        */ GPIOA, GPIO_PinSource0,  RCC_AHB1Periph_GPIOA}, \
+  { /* KEY_4        */ GPIOE, GPIO_PinSource9 , RCC_AHB1Periph_GPIOE}, \
+  { /* KEY_5        */ GPIOE, GPIO_PinSource10, RCC_AHB1Periph_GPIOE}, \
+  { /* KEY_6        */ GPIOE, GPIO_PinSource11, RCC_AHB1Periph_GPIOE}, \
+  { /* KEY_7        */ GPIOE, GPIO_PinSource12, RCC_AHB1Periph_GPIOE}, \
+  { /* KEY_8        */ GPIOE, GPIO_PinSource13, RCC_AHB1Periph_GPIOE}, \
+  { /* KEY_9        */ GPIOE, GPIO_PinSource14, RCC_AHB1Periph_GPIOE}, \
+  { /* KEY_ASTERICK */ GPIOE, GPIO_PinSource15, RCC_AHB1Periph_GPIOE}, \
+  { /* KEY_0        */ 0, 0, 0}, \
+  { /* KEY_POUND    */ 0, 0, 0}
+#endif
 
 /* Vibrator ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
+#ifdef HAS_VIBRATOR
 #define VIBRATOR_RCC_AHB1Periph_GPIO  RCC_AHB1Periph_GPIOB
 #define VIBRATOR_PIN                  GPIO_Pin_4
 #define VIBRATOR_GPIO                 GPIOB
+#endif
 
 /* ADC ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
+#ifdef HAS_BATTERY
 #define ADC_BAT_GPIO                  GPIOB
 #define ADC_BAT_RCC_AHB1Periph_GPIO   RCC_AHB1Periph_GPIOB
 #define ADC_BAT_PIN                   GPIO_Pin_0
@@ -118,10 +150,7 @@ typedef struct {
 
 #define HANDSET_LOW_THRESHOLD_MV      500
 #define HANDSET_HIGH_THRESHOLD_MV     2000
-
-/* SD ------------------------------------------------------------------------*/
-#define SDIO_IRQ_PRIORITY       1
-#define SDIO_IRQ_SUBPRIORITY    2
+#endif
 
 /*------------------------------------
              CONFIGURATION: Audio Codec Driver Configuration parameters
@@ -163,7 +192,7 @@ typedef struct {
    Make sure that this define is not already declared in other files (ie.
   stm322xg_eval.h file). It can be used in parallel by other modules. */
 #ifndef I2C_SPEED
- #define I2C_SPEED                        100000
+ #define I2C_SPEED                        400000
 #endif /* I2C_SPEED */
 
 /* Uncomment defines below to select standard for audio communication between
@@ -188,81 +217,154 @@ typedef struct {
 /*-----------------------------------
                     Hardware Configuration defines parameters
                                      -----------------------------------------*/
+#define AUDIO_MAL_DMA_PERIPH_DATA_SIZE DMA_PeripheralDataSize_HalfWord
+#define AUDIO_MAL_DMA_MEM_DATA_SIZE    DMA_MemoryDataSize_HalfWord
+#define DMA_MAX_SZE                    0xFFFF
+
+#ifdef N1100
 /* Audio Reset Pin definition */
-#define AUDIO_RESET_GPIO_CLK           RCC_AHB1Periph_GPIOC
-#define AUDIO_RESET_PIN                GPIO_Pin_7
-#define AUDIO_RESET_GPIO               GPIOC
+# define AUDIO_RESET_GPIO_CLK           RCC_AHB1Periph_GPIOC
+# define AUDIO_RESET_PIN                GPIO_Pin_7
+# define AUDIO_RESET_GPIO               GPIOC
 
 /* I2S peripheral configuration defines */
-#define CODEC_I2S                      SPI2
-#define CODEC_I2S_CLK                  RCC_APB1Periph_SPI2
-#define CODEC_I2S_ADDRESS              (SPI2_BASE + 0x000C)
-#define CODEC_I2S_GPIO_AF              GPIO_AF_SPI2
-#define CODEC_I2S_IRQ                  SPI2_IRQn
-#define CODEC_I2S_GPIO_CLOCK           (RCC_AHB1Periph_GPIOC | RCC_AHB1Periph_GPIOB)
-#define CODEC_I2S_WS_PIN               GPIO_Pin_12
-#define CODEC_I2S_SCK_PIN              GPIO_Pin_13
-#define CODEC_I2S_SD_PIN               GPIO_Pin_15
-#define CODEC_I2S_MCK_PIN              GPIO_Pin_6
-#define CODEC_I2S_WS_PINSRC            GPIO_PinSource12
-#define CODEC_I2S_SCK_PINSRC           GPIO_PinSource13
-#define CODEC_I2S_SD_PINSRC            GPIO_PinSource15
-#define CODEC_I2S_MCK_PINSRC           GPIO_PinSource6
-#define CODEC_I2S_GPIO                 GPIOB
-#define CODEC_I2S_WS_GPIO              GPIOB
-#define CODEC_I2S_MCK_GPIO             GPIOC
-#define Audio_I2S_IRQHandler           SPI2_IRQHandler
+# define CODEC_I2S                      SPI2
+# define CODEC_I2S_CLK                  RCC_APB1Periph_SPI2
+# define CODEC_I2S_ADDRESS              (SPI2_BASE + 0x000C)
+# define CODEC_I2S_GPIO_AF              GPIO_AF_SPI2
+# define CODEC_I2S_IRQ                  SPI2_IRQn
+# define CODEC_I2S_GPIO_CLOCK           (RCC_AHB1Periph_GPIOC | RCC_AHB1Periph_GPIOB)
+# define CODEC_I2S_WS_PIN               GPIO_Pin_12
+# define CODEC_I2S_SCK_PIN              GPIO_Pin_13
+# define CODEC_I2S_SD_PIN               GPIO_Pin_15
+# define CODEC_I2S_MCK_PIN              GPIO_Pin_6
+# define CODEC_I2S_WS_PINSRC            GPIO_PinSource12
+# define CODEC_I2S_SCK_PINSRC           GPIO_PinSource13
+# define CODEC_I2S_SD_PINSRC            GPIO_PinSource15
+# define CODEC_I2S_MCK_PINSRC           GPIO_PinSource6
+# define CODEC_I2S_GPIO                 GPIOB
+# define CODEC_I2S_WS_GPIO              GPIOB
+# define CODEC_I2S_MCK_GPIO             GPIOC
+# define Audio_I2S_IRQHandler           SPI2_IRQHandler
 
+# define DAC_DHR12L1_ADDRESS            0x4000740C
+# define DAC_DHR12R1_ADDRESS            0x40007408
+# define DAC_DHR8R1_ADDRESS             0x40007410
+# define AUDIO_DAC_CHANNEL              DAC_Channel_1
 
- #define AUDIO_MAL_DMA_PERIPH_DATA_SIZE DMA_PeripheralDataSize_HalfWord
- #define AUDIO_MAL_DMA_MEM_DATA_SIZE    DMA_MemoryDataSize_HalfWord
- #define DMA_MAX_SZE                    0xFFFF
+/* I2S DMA Stream definitions */
+# define AUDIO_I2S_DMA_CLOCK            RCC_AHB1Periph_DMA1
+# define AUDIO_I2S_DMA_STREAM           DMA1_Stream4
+# define AUDIO_I2S_DMA_DREG             CODEC_I2S_ADDRESS
+# define AUDIO_I2S_DMA_CHANNEL          DMA_Channel_0
+# define AUDIO_I2S_DMA_IRQ              DMA1_Stream4_IRQn
+# define AUDIO_I2S_DMA_FLAG_TC          DMA_FLAG_TCIF4
+# define AUDIO_I2S_DMA_FLAG_HT          DMA_FLAG_HTIF4
+# define AUDIO_I2S_DMA_FLAG_FE          DMA_FLAG_FEIF4
+# define AUDIO_I2S_DMA_FLAG_TE          DMA_FLAG_TEIF4
+# define AUDIO_I2S_DMA_FLAG_DME         DMA_FLAG_DMEIF4
 
+# define Audio_MAL_I2S_IRQHandler       DMA1_Stream4_IRQHandler
 
- #define DAC_DHR12L1_ADDRESS            0x4000740C
- #define DAC_DHR12R1_ADDRESS            0x40007408
- #define DAC_DHR8R1_ADDRESS             0x40007410
- #define AUDIO_DAC_CHANNEL              DAC_Channel_1
+/* DAC DMA Stream definitions */
+# define AUDIO_DAC_DMA_CLOCK            RCC_AHB1Periph_DMA1
+# define AUDIO_DAC_DMA_STREAM           DMA1_Stream0
+# define AUDIO_DAC_DMA_DREG             DAC_DHR12L1_ADDRESS
+# define AUDIO_DAC_DMA_CHANNEL          DMA_Channel_0
+# define AUDIO_DAC_DMA_IRQ              DMA1_Stream0_IRQn
+# define AUDIO_DAC_DMA_FLAG_TC          DMA_FLAG_TCIF0
+# define AUDIO_DAC_DMA_FLAG_HT          DMA_FLAG_HTIF0
+# define AUDIO_DAC_DMA_FLAG_FE          DMA_FLAG_FEIF0
+# define AUDIO_DAC_DMA_FLAG_TE          DMA_FLAG_TEIF0
+# define AUDIO_DAC_DMA_FLAG_DME         DMA_FLAG_DMEIF0
 
- /* I2S DMA Stream definitions */
- #define AUDIO_I2S_DMA_CLOCK            RCC_AHB1Periph_DMA1
- #define AUDIO_I2S_DMA_STREAM           DMA1_Stream4
- #define AUDIO_I2S_DMA_DREG             CODEC_I2S_ADDRESS
- #define AUDIO_I2S_DMA_CHANNEL          DMA_Channel_0
- #define AUDIO_I2S_DMA_IRQ              DMA1_Stream4_IRQn
- #define AUDIO_I2S_DMA_FLAG_TC          DMA_FLAG_TCIF4
- #define AUDIO_I2S_DMA_FLAG_HT          DMA_FLAG_HTIF4
- #define AUDIO_I2S_DMA_FLAG_FE          DMA_FLAG_FEIF4
- #define AUDIO_I2S_DMA_FLAG_TE          DMA_FLAG_TEIF4
- #define AUDIO_I2S_DMA_FLAG_DME         DMA_FLAG_DMEIF4
-
- #define Audio_MAL_I2S_IRQHandler       DMA1_Stream4_IRQHandler
-
- /* DAC DMA Stream definitions */
- #define AUDIO_DAC_DMA_CLOCK            RCC_AHB1Periph_DMA1
- #define AUDIO_DAC_DMA_STREAM           DMA1_Stream0
- #define AUDIO_DAC_DMA_DREG             DAC_DHR12L1_ADDRESS
- #define AUDIO_DAC_DMA_CHANNEL          DMA_Channel_0
- #define AUDIO_DAC_DMA_IRQ              DMA1_Stream0_IRQn
- #define AUDIO_DAC_DMA_FLAG_TC          DMA_FLAG_TCIF0
- #define AUDIO_DAC_DMA_FLAG_HT          DMA_FLAG_HTIF0
- #define AUDIO_DAC_DMA_FLAG_FE          DMA_FLAG_FEIF0
- #define AUDIO_DAC_DMA_FLAG_TE          DMA_FLAG_TEIF0
- #define AUDIO_DAC_DMA_FLAG_DME         DMA_FLAG_DMEIF0
-
- #define Audio_MAL_DAC_IRQHandler       DMA1_Stream0_IRQHandler
+# define Audio_MAL_DAC_IRQHandler       DMA1_Stream0_IRQHandler
 
 
 /* I2C peripheral configuration defines (control interface of the audio codec) */
-#define CODEC_I2C                      I2C2
-#define CODEC_I2C_CLK                  RCC_APB1Periph_I2C2
-#define CODEC_I2C_GPIO_CLOCK           RCC_AHB1Periph_GPIOB
-#define CODEC_I2C_GPIO_AF              GPIO_AF_I2C2
-#define CODEC_I2C_GPIO                 GPIOB
-#define CODEC_I2C_SCL_PIN              GPIO_Pin_10
-#define CODEC_I2C_SDA_PIN              GPIO_Pin_11
-#define CODEC_I2S_SCL_PINSRC           GPIO_PinSource10
-#define CODEC_I2S_SDA_PINSRC           GPIO_PinSource11
+# define CODEC_I2C                      I2C2
+# define CODEC_I2C_CLK                  RCC_APB1Periph_I2C2
+# define CODEC_I2C_GPIO_CLOCK           RCC_AHB1Periph_GPIOB
+# define CODEC_I2C_GPIO_AF              GPIO_AF_I2C2
+# define CODEC_I2C_GPIO                 GPIOB
+# define CODEC_I2C_SCL_PIN              GPIO_Pin_10
+# define CODEC_I2C_SDA_PIN              GPIO_Pin_11
+# define CODEC_I2S_SCL_PINSRC           GPIO_PinSource10
+# define CODEC_I2S_SDA_PINSRC           GPIO_PinSource11
+#endif
+
+#ifdef F4DISCOVERY
+/* Audio Reset Pin definition */
+# define AUDIO_RESET_GPIO_CLK           RCC_AHB1Periph_GPIOD
+# define AUDIO_RESET_PIN                GPIO_Pin_4
+# define AUDIO_RESET_GPIO               GPIOD
+
+/* I2S peripheral configuration defines */
+# define CODEC_I2S                      SPI3
+# define CODEC_I2S_CLK                  RCC_APB1Periph_SPI3
+# define CODEC_I2S_ADDRESS              0x40003C0C
+# define CODEC_I2S_GPIO_AF              GPIO_AF_SPI3
+# define CODEC_I2S_IRQ                  SPI3_IRQn
+# define CODEC_I2S_GPIO_CLOCK           (RCC_AHB1Periph_GPIOC | RCC_AHB1Periph_GPIOA)
+# define CODEC_I2S_WS_PIN               GPIO_Pin_4
+# define CODEC_I2S_SCK_PIN              GPIO_Pin_10
+# define CODEC_I2S_SD_PIN               GPIO_Pin_12
+# define CODEC_I2S_MCK_PIN              GPIO_Pin_7
+# define CODEC_I2S_WS_PINSRC            GPIO_PinSource4
+# define CODEC_I2S_SCK_PINSRC           GPIO_PinSource10
+# define CODEC_I2S_SD_PINSRC            GPIO_PinSource12
+# define CODEC_I2S_MCK_PINSRC           GPIO_PinSource7
+# define CODEC_I2S_GPIO                 GPIOC
+# define CODEC_I2S_WS_GPIO              GPIOA
+# define CODEC_I2S_MCK_GPIO             GPIOC
+# define Audio_I2S_IRQHandler           SPI3_IRQHandler
+
+# define DAC_DHR12L1_ADDRESS            0x4000740C
+# define DAC_DHR12R1_ADDRESS            0x40007408
+# define DAC_DHR8R1_ADDRESS             0x40007410
+# define AUDIO_DAC_CHANNEL              DAC_Channel_1
+
+/* I2S DMA Stream definitions */
+# define AUDIO_I2S_DMA_CLOCK            RCC_AHB1Periph_DMA1
+# define AUDIO_I2S_DMA_STREAM           DMA1_Stream7
+# define AUDIO_I2S_DMA_DREG             CODEC_I2S_ADDRESS
+# define AUDIO_I2S_DMA_CHANNEL          DMA_Channel_0
+# define AUDIO_I2S_DMA_IRQ              DMA1_Stream7_IRQn
+# define AUDIO_I2S_DMA_FLAG_TC          DMA_FLAG_TCIF7
+# define AUDIO_I2S_DMA_FLAG_HT          DMA_FLAG_HTIF7
+# define AUDIO_I2S_DMA_FLAG_FE          DMA_FLAG_FEIF7
+# define AUDIO_I2S_DMA_FLAG_TE          DMA_FLAG_TEIF7
+# define AUDIO_I2S_DMA_FLAG_DME         DMA_FLAG_DMEIF7
+
+# define Audio_MAL_I2S_IRQHandler       DMA1_Stream7_IRQHandler
+
+
+/* DAC DMA Stream definitions */
+# define AUDIO_DAC_DMA_CLOCK            RCC_AHB1Periph_DMA1
+# define AUDIO_DAC_DMA_STREAM           DMA1_Stream0
+# define AUDIO_DAC_DMA_DREG             DAC_DHR12L1_ADDRESS
+# define AUDIO_DAC_DMA_CHANNEL          DMA_Channel_0
+# define AUDIO_DAC_DMA_IRQ              DMA1_Stream0_IRQn
+# define AUDIO_DAC_DMA_FLAG_TC          DMA_FLAG_TCIF0
+# define AUDIO_DAC_DMA_FLAG_HT          DMA_FLAG_HTIF0
+# define AUDIO_DAC_DMA_FLAG_FE          DMA_FLAG_FEIF0
+# define AUDIO_DAC_DMA_FLAG_TE          DMA_FLAG_TEIF0
+# define AUDIO_DAC_DMA_FLAG_DME         DMA_FLAG_DMEIF0
+
+# define Audio_MAL_DAC_IRQHandler       DMA1_Stream0_IRQHandler
+
+
+/* I2C peripheral configuration defines (control interface of the audio codec) */
+# define CODEC_I2C                      I2C1
+# define CODEC_I2C_CLK                  RCC_APB1Periph_I2C1
+# define CODEC_I2C_GPIO_CLOCK           RCC_AHB1Periph_GPIOB
+# define CODEC_I2C_GPIO_AF              GPIO_AF_I2C1
+# define CODEC_I2C_GPIO                 GPIOB
+# define CODEC_I2C_SCL_PIN              GPIO_Pin_6
+# define CODEC_I2C_SDA_PIN              GPIO_Pin_9
+# define CODEC_I2S_SCL_PINSRC           GPIO_PinSource6
+# define CODEC_I2S_SDA_PINSRC           GPIO_PinSource9
+#endif
 
 /* Maximum Timeout values for flags and events waiting loops. These timeouts are
    not based on accurate values, they just guarantee that the application will
@@ -271,6 +373,7 @@ typedef struct {
    conditions (interrupts routines ...). */
 #define CODEC_FLAG_TIMEOUT             ((uint32_t)0x1000)
 #define CODEC_LONG_TIMEOUT             ((uint32_t)(300 * CODEC_FLAG_TIMEOUT))
+
 /*----------------------------------------------------------------------------*/
 
 /*-----------------------------------
@@ -302,6 +405,11 @@ typedef struct {
 #define AUDIO_MUTE_ON                 1
 #define AUDIO_MUTE_OFF                0
 /*----------------------------------------------------------------------------*/
+
+#ifdef HAS_SDIO
+/* SD ------------------------------------------------------------------------*/
+#define SDIO_IRQ_PRIORITY       1
+#define SDIO_IRQ_SUBPRIORITY    2
 
 /* Exported constants --------------------------------------------------------*/
 #define SD_DETECT_PIN                    GPIO_Pin_1
@@ -345,5 +453,6 @@ typedef struct {
 #define SD_SDIO_DMA_IRQn              DMA2_Stream6_IRQn
 #define SD_SDIO_DMA_IRQHANDLER        DMA2_Stream6_IRQHandler
 #endif /* SD_SDIO_DMA_STREAM3 */
+#endif
 
 #endif /* BSP_CONFIG_H_ */

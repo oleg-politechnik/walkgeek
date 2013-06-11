@@ -30,10 +30,14 @@
 #include <assert.h>
 #include "common.h"
 #include <unistd.h>
-#include "usbd_cdc_core.h"
+#ifdef ENABLE_TRACE
+# include "usbd_cdc_core.h"
+#endif
 
 /* Imported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+#ifdef ENABLE_TRACE
 extern CDC_IF_Prop_TypeDef VCP_fops;
+#endif
 
 /* Private define ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private typedef ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -44,7 +48,7 @@ extern CDC_IF_Prop_TypeDef VCP_fops;
 
 int _write(int file, char *buf, int nbytes)
 {
-#if !ENABLE_TRACE
+#ifndef ENABLE_TRACE
   return nbytes;
 #else
   int tx_cnt = 0;

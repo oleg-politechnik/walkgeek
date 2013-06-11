@@ -80,10 +80,6 @@ void CPU_FreeStackBottom(void)
 {
 }
 
-void CPU_EnableFPU(void)
-{
-}
-
 void *systick_thread(void *arg)
 {
   while (!stop)
@@ -113,6 +109,19 @@ void CPU_EnableSysTick(u16 n)
     printf("ERROR; return code from pthread_create() is %d\n", rc);
     exit(-1);
   }
+}
+
+void PowerManager_Init(void)
+{
+}
+
+void PowerManager_MainThread(void)
+{
+}
+
+PowerManagerState_Typedef PowerManager_GetState(void)
+{
+  return PM_ONLINE;
 }
 
 /* Power monitoring --------------------------------------------------------- */
@@ -305,15 +314,15 @@ void assert_failed(uint8_t* file, uint32_t line, uint8_t* expr)
 #endif
 
 
-void BSP_USBD_MSC_Init()
+void USB_MSC_Init()
 {
 }
 
-void BSP_USBD_CDC_Init()
+void USB_CDC_Init()
 {
 }
 
-void BSP_USBD_DeInit()
+void USB_DeInit()
 {
 }
 

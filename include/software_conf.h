@@ -33,10 +33,6 @@
 #define PLAYER_DEFAULT_VOLUME               20
 #define PLAYER_INI_FILE                     "0:/player.ini"
 
-#define DEBUG                               1
-#define ENABLE_TRACE                        0
-#define PROFILING                           0
-
 #define NAVIGATOR_MAX_NESTING_LEVEL         10
 
 #define SD_BLOCK_SIZE                       512
@@ -54,13 +50,9 @@
 /* CDC buf size */
 #define APP_RX_DATA_SIZE                    1024
 
-#if DEBUG
-# define DISABLE_MSC                        1
-#endif
-
 #ifdef SIMULATOR
 # undef ENABLE_TRACE
-#define ENABLE_TRACE                        1
+# define ENABLE_TRACE                        1
 #endif
 
 #endif /* SOFTWARE_CONF_H_ */

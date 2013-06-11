@@ -107,9 +107,7 @@ void System_VbusApplied(void)
 
   if (SystemState != SS_USB_MSC)
   {
-#if ENABLE_TRACE
     USB_CDC_Init();
-#endif
     return;
   }
 }
@@ -123,8 +121,6 @@ void System_VbusDetached(void)
 
 void System_Init(void)
 {
-  CPU_EnableFPU();
-
   Scheduler_Reset();
 
   CPU_EnableSysTick(HZ);
@@ -142,21 +138,18 @@ void System_Init(void)
   }
   else
   {
+#ifdef HAS_BATTERY
     Scheduler_PutTask(10, System_Check_PPP_Button, REPEAT);
     Scheduler_PutTask(1000, System_StartPlayer, NO_REPEAT);
+#endif
   }
 
   Scheduler_PutTask(10000, System_ForbidDebugging, NO_REPEAT);
-
-#if PROFILING
-  System_StartPlayer();
-  USB_CDC_Init();
-#endif
 }
 
 void RAM_FUNC System_SysTickHandler(void)
 {
-#if !PROFILING
+#ifndef PROFILING
   Keypad_1msScan();
   Scheduler_1msCycle();
 

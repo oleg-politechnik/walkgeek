@@ -57,7 +57,7 @@ typedef enum
 } ProfileFunction_Typedef;
 
 /* Exported functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-#if PROFILING
+#ifdef PROFILING
 void Profiler_DoEnterFunc(char *func_name, ProfileFunction_Typedef func);
 void Profiler_ExitFunc(ProfileFunction_Typedef func);
 void Profiler_Print(void);

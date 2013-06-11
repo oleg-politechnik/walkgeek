@@ -27,6 +27,7 @@
 #include "usb_dcd_int.h"
 #include "stm324xg_eval_sdio_sd.h"
 #include "disp_1100.h"
+#include "stm32f4xx_it.h"
 
 extern uint32_t USBD_OTG_ISR_Handler(USB_OTG_CORE_HANDLE *pdev);
 
@@ -227,6 +228,7 @@ extern uint32_t USBD_OTG_EP1OUT_ISR_Handler (USB_OTG_CORE_HANDLE *pdev);
 /******************************************************************************/
 /*                 STM32F4xx Peripherals Interrupt Handlers                   */
 /******************************************************************************/
+#ifdef HAS_SDIO
 /**
  * @brief  This function handles SDIO global interrupt request.
  * @param  None
@@ -249,6 +251,7 @@ void SD_SDIO_DMA_IRQHANDLER(void)
   /* Process DMA2 Stream3 or DMA2 Stream6 Interrupt Sources */
   SD_ProcessDMAIRQ();
 }
+#endif
 
 #ifdef USE_USB_OTG_FS
 /**
@@ -286,9 +289,27 @@ void OTG_FS_WKUP_IRQHandler(void)
  */
 void OTG_FS_IRQHandler(void)
 {
-  USBD_OTG_ISR_Handler(&USB_OTG_Core);
+#ifdef USE_DEVICE_MODE
+ // USBD_OTG_ISR_Handler(&USB_OTG_Core);
+#endif
+
+#ifdef USE_HOST_MODE
+  USBH_OTG_ISR_Handler(&USB_OTG_Core);
+#endif
 }
 #endif /* USE_USB_OTG_FS */
+
+#ifdef USE_HOST_MODE
+/**
+  * @brief  This function handles TIM2 global interrupt request.
+  * @param  None
+  * @retval None
+  */
+void TIM2_IRQHandler(void)
+{
+  USB_OTG_BSP_TimerIRQ();
+}
+#endif
 
 #ifdef USE_USB_OTG_HS
 /**

@@ -18,11 +18,11 @@ include_directories(
 
 add_definitions(-DUSE_FULL_ASSERT)
 
-include(bsp/bsp.cmake)
-
-IF(USE_MP3)
-  add_definitions(-DUSE_MP3)
+if(ENABLE_TRACE)
+  add_definitions(-DENABLE_TRACE)
 endif()
+
+include(bsp/bsp.cmake)
 
 add_subdirectory(lib)
 
@@ -33,7 +33,6 @@ set (SOURCES
     src/player/player.c
     src/navigator.c
     src/nestedfilter.c
-    src/powermanager.c
     src/scheduler.c
     src/system.c
     src/ui.c
@@ -41,6 +40,12 @@ set (SOURCES
     
     main.c
 )
+
+if(HAS_BATTERY)
+  set (SOURCES ${SOURCES}
+    src/powermanager.c
+  )
+endif()
 
 IF(USE_MP3)
   set (SOURCES ${SOURCES}

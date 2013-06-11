@@ -34,7 +34,7 @@
 
 /* Exported defines ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Exported macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-#if ENABLE_TRACE
+#ifdef ENABLE_TRACE
 # define trace(...) printf(__VA_ARGS__)
 #else
 # define trace(...)

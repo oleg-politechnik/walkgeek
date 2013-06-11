@@ -40,7 +40,6 @@
 void CPU_EnterLowPowerState(void);
 void CPU_EnableSysTick(u16 hz);
 void CPU_InitUserHeap(void);
-void CPU_EnableFPU(void);
 
 void *CPU_GetUserHeapStart(void);
 size_t CPU_GetUserHeapSize(void);

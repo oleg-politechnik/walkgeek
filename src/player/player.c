@@ -588,6 +588,8 @@ FuncResult Player_RestoreSettings()
 
 void Player_AudioFileError(char *error)
 {
+  trace("Player ERROR: %s", error);
+
   strncpy(PlayerErrorString, error, sizeof(PlayerErrorString));
 
   SetVariable(VAR_PlayerState, PlayerStatus, PS_ERROR_FILE);
