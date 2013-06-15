@@ -61,6 +61,8 @@
 #include "ff.h"
 #include "audio_if.h"
 #include "opus_types.h"
+#include "opus/config.h"
+#include "opus/celt/stack_alloc.h"
 
 /* Imported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 extern PlayerStatus_Typedef PlayerStatus;
@@ -68,7 +70,8 @@ extern PlayerState_Typedef PlayerState;
 
 /* Private define ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* 20ms at 48000, TODO 120ms */
-#define MAX_FRAME_SIZE (960)
+#define MAX_FRAME_SIZE      960
+#define OPUS_STACK_SIZE     32000 /*31684*/
 
 /* Private typedef ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -332,7 +335,6 @@ opus_int64 audio_write(opus_int16 *pcm, int channels, int frame_size,
     ret = (out_len < maxout ? out_len : maxout);
     int to_out = ret;
 
-#ifndef PROFILING
     AudioBuffer_Typedef *buffer;
     while (!(buffer = AudioBuffer_TryGetProducer()))
       Audio_PeriodicKick();
@@ -343,8 +345,10 @@ opus_int64 audio_write(opus_int16 *pcm, int channels, int frame_size,
     buffer->sampling_freq = rate;
     buffer->size = to_write * channels;
 
+#ifndef SIMULATOR
     AudioBuffer_MoveProducer();
 #endif
+
     sampout += ret;
     maxout -= ret;
   }
@@ -380,10 +384,17 @@ void OPUS_LoadFile(char *filepath)
   proceeding_page = 0;
   seeking = 0;
 
+  trace("Opus started");
+  print_user_heap_mallinfo();
+
   og = user_zalloc(sizeof(ogg_page));
   op = user_zalloc(sizeof(ogg_packet));
   os = user_zalloc(sizeof(ogg_stream_state));
   file = user_zalloc(sizeof(FIL));
+
+#ifdef NONTHREADSAFE_PSEUDOSTACK
+  global_stack = user_malloc(OPUS_STACK_SIZE);
+#endif
 
   res = f_open(file, filepath, FA_READ);
   if (res != FR_OK)
@@ -394,7 +405,7 @@ void OPUS_LoadFile(char *filepath)
 
   /* Determine the audio length */
   {
-    minogg_sync_init(&os->oy, 1024, NULL);
+    minogg_sync_init(&os->oy, 2048, NULL);
 
     /* All we need here is to read last page's header granulepos */
     /* Ogg max page size is 65K, so... */
@@ -408,6 +419,9 @@ void OPUS_LoadFile(char *filepath)
 
     // ogg_sync_reset(&oy); todo
   }
+
+  trace("Ogg allocated");
+  print_user_heap_mallinfo();
 
   os->oy.nextpage_pos = 0; //todo this is ugly
 }
@@ -454,222 +468,214 @@ void OPUS_MainThread(void)
   char *data;
   UINT nb_read;
 
-  do
+  if (!frame_size) /* already have decoded frame */
   {
-    if (!frame_size) /* already have decoded frame */
+    if (proceeding_page)
     {
-      Profiler_EnterFunc(PF_TOTAL);
-
-      if (proceeding_page)
+      if (ogg_stream_packetout(os, op) == 1)
       {
-        if (ogg_stream_packetout(os, op) == 1)
+        proceeding_page = 1;
+        /*OggOpus streams are identified by a magic string in the initial
+         stream header.*/
+        if (op->b_o_s && op->bytes >= 8 && !memcmp(op->packet, "OpusHead", 8))
         {
-          proceeding_page = 1;
-          /*OggOpus streams are identified by a magic string in the initial
-           stream header.*/
-          if (op->b_o_s && op->bytes >= 8 && !memcmp(op->packet, "OpusHead", 8))
+          if (!has_opus_stream)
           {
-            if (!has_opus_stream)
-            {
-              opus_serialno = os->serialno;
-              has_opus_stream = 1;
-              link_out = 0;
-              packet_count = 0;
-              eos = 0;
-              total_links++;
-            }
-            else
-            {
-              trace("Warning: ignoring opus stream %lld\n",
-                      (long long) os->serialno);
-            }
-          }
-          if (!has_opus_stream || os->serialno != opus_serialno)
-          {
-            trace("!has_opus_stream || os->serialno != opus_serialno");
-            exit(1);
-            return;
-          }
-
-          /*If first packet in a logical stream, process the Opus header*/
-          if (packet_count == 0)
-          {
-            st = process_header(op, &rate, &channels, &preskip, quiet);
-            if (!st)
-              exit(1);
-
-            PlayerState.metadata.channel_count = channels;
-
-            if (ogg_stream_packetout(os, op) != 0 || og->header[og->header_len
-                    - 1] == 255)
-            {
-              /*The format specifies that the initial header and tags packets are on their
-               own pages. To aid implementors in discovering that their files are wrong
-               we reject them explicitly here. In some player designs files like this would
-               fail even without an explicit test.*/
-
-              Player_AudioFileError(
-                      "Extra packets on initial header page. Invalid stream.");
-              return;
-            }
-
-            /*Remember how many samples at the front we were told to skip
-             so that we can adjust the timestamp counting.*/
-            gran_offset = preskip;
-
-            if (end_granule < gran_offset)
-              exit(1);
-
-            PlayerState.metadata.mstime_max = (end_granule - gran_offset)
-                    / (rate / 1000);
-
-            output = CPU_AllocFromStackBottom(
-                    sizeof(opus_int16) * MAX_FRAME_SIZE * channels);
-            if (!output)
-            {
-              Player_AudioFileError("Cannot allocate CPU_AllocFromStackBottom");
-              return;
-            }
-
-            SyncVariable(VAR_AudioStatus);
-          }
-          else if (packet_count == 1)
-          {
-            if (!quiet)
-              print_comments((char*) op->packet, op->bytes);
-
-            //          if (ogg_stream_packetout(os, &op) != 0 || og.header[og.header_len
-            //                  - 1] == 255)
-            //          {
-            //            Player_AudioFileError(
-            //                    "Extra packets on initial tags page. Invalid stream.");
-            //            return;
-            //          }
+            opus_serialno = os->serialno;
+            has_opus_stream = 1;
+            link_out = 0;
+            packet_count = 0;
+            eos = 0;
+            total_links++;
           }
           else
           {
-            int ret;
-
-            /*End of stream condition*/
-            if (op->e_o_s && os->serialno == opus_serialno)
-              eos = 1; /* don't care for anything except opus eos */
-
-            /*Decode Opus packet*/
-
-            Profiler_EnterFunc(PF_CODEC_TOTAL);
-
-            ret = opus_decode(st, (unsigned char*) op->packet, op->bytes, output,
-                    MAX_FRAME_SIZE, 0);
-
-            Profiler_ExitFunc(PF_CODEC_TOTAL);
-
-            /*If the decoder returned less than zero, we have an error.*/
-            if (ret < 0)
-            {
-              trace("Decoding error: %s\n", opus_strerror(ret));
-              exit(1);
-            }
-            frame_size = ret;
-
-            /*This handles making sure that our output duration respects
-             the final end-trim by not letting the output sample count
-             get ahead of the granpos indicated value.*/
-            maxout = ((page_granule - gran_offset) * rate / 48000) - link_out;
+            trace("Warning: ignoring opus stream %lld\n",
+                    (long long) os->serialno);
           }
-          packet_count++;
         }
-        else
+        if (!has_opus_stream || os->serialno != opus_serialno)
         {
-          proceeding_page = 0;
+          trace("!has_opus_stream || os->serialno != opus_serialno");
+          exit(1);
+          return;
         }
-      }
 
-      /*We're done*/
-      if (eos)
-      {
-        has_opus_stream = 0;
-        if (st)
-          opus_decoder_destroy(st);
-        st = NULL;
-      }
-      else
-      {
-        if (!proceeding_page && minogg_sync_pageout(&os->oy, og) == MINOGG_OK)
+        /*If first packet in a logical stream, process the Opus header*/
+        if (packet_count == 0)
         {
-          if (stream_init == 0)
-          {
-            ogg_stream_init(os, ogg_page_serialno(og));
-            stream_init = 1;
-          }
-          if (ogg_page_serialno(og) != os->serialno)
-          {
-            /* so all streams are read. */
-            ogg_stream_reset_serialno(os, ogg_page_serialno(og));
-          }
-          /*Add page to the bitstream*/
-          ogg_stream_pagein(os, og);
+          st = process_header(op, &rate, &channels, &preskip, quiet);
+          if (!st)
+            exit(1);
 
-          page_granule = ogg_page_granulepos(og);
+          trace("Decoder allocated");
+          print_user_heap_mallinfo();
 
-          proceeding_page = 1;
+          PlayerState.metadata.channel_count = channels;
+
+          if (ogg_stream_packetout(os, op) != 0 || og->header[og->header_len
+                  - 1] == 255)
+          {
+            /*The format specifies that the initial header and tags packets are on their
+             own pages. To aid implementors in discovering that their files are wrong
+             we reject them explicitly here. In some player designs files like this would
+             fail even without an explicit test.*/
+
+            Player_AudioFileError(
+                    "Extra packets on initial header page. Invalid stream.");
+            return;
+          }
+
+          /*Remember how many samples at the front we were told to skip
+           so that we can adjust the timestamp counting.*/
+          gran_offset = preskip;
+
+          if (end_granule < gran_offset)
+            exit(1);
+
+          PlayerState.metadata.mstime_max = (end_granule - gran_offset) / (rate
+                  / 1000);
+
+          output = user_malloc(sizeof(opus_int16) * MAX_FRAME_SIZE * channels);
+          if (!output)
+          {
+            Player_AudioFileError("Cannot allocate CPU_AllocFromStackBottom");
+            return;
+          }
+
+          trace("Output buffer allocated");
+          print_user_heap_mallinfo();
+
+          SyncVariable(VAR_AudioStatus);
         }
-      } Profiler_ExitFunc(PF_TOTAL);
-    }
-
-    if (frame_size) /* already have decoded frame */
-    {
-      if (AudioBuffer_TryGetProducer())
-      {
-        opus_int64 outsamp;
-
-        outsamp = audio_write(output, channels, frame_size, &preskip,
-                0 > maxout ? 0 : maxout);
-        link_out += outsamp;
-        audio_size += outsamp;
-
-        PlayerState.metadata.mstime_curr = audio_size / (rate / 1000);
-
-        frame_size = 0; /* we have consumed that last decoded frame */
-
-        if (f_eof(file))
+        else if (packet_count == 1)
         {
-          trace("\rDecoding complete.        \n");
-          /*Did we make it to the end without recovering ANY opus logical streams?*/
-          if (!total_links)
+          if (!quiet)
+            print_comments((char*) op->packet, op->bytes);
+
+#if 0
+          if (ogg_stream_packetout(os, &op) != 0 || og.header[og.header_len
+                  - 1] == 255)
           {
-            trace("This doesn't look like a Opus file\n");
-          }
-
-//          if (stream_init)
-//            ogg_stream_clear(os);
-//          ogg_sync_clear(&oy);
-
-          f_close(file);
-
-          CPU_FreeStackBottom();
-          PlayerStatus = PS_EOF;
-
-          break;
-
-#ifdef PROFILING
-          //if (Profiler_GetResult(PF_TOTAL) > 10*1000000)
-
-          {
-            printf("realtime: %u codec time: %u\n", (int) (last_coded_seconds),
-                    Profiler_GetResult(PF_TOTAL)/1000000);
-            Profiler_Print();
-            while(1)
-            ;
+            Player_AudioFileError(
+                    "Extra packets on initial tags page. Invalid stream.");
+            return;
           }
 #endif
         }
+        else
+        {
+          int ret;
+
+          /*End of stream condition*/
+          if (op->e_o_s && os->serialno == opus_serialno)
+            eos = 1; /* don't care for anything except opus eos */
+
+          /*Decode Opus packet*/Profiler_EnterFunc(PF_CODEC_DECODE);
+          //            CPU_DisableInterrupts();
+          {
+            ret = opus_decode(st, (unsigned char*) op->packet, op->bytes,
+                    output, MAX_FRAME_SIZE, 0);
+          }
+          //            CPU_RestoreInterrupts();
+          Profiler_ExitFunc(PF_CODEC_DECODE);
+
+          /*If the decoder returned less than zero, we have an error.*/
+          if (ret < 0)
+          {
+            trace("Decoding error: %s\n", opus_strerror(ret));
+            exit(1);
+          }
+          frame_size = ret;
+
+          /*This handles making sure that our output duration respects
+           the final end-trim by not letting the output sample count
+           get ahead of the granpos indicated value.*/
+          maxout = ((page_granule - gran_offset) * rate / 48000) - link_out;
+        }
+        packet_count++;
+      }
+      else
+      {
+        proceeding_page = 0;
       }
     }
-  } while (!AudioBuffer_TryGetProducer());
+
+    /*We're done*/
+    if (eos)
+    {
+      has_opus_stream = 0;
+      if (st)
+        opus_decoder_destroy(st);
+      st = NULL;
+
+      trace("Opus destroyed");
+      print_user_heap_mallinfo();
+    }
+    else
+    {
+      if (!proceeding_page && minogg_sync_pageout(&os->oy, og) == MINOGG_OK)
+      {
+        if (stream_init == 0)
+        {
+          ogg_stream_init(os, ogg_page_serialno(og));
+          stream_init = 1;
+        }
+        if (ogg_page_serialno(og) != os->serialno)
+        {
+          /* so all streams are read. */
+          ogg_stream_reset_serialno(os, ogg_page_serialno(og));
+        }
+        /*Add page to the bitstream*/
+        ogg_stream_pagein(os, og);
+
+        page_granule = ogg_page_granulepos(og);
+
+        proceeding_page = 1;
+      }
+    }
+  }
+
+  if (frame_size) /* already have decoded frame */
+  {
+    if (AudioBuffer_TryGetProducer())
+    {
+      opus_int64 outsamp;
+
+      outsamp = audio_write(output, channels, frame_size, &preskip,
+              0 > maxout ? 0 : maxout);
+      link_out += outsamp;
+      audio_size += outsamp;
+
+      PlayerState.metadata.mstime_curr = audio_size / (rate / 1000);
+
+      frame_size = 0; /* we have consumed that last decoded frame */
+
+      if (f_eof(file))
+      {
+        trace("\rDecoding complete.        \n");
+        /*Did we make it to the end without recovering ANY opus logical streams?*/
+        if (!total_links)
+        {
+          trace("This doesn't look like a Opus file\n");
+        }
+
+        //          if (stream_init)
+        //            ogg_stream_clear(os);
+        //          ogg_sync_clear(&oy);
+
+        f_close(file);
+
+        PlayerStatus = PS_EOF;
+      }
+    }
+  }
 }
 
 void OPUS_Seek(u32 msec)
 {
+  //todo debug
+
   assert_param(msec < PlayerState.metadata.mstime_max);
 
   trace("Opus: trying to seek to %us... ", msec / 1000);
@@ -699,5 +705,10 @@ void OPUS_Seek(u32 msec)
 
 void OPUS_Stop(void)
 {
+#ifdef NONTHREADSAFE_PSEUDOSTACK
+  if (global_stack)
+    user_free(global_stack);
+#endif
+
   f_close(file);
 }

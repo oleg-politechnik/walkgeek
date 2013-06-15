@@ -27,8 +27,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f4xx.h"
 #include "stm32f4xx_gpio.h"
-
-#include "bsp_config.h"
+#include "common.h"
 
 /** @addtogroup Utilities
   * @{
@@ -61,6 +60,36 @@
 /**
   * @}
   */
+
+/*-----------------------------------
+                        Audio Codec User defines
+                                     -----------------------------------------*/
+/* Audio interface : I2S or DAC */
+#define AUDIO_INTERFACE_I2S           1
+#define AUDIO_INTERFACE_DAC           2
+
+/* Codec output DEVICE */
+#define OUTPUT_DEVICE_SPEAKER         1
+#define OUTPUT_DEVICE_HEADPHONE       2
+#define OUTPUT_DEVICE_BOTH            3
+#define OUTPUT_DEVICE_AUTO            4
+
+/* Volume Levels values */
+#define DEFAULT_VOLMIN                0x00
+#define DEFAULT_VOLMAX                0xFF
+#define DEFAULT_VOLSTEP               0x04
+
+#define AUDIO_PAUSE                   0
+#define AUDIO_RESUME                  1
+
+/* Codec POWER DOWN modes */
+#define CODEC_PDWN_HW                 1
+#define CODEC_PDWN_SW                 2
+
+/* MUTE commands */
+#define AUDIO_MUTE_ON                 1
+#define AUDIO_MUTE_OFF                0
+/*----------------------------------------------------------------------------*/
 
 /** @defgroup STM32F4_DISCOVERY_AUDIO_CODEC_Exported_Functions
   * @{

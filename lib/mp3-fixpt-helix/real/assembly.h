@@ -56,17 +56,13 @@
 #ifndef _ASSEMBLY_H
 #define _ASSEMBLY_H
 
-#if (defined _WIN32 && !defined _WIN32_WCE) || (defined __WINS__ && defined _SYMBIAN) || defined(_OPENWAVE_SIMULATOR) || defined(WINCE_EMULATOR) || defined (AEE_SIMULATOR)    /* Symbian emulator for Ix86 */
+#if defined(__GNUC__) && defined (SIMULATOR)
 
-#pragma warning( disable : 4035 )	/* complains about inline asm not returning a value */
+typedef long long Word64;
 
 static __inline int MULSHIFT32(int x, int y)
 {
-	__asm {
-		mov eax, x
-		imul y
-		mov eax, edx
-	}
+  return x * y;
 }
 
 static __inline int FASTABS(int x)
@@ -101,172 +97,50 @@ static __inline int CLZ(int x)
  *  (sometimes compiler thunks to function calls instead of code generating)
  * required for Symbian emulator
  */
-#ifdef __CW32__
-typedef long long Word64;
-#else
-typedef __int64 Word64;
-#endif
-
+//#ifdef __CW32__
+//typedef long long Word64;
+//#else
+//typedef __int64 Word64;
+//#endif
+//
 static __inline Word64 MADD64(Word64 sum, int x, int y)
 {
-	unsigned int sumLo = ((unsigned int *)&sum)[0];
-	int sumHi = ((int *)&sum)[1];
-
-	__asm {
-		mov eax, x
-		imul y
-		add eax, sumLo
-		adc edx, sumHi
-	}
-
-	/* equivalent to return (sum + ((__int64)x * y)); */
+  return (sum + ((Word64)x * y));
 }
-
-static __inline Word64 SHL64(Word64 x, int n)
-{
-	unsigned int xLo = ((unsigned int *)&x)[0];
-	int xHi = ((int *)&x)[1];
-	unsigned char nb = (unsigned char)n;
-
-	if (n < 32) {
-		__asm {
-			mov edx, xHi
-			mov eax, xLo
-			mov cl, nb
-			shld edx, eax, cl
-			shl eax, cl
-		}
-	} else if (n < 64) {
-		/* shl masks cl to 0x1f */
-		__asm {
-			mov edx, xLo
-			mov cl, nb
-			xor eax, eax
-			shl edx, cl
-		}
-	} else {
-		__asm {
-			xor edx, edx
-			xor eax, eax
-		}
-	}
-}
-
+//
+//static __inline Word64 SHL64(Word64 x, int n)
+//{
+//	unsigned int xLo = ((unsigned int *)&x)[0];
+//	int xHi = ((int *)&x)[1];
+//	unsigned char nb = (unsigned char)n;
+//
+//	if (n < 32) {
+//		__asm {
+//			mov edx, xHi
+//			mov eax, xLo
+//			mov cl, nb
+//			shld edx, eax, cl
+//			shl eax, cl
+//		}
+//	} else if (n < 64) {
+//		/* shl masks cl to 0x1f */
+//		__asm {
+//			mov edx, xLo
+//			mov cl, nb
+//			xor eax, eax
+//			shl edx, cl
+//		}
+//	} else {
+//		__asm {
+//			xor edx, edx
+//			xor eax, eax
+//		}
+//	}
+//}
+//
 static __inline Word64 SAR64(Word64 x, int n)
 {
-	unsigned int xLo = ((unsigned int *)&x)[0];
-	int xHi = ((int *)&x)[1];
-	unsigned char nb = (unsigned char)n;
-
-	if (n < 32) {
-		__asm {
-			mov edx, xHi
-			mov eax, xLo
-			mov cl, nb
-			shrd eax, edx, cl
-			sar edx, cl
-		}
-	} else if (n < 64) {
-		/* sar masks cl to 0x1f */
-		__asm {
-			mov edx, xHi
-			mov eax, xHi
-			mov cl, nb
-			sar edx, 31
-			sar eax, cl
-		}
-	} else {
-		__asm {
-			sar xHi, 31
-			mov eax, xHi
-			mov edx, xHi
-		}
-	}
-}
-
-#elif (defined _WIN32) && (defined _WIN32_WCE)
-
-/* use asm function for now (EVC++ 3.0 does horrible job compiling __int64 version) */
-#define MULSHIFT32	xmp3_MULSHIFT32
-int MULSHIFT32(int x, int y);
-
-static __inline int FASTABS(int x)
-{
-	int sign;
-
-	sign = x >> (sizeof(int) * 8 - 1);
-	x ^= sign;
-	x -= sign;
-
-	return x;
-}
-
-static __inline int CLZ(int x)
-{
-	int numZeros;
-
-	if (!x)
-	return (sizeof(int) * 8);
-
-	numZeros = 0;
-	while (!(x & 0x80000000)) {
-		numZeros++;
-		x <<= 1;
-	}
-
-	return numZeros;
-}
-
-#elif defined ARM_ADS
-
-static __inline int MULSHIFT32(int x, int y)
-{
-	/* important rules for smull RdLo, RdHi, Rm, Rs:
-	 *     RdHi and Rm can't be the same register
-	 *     RdLo and Rm can't be the same register
-	 *     RdHi and RdLo can't be the same register
-	 * Note: Rs determines early termination (leading sign bits) so if you want to specify
-	 *   which operand is Rs, put it in the SECOND argument (y)
-	 * For inline assembly, x and y are not assumed to be R0, R1 so it shouldn't matter
-	 *   which one is returned. (If this were a function call, returning y (R1) would 
-	 *   require an extra "mov r0, r1")
-	 */
-	int zlow;
-	__asm {
-		smull zlow,y,x,y
-	}
-
-	return y;
-}
-
-static __inline int FASTABS(int x)
-{
-	int t=0; /*Really is not necessary to initialiaze only to avoid warning*/
-
-	__asm {
-		eor t, x, x, asr
-#31
-		sub t, t, x, asr
-#31
-	}
-
-	return t;
-}
-
-static __inline int CLZ(int x)
-{
-	int numZeros;
-
-	if (!x)
-	return (sizeof(int) * 8);
-
-	numZeros = 0;
-	while (!(x & 0x80000000)) {
-		numZeros++;
-		x <<= 1;
-	}
-
-	return numZeros;
+  return x >> n;
 }
 
 #elif defined(__GNUC__) && defined(ARM)
@@ -375,7 +249,6 @@ static __inline Word64 MADD64(Word64 sum64, int x, int y) {
 
 static __inline Word64 SAR64(Word64 x, int n) {
 	return x >> n;
-
 }
 
 #else

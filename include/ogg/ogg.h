@@ -73,10 +73,12 @@ typedef struct {
 //  long    body_returned;         /* elements of fill returned */
 
 
-  int     *lacing_vals;      /* The values that will go to the segment table */
+  unsigned short     *lacing_vals;      /* The values that will go to the segment table */
+#ifdef MINOGG_GRANULEPOS_CACHE
   ogg_int64_t *granule_vals; /* granulepos values for headers. Not compact
                                 this way, but it is simple coupled to the
                                 lacing fifo */
+#endif
   long    lacing_storage;
   long    lacing_fill;
   long    lacing_packet;
@@ -109,8 +111,9 @@ typedef struct {
   long  bytes;
   long  b_o_s;
   long  e_o_s;
-
+#ifdef MINOGG_GRANULEPOS_CACHE
   ogg_int64_t  granulepos;
+#endif
 
   ogg_int64_t  packetno;     /* sequence number for decode; the framing
                                 knows where there's a hole in the data,

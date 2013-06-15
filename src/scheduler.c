@@ -39,10 +39,11 @@ typedef struct
 } Task_Typedef;
 
 /* Private define ------------------------------------------------------------*/
+#define SCHEDULER_MAX_TASK  20
+
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
-static Task_Typedef *tasks;
-static u32 task_count;
+static Task_Typedef tasks[SCHEDULER_MAX_TASK];
 
 /* Private function prototypes -----------------------------------------------*/
 /* Private functions ---------------------------------------------------------*/
@@ -50,7 +51,7 @@ static inline Task_Typedef* Task_Find(void *callback)
 {
   u32 i;
 
-  for (i = 0; i < task_count; ++i)
+  for (i = 0; i < SCHEDULER_MAX_TASK; ++i)
   {
     if (tasks[i].callback == callback)
     {
@@ -65,12 +66,7 @@ void Scheduler_Reset(void)
 {
   CPU_DisableInterrupts();
   {
-    if (tasks)
-      free(tasks);
-
-    tasks = NULL;
-
-    task_count = 0;
+    bzero(tasks, sizeof(tasks));
   }
   CPU_RestoreInterrupts();
 }
@@ -87,54 +83,29 @@ FuncResult Scheduler_PutTask(u32 timeout_ms, void(*callback)(void),
   assert_param(timeout_ms);
 
   CPU_DisableInterrupts();
-  do
+
+  task = Task_Find(callback);
+  if (task == NULL)
   {
-    task = Task_Find(callback);
-    if (task == NULL)
-    {
-      task = Task_Find(NULL); /* find free space */
+    task = Task_Find(NULL); /* find free space */
 
-      if (task == NULL)
-      {
-        task_count++;
-        if (task_count - 1 == 0)
-        {
-          tasks = malloc(task_count * sizeof(Task_Typedef));
-        }
-        else
-        {
-          tasks = realloc(tasks, task_count * sizeof(Task_Typedef));
-        }
+    assert_param (task != NULL);
 
-        if (tasks == NULL)
-        {
-          ret = FUNC_ERROR;
-          break;
-        }
+    task->callback = callback;
+  }
 
-        task = &tasks[task_count - 1];
+  task->timeout_ms = timeout_ms;
+  ret = FUNC_SUCCESS;
 
-        memset(task, 0, sizeof(Task_Typedef));
-      }
+  if (repeat == REPEAT)
+  {
+    task->timeout_ms_reload = task->timeout_ms;
+  }
+  else
+  {
+    task->timeout_ms_reload = 0;
+  }
 
-      task->callback = callback;
-    }
-
-    //if (task != NULL)
-    //{
-    task->timeout_ms = timeout_ms;
-    ret = FUNC_SUCCESS;
-
-    if (repeat == REPEAT)
-    {
-      task->timeout_ms_reload = task->timeout_ms;
-    }
-    else
-    {
-      task->timeout_ms_reload = 0;
-    }
-    //}
-  } while (0);
   CPU_RestoreInterrupts();
 
   return ret;
@@ -175,7 +146,7 @@ void Scheduler_1msCycle(void)
 
   CPU_DisableInterrupts();
 
-  for (i = 0; i < task_count; ++i)
+  for (i = 0; i < SCHEDULER_MAX_TASK; ++i)
   {
     callback = 0;
 

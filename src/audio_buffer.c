@@ -67,6 +67,10 @@ AudioBuffer_Typedef *AudioBuffer_TryGetProducer(void)
     }
     CPU_RestoreInterrupts();
 
+#ifdef PROFILING
+    buffers[ix].size = 0;
+#endif
+
     return (&buffers[ix]);
   }
   else
@@ -77,12 +81,14 @@ AudioBuffer_Typedef *AudioBuffer_TryGetProducer(void)
 
 void AudioBuffer_MoveProducer(void)
 {
+#ifndef PROFILING
   assert_param(length + 1 < AUDIO_BUFFER_COUNT);
   CPU_DisableInterrupts();
   {
     length++;
   }
   CPU_RestoreInterrupts();
+#endif
 }
 
 AudioBuffer_Typedef *AudioBuffer_TryGetConsumer(void)
@@ -94,6 +100,7 @@ AudioBuffer_Typedef *AudioBuffer_TryGetConsumer(void)
 
 void AudioBuffer_MoveConsumer(void)
 {
+#ifndef PROFILING
   assert_param(length > 0);
 
   CPU_DisableInterrupts();
@@ -103,6 +110,6 @@ void AudioBuffer_MoveConsumer(void)
     index_consumer = (index_consumer + 1) % AUDIO_BUFFER_COUNT;
   }
   CPU_RestoreInterrupts();
-
+#endif
   //    iprintf("con_length %i\n", length);
 }

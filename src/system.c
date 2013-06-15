@@ -32,6 +32,7 @@
 #include "ui.h"
 #include "powermanager.h"
 #include "audio_if.h"
+#include "cpu_config.h"
 
 /* Imported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private define ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -87,8 +88,9 @@ void System_PowerEnable(void)
   BSP_PowerEnable();
 
   Scheduler_RemoveTask(System_Check_PPP_Button);
-
+#ifndef PROFILING
   UI_Init();
+#endif
 
 //  Vibrator_SendSignal(30);
 }
@@ -132,6 +134,11 @@ void System_Init(void)
   PowerManager_Init();
   PowerManager_MainThread();
 
+#ifdef PROFILING
+  System_StartPlayer();
+  return;
+#endif
+
   if (PowerManager_GetState() == PM_ONLINE)
   {
     System_StartPlayer();
@@ -151,6 +158,7 @@ void RAM_FUNC System_SysTickHandler(void)
 {
 #ifndef PROFILING
   Keypad_1msScan();
+
   Scheduler_1msCycle();
 
   if (msDelay)
@@ -163,6 +171,11 @@ void RAM_FUNC System_SysTickHandler(void)
 /* TODO add check of calling from an isr */
 void RAM_FUNC System_SetState(SystemState_Typedef NewState)
 {
+  if (NewState == SS_USB_MSC && PowerManager_GetState() != PM_ONLINE)
+  {
+    return;
+  }
+
   SystemStateNew = NewState;
   if (NewState == SS_SHUTDOWN)
   {
@@ -231,7 +244,7 @@ void System_MainThread(void)
   }
 
   /* Main work */
-#if! PROFILING
+#ifndef PROFILING
   UI_MainCycle();
 #endif
   PowerManager_MainThread();

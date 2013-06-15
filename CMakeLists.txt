@@ -10,6 +10,7 @@ include(flags.cmake)
 
 include_directories(
   include
+  lib
   lib/fat_fs
   lib/mp3-fixpt-helix/pub
   lib/minIni
@@ -18,8 +19,17 @@ include_directories(
 
 add_definitions(-DUSE_FULL_ASSERT)
 
+if(PROFILING)
+  add_definitions(-DPROFILING)
+  set(ENABLE_TRACE 1)
+endif()
+
 if(ENABLE_TRACE)
   add_definitions(-DENABLE_TRACE)
+endif()
+
+if(USE_MP3)
+  add_definitions(-DUSE_MP3)
 endif()
 
 include(bsp/bsp.cmake)

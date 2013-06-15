@@ -38,11 +38,9 @@
 /* Exported macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Exported types ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 typedef enum {
-  AS_INACTIVE,
   AS_STOPPED,
   AS_PLAYING,
   AS_PAUSED,
-  AS_SUSPENDED_PLAYBACK,
   AS_ERROR
 } AudioState_Typedef;
 

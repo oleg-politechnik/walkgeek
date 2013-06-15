@@ -144,7 +144,7 @@
 #define STDC_HEADERS 1
 
 /* Use C99 variable-size arrays */
-#define VAR_ARRAYS /**/
+#define NONTHREADSAFE_PSEUDOSTACK /**/
 
 /* Version number of package */
 #define VERSION "0.1.6"

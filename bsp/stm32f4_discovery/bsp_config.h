@@ -30,9 +30,6 @@
 #define BSP_CONFIG_H_
 
 /* Includes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-#include "stm32f4_discovery_audio_codec.h"
-#include "usbd_storage_msd.h"
-
 /* Exported defines ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 #ifdef HAS_BATTERY
 # define PWR_EN_GPIO                 GPIOB
@@ -253,33 +250,18 @@ typedef struct {
 # define AUDIO_DAC_CHANNEL              DAC_Channel_1
 
 /* I2S DMA Stream definitions */
-# define AUDIO_I2S_DMA_CLOCK            RCC_AHB1Periph_DMA1
-# define AUDIO_I2S_DMA_STREAM           DMA1_Stream4
-# define AUDIO_I2S_DMA_DREG             CODEC_I2S_ADDRESS
-# define AUDIO_I2S_DMA_CHANNEL          DMA_Channel_0
-# define AUDIO_I2S_DMA_IRQ              DMA1_Stream4_IRQn
-# define AUDIO_I2S_DMA_FLAG_TC          DMA_FLAG_TCIF4
-# define AUDIO_I2S_DMA_FLAG_HT          DMA_FLAG_HTIF4
-# define AUDIO_I2S_DMA_FLAG_FE          DMA_FLAG_FEIF4
-# define AUDIO_I2S_DMA_FLAG_TE          DMA_FLAG_TEIF4
-# define AUDIO_I2S_DMA_FLAG_DME         DMA_FLAG_DMEIF4
+# define AUDIO_MAL_DMA_CLOCK            RCC_AHB1Periph_DMA1
+# define AUDIO_MAL_DMA_STREAM           DMA1_Stream4
+# define AUDIO_MAL_DMA_DREG             CODEC_I2S_ADDRESS
+# define AUDIO_MAL_DMA_CHANNEL          DMA_Channel_0
+# define AUDIO_MAL_DMA_IRQ              DMA1_Stream4_IRQn
+# define AUDIO_MAL_DMA_FLAG_TC          DMA_FLAG_TCIF4
+# define AUDIO_MAL_DMA_FLAG_HT          DMA_FLAG_HTIF4
+# define AUDIO_MAL_DMA_FLAG_FE          DMA_FLAG_FEIF4
+# define AUDIO_MAL_DMA_FLAG_TE          DMA_FLAG_TEIF4
+# define AUDIO_MAL_DMA_FLAG_DME         DMA_FLAG_DMEIF4
 
-# define Audio_MAL_I2S_IRQHandler       DMA1_Stream4_IRQHandler
-
-/* DAC DMA Stream definitions */
-# define AUDIO_DAC_DMA_CLOCK            RCC_AHB1Periph_DMA1
-# define AUDIO_DAC_DMA_STREAM           DMA1_Stream0
-# define AUDIO_DAC_DMA_DREG             DAC_DHR12L1_ADDRESS
-# define AUDIO_DAC_DMA_CHANNEL          DMA_Channel_0
-# define AUDIO_DAC_DMA_IRQ              DMA1_Stream0_IRQn
-# define AUDIO_DAC_DMA_FLAG_TC          DMA_FLAG_TCIF0
-# define AUDIO_DAC_DMA_FLAG_HT          DMA_FLAG_HTIF0
-# define AUDIO_DAC_DMA_FLAG_FE          DMA_FLAG_FEIF0
-# define AUDIO_DAC_DMA_FLAG_TE          DMA_FLAG_TEIF0
-# define AUDIO_DAC_DMA_FLAG_DME         DMA_FLAG_DMEIF0
-
-# define Audio_MAL_DAC_IRQHandler       DMA1_Stream0_IRQHandler
-
+# define Audio_MAL_IRQHandler           DMA1_Stream4_IRQHandler
 
 /* I2C peripheral configuration defines (control interface of the audio codec) */
 # define CODEC_I2C                      I2C2
@@ -325,34 +307,18 @@ typedef struct {
 # define AUDIO_DAC_CHANNEL              DAC_Channel_1
 
 /* I2S DMA Stream definitions */
-# define AUDIO_I2S_DMA_CLOCK            RCC_AHB1Periph_DMA1
-# define AUDIO_I2S_DMA_STREAM           DMA1_Stream7
-# define AUDIO_I2S_DMA_DREG             CODEC_I2S_ADDRESS
-# define AUDIO_I2S_DMA_CHANNEL          DMA_Channel_0
-# define AUDIO_I2S_DMA_IRQ              DMA1_Stream7_IRQn
-# define AUDIO_I2S_DMA_FLAG_TC          DMA_FLAG_TCIF7
-# define AUDIO_I2S_DMA_FLAG_HT          DMA_FLAG_HTIF7
-# define AUDIO_I2S_DMA_FLAG_FE          DMA_FLAG_FEIF7
-# define AUDIO_I2S_DMA_FLAG_TE          DMA_FLAG_TEIF7
-# define AUDIO_I2S_DMA_FLAG_DME         DMA_FLAG_DMEIF7
+# define AUDIO_MAL_DMA_CLOCK            RCC_AHB1Periph_DMA1
+# define AUDIO_MAL_DMA_STREAM           DMA1_Stream7
+# define AUDIO_MAL_DMA_DREG             CODEC_I2S_ADDRESS
+# define AUDIO_MAL_DMA_CHANNEL          DMA_Channel_0
+# define AUDIO_MAL_DMA_IRQ              DMA1_Stream7_IRQn
+# define AUDIO_MAL_DMA_FLAG_TC          DMA_FLAG_TCIF7
+# define AUDIO_MAL_DMA_FLAG_HT          DMA_FLAG_HTIF7
+# define AUDIO_MAL_DMA_FLAG_FE          DMA_FLAG_FEIF7
+# define AUDIO_MAL_DMA_FLAG_TE          DMA_FLAG_TEIF7
+# define AUDIO_MAL_DMA_FLAG_DME         DMA_FLAG_DMEIF7
 
-# define Audio_MAL_I2S_IRQHandler       DMA1_Stream7_IRQHandler
-
-
-/* DAC DMA Stream definitions */
-# define AUDIO_DAC_DMA_CLOCK            RCC_AHB1Periph_DMA1
-# define AUDIO_DAC_DMA_STREAM           DMA1_Stream0
-# define AUDIO_DAC_DMA_DREG             DAC_DHR12L1_ADDRESS
-# define AUDIO_DAC_DMA_CHANNEL          DMA_Channel_0
-# define AUDIO_DAC_DMA_IRQ              DMA1_Stream0_IRQn
-# define AUDIO_DAC_DMA_FLAG_TC          DMA_FLAG_TCIF0
-# define AUDIO_DAC_DMA_FLAG_HT          DMA_FLAG_HTIF0
-# define AUDIO_DAC_DMA_FLAG_FE          DMA_FLAG_FEIF0
-# define AUDIO_DAC_DMA_FLAG_TE          DMA_FLAG_TEIF0
-# define AUDIO_DAC_DMA_FLAG_DME         DMA_FLAG_DMEIF0
-
-# define Audio_MAL_DAC_IRQHandler       DMA1_Stream0_IRQHandler
-
+# define Audio_MAL_IRQHandler           DMA1_Stream7_IRQHandler
 
 /* I2C peripheral configuration defines (control interface of the audio codec) */
 # define CODEC_I2C                      I2C1
@@ -374,36 +340,6 @@ typedef struct {
 #define CODEC_FLAG_TIMEOUT             ((uint32_t)0x1000)
 #define CODEC_LONG_TIMEOUT             ((uint32_t)(300 * CODEC_FLAG_TIMEOUT))
 
-/*----------------------------------------------------------------------------*/
-
-/*-----------------------------------
-                        Audio Codec User defines
-                                     -----------------------------------------*/
-/* Audio interface : I2S or DAC */
-#define AUDIO_INTERFACE_I2S           1
-#define AUDIO_INTERFACE_DAC           2
-
-/* Codec output DEVICE */
-#define OUTPUT_DEVICE_SPEAKER         1
-#define OUTPUT_DEVICE_HEADPHONE       2
-#define OUTPUT_DEVICE_BOTH            3
-#define OUTPUT_DEVICE_AUTO            4
-
-/* Volume Levels values */
-#define DEFAULT_VOLMIN                0x00
-#define DEFAULT_VOLMAX                0xFF
-#define DEFAULT_VOLSTEP               0x04
-
-#define AUDIO_PAUSE                   0
-#define AUDIO_RESUME                  1
-
-/* Codec POWER DOWN modes */
-#define CODEC_PDWN_HW                 1
-#define CODEC_PDWN_SW                 2
-
-/* MUTE commands */
-#define AUDIO_MUTE_ON                 1
-#define AUDIO_MUTE_OFF                0
 /*----------------------------------------------------------------------------*/
 
 #ifdef HAS_SDIO

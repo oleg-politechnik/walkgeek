@@ -194,23 +194,23 @@ void UI_VariableChangedHandler(VAR_Index var)
 
         rem = sizeof(str_buf) - strlen(str_buf) - 1;
 
-        if (*PlayerState.metadata.artist)
-        {
-          strncat(str_buf, PlayerState.metadata.artist, rem);
-
-          rem = sizeof(str_buf) - strlen(str_buf) - 1;
-
-          strncat(str_buf, " - ", rem);
-        }
-
-        if (*PlayerState.metadata.title)
-        {
-          strncat(str_buf, PlayerState.metadata.title, rem);
-        }
-        else
-        {
+//        if (*PlayerState.metadata.artist)
+//        {
+//          strncat(str_buf, PlayerState.metadata.artist, rem);
+//
+//          rem = sizeof(str_buf) - strlen(str_buf) - 1;
+//
+//          strncat(str_buf, " - ", rem);
+//        }
+//
+//        if (*PlayerState.metadata.title)
+//        {
+//          strncat(str_buf, PlayerState.metadata.title, rem);
+//        }
+//        else
+//        {
           strncat(str_buf, PlayerState.metadata.file_name, rem);
-        }
+//        }
 
         rem = sizeof(str_buf) - strlen(str_buf) - 1;
 
@@ -291,11 +291,9 @@ void UI_VariableChangedHandler(VAR_Index var)
             break;
 
           case AS_STOPPED:
-          case AS_INACTIVE:
             break;
 
           case AS_PAUSED:
-          case AS_SUSPENDED_PLAYBACK:
             str = "-";
             break;
 

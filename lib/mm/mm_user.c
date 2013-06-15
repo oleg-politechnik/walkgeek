@@ -71,13 +71,14 @@ void CPU_InitUserHeap(void)
   mm_initialize(&g_mmheap_user, CPU_GetUserHeapStart(), CPU_GetUserHeapSize());
 }
 
-void print_user_heap_mallinfo()
+void print_user_heap_mallinfo(void)
 {
   struct mallinfo info;
 
   mm_mallinfo(&g_mmheap_user, &info);
 
-  printf("user heap status: %db free / %db alloc\n", info.fordblks, info.uordblks);
+  trace(": %db used (%%%d) out of %db\n", info.uordblks,
+          info.uordblks * 100 / info.arena, info.arena);
 }
 
 void *user_malloc(size_t size)

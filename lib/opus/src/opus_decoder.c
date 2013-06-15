@@ -699,7 +699,7 @@ int opus_decode_native(OpusDecoder *st, const unsigned char *data,
       int self_delimited, int *packet_offset)
 {
    int i, nb_samples;
-   int count, offset;
+   int count, offset = 0;
    unsigned char toc;
    int tot_offset;
    int packet_frame_size, packet_bandwidth, packet_mode, packet_stream_channels;

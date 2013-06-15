@@ -29,7 +29,7 @@
 #define CPU_H_
 
 /* Includes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-#include "cpu_config.h"
+#include "common.h"
 
 /* Public defines ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Public types ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -45,8 +45,8 @@ void *CPU_GetUserHeapStart(void);
 size_t CPU_GetUserHeapSize(void);
 size_t CPU_GetStackSize(void);
 
-void *CPU_AllocFromStackBottom(size_t size);
-void CPU_FreeStackBottom(void);
+void CPU_RefillStack(void);
+size_t CPU_GetStackFree(void);
 
 void CPU_DisableInterrupts(void) RAM_FUNC;
 void CPU_RestoreInterrupts(void) RAM_FUNC;

@@ -32,6 +32,9 @@
 /* Includes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 #include "stm32f4xx.h"
 #include "common.h"
+#include "cpu.h"
+
+extern u32 SysMsCounter;
 
 /* Exported defines ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Exported types ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -56,5 +59,31 @@ static inline bool CPU_CompareExchange(volatile uint32_t *ptr, uint32_t oldValue
   __CLREX();
   return false;
 }
+
+#ifdef PROFILING
+static inline u32 uS_Profiler_GetValue(void)
+{
+  u32 ret;
+
+  CPU_DisableInterrupts();
+
+  ret = SysMsCounter*1000 + (SysTick->VAL) / (SysTick->LOAD + 1);
+
+  CPU_RestoreInterrupts();
+
+  return ret;
+}
+
+static inline u32 uS_Profiler_GetDiff(u32 value)
+{
+  u32 cur;
+
+  cur = uS_Profiler_GetValue();
+
+  assert_param(cur >= value);
+
+  return cur - value;
+}
+#endif
 
 #endif /* CPU_CONFIG_H_ */

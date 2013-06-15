@@ -37,9 +37,9 @@
 /* Private variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 static volatile u32 nesting = 0;
 
-static u32 profile_entry_points[PF_MAX];
-static u32 profile_results[PF_MAX];
-static char* profile_func_names[PF_MAX];
+u32 profile_entry_points[PF_MAX];
+u32 profile_results[PF_MAX];
+char* profile_func_names[PF_MAX];
 
 extern unsigned int _sstack;
 extern unsigned int _estack;
@@ -132,54 +132,43 @@ size_t CPU_GetUserHeapSize(void)
 
 size_t CPU_GetStackSize(void)
 {
-  return (size_t) (&_estack - &_sstack);
+  return (size_t) ((char *) &_estack - (char *) &_sstack);
 }
 
-void *CPU_AllocFromStackBottom(size_t size)
+void CPU_RefillStack(void)
 {
-  if (size < CPU_GetStackSize())
-    return &_sstack;
+  char *p = (char *) &_sstack;
+  char *end = (char *) __get_MSP();
 
-  return NULL;
+  while (p < end)
+  {
+    *p = 0xa5;
+    p++;
+  }
 }
 
-void CPU_FreeStackBottom(void)
+size_t CPU_GetStackFree(void)
 {
-  //todo: refill with 0xa5 pattern
+  char *p = (char *) &_sstack;
+  char *end = (char *) __get_MSP();
+
+  while (p < end)
+  {
+    if (*p != 0xa5)
+      break;
+
+    p++;
+  }
+
+  return (size_t) (p - (char *) &_sstack);
 }
 
 #ifdef PROFILING
-static u32 uS_Profiler_GetValue(void)
+void Profiler_Init(void)
 {
-  u32 ret;
-
-  CPU_DisableInterrupts();
-
-  ret = SysMsCounter*1000 + (SysTick->VAL) / (SysTick->LOAD + 1);
-
-  CPU_RestoreInterrupts();
-
-  return ret;
-}
-
-static u32 uS_Profiler_GetDiff(u32 value)
-{
-  u32 cur;
-
-  cur = uS_Profiler_GetValue();
-
-  assert_param(cur >= value);
-
-  return cur - value;
-}
-
-void Profiler_DoEnterFunc(char *func_name, ProfileFunction_Typedef func)
-{
-  assert_param(func < PF_MAX);
-
-  profile_func_names[func] = func_name;
-
-  profile_entry_points[func] = uS_Profiler_GetValue();
+  memset(profile_entry_points, 0, sizeof(profile_entry_points));
+  memset(profile_results, 0, sizeof(profile_results));
+  memset(profile_func_names, 0, sizeof(profile_func_names));
 }
 
 unsigned int Profiler_GetResult(ProfileFunction_Typedef func)
@@ -189,11 +178,9 @@ unsigned int Profiler_GetResult(ProfileFunction_Typedef func)
   return profile_results[func];
 }
 
-void Profiler_ExitFunc(ProfileFunction_Typedef func)
+void Profiler_SetTotal(u32 total)
 {
-  assert_param(func < PF_MAX);
-
-  profile_results[func] += uS_Profiler_GetDiff(profile_entry_points[func]);
+  profile_results[PF_TOTAL] = total;
 }
 
 void Profiler_Print(void)

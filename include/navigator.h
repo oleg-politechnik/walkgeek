@@ -39,7 +39,7 @@
 typedef struct
 {
   DIR dir;
-  int dir_entry_ix;
+  int dir_entry_ix_new;
   int dir_entry_prev_interesting_ix;
   int dir_entry_ix_count;
 } NavigatorDir_Typedef;
@@ -74,6 +74,7 @@ void Navigator_Init(void);
 void Navigator_InitRoot(NavigatorContext_Typedef *ctx,
     char *suffixes_white_list[]);
 bool Navigator_Cd(NavigatorContext_Typedef *ctx, char *path);
+void Navigator_ResetDir(NavigatorContext_Typedef *ctx);
 bool Navigator_CdUp(NavigatorContext_Typedef *ctx);
 bool Navigator_TryFile(NavigatorContext_Typedef *ctx, char *filename);
 void Navigator_DeInit(void);

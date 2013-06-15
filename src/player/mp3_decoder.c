@@ -31,7 +31,8 @@
 #include "player.h"
 #include "mp3_decoder.h"
 #include "mediafile.h"
-#include "../../include/bsp.h"
+#include "bsp.h"
+#include "profile.h"
 
 extern PlayerStatus_Typedef PlayerStatus;
 
@@ -128,7 +129,7 @@ FuncResult MediaFile_FillFromFile(MediaFile_Typedef *mfile, u32 abs_offset)
 {
   assert_param(mfile->state >= MFS_OPENED);
 
-  assert_param(abs_offset < mfile->file.fsize);
+  assert_param(abs_offset <= mfile->file.fsize);
 
   if (f_lseek(&mfile->file, abs_offset) != FR_OK)
   {
@@ -461,7 +462,13 @@ FuncResult MP3_ReadMetadata(MediaFile_Typedef *mfile)
 
 void MP3_LoadFile(char *filepath)
 {
+  trace("MP3 started");
+  print_user_heap_mallinfo();
+
   mfile = (MediaFile_Typedef *) user_zalloc(sizeof(MediaFile_Typedef));
+
+  trace("MP3 file buffers allocated");
+  print_user_heap_mallinfo();
 
   MediaFile_Open(mfile, filepath);
 
@@ -472,6 +479,9 @@ void MP3_LoadFile(char *filepath)
 
   pMP3Decoder = MP3InitDecoder();
   assert_param(pMP3Decoder);
+
+  trace("MP3 decoder allocated");
+  print_user_heap_mallinfo();
 }
 
 void MP3_MainThread(void)
@@ -526,11 +536,14 @@ void MP3_MainThread(void)
   bytesLeft = mfile->bytes_in_buf;
   f_buffer = &FILE_BUF(mfile, 0);
 
-  //PROFILE_START("MP3Decode");
-  err
-          = MP3Decode(pMP3Decoder, &f_buffer, &bytesLeft,
-                  (s16*) audio_buf->data, 0);
-  //PROFILE_END();
+  Profiler_EnterFunc(PF_CODEC_DECODE);
+//  CPU_DisableInterrupts();
+  {
+    err = MP3Decode(pMP3Decoder, &f_buffer, &bytesLeft, (s16*) audio_buf->data,
+	0);
+  }
+//  CPU_RestoreInterrupts();
+  Profiler_ExitFunc(PF_CODEC_DECODE);
 
   if (err != ERR_MP3_NONE)
   {
@@ -623,5 +636,8 @@ void MP3_Seek(u32 msec)
 
 void MP3_Stop(void)
 {
+  trace("MP3 deallocated");
+  print_user_heap_mallinfo();
+
   MediaFile_Close(mfile);
 }

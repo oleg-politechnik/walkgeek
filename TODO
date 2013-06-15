@@ -10,6 +10,8 @@ Bugs:
 - move celt funcs to mem?
 - SD card DMA timeouts
 - strange voltage drop on 0.2 V when in pause
+- power-on fails if prematurely release ppp key (even though screen backlight goes on)
+- headset button starts working like after 3-4 hits
 
 ~~~~~~~~ Software / Algorithms / Sync
 - trace via CDC sometimes goes insane
@@ -19,6 +21,7 @@ Bugs:
 - PAUSE BROKEN
 - fadeouts
 - sometimes shutdown -> saving can stuck
+- memzero when de-init
 
 Features:
 - remove pause->stop for audio buffer????

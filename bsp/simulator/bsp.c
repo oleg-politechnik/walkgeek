@@ -44,7 +44,6 @@
 /* Private functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 char user_heap[256*1024];
-char stack[64*1024];
 
 static bool stop;
 
@@ -68,16 +67,18 @@ size_t CPU_GetUserHeapSize(void)
   return sizeof(user_heap);
 }
 
-void *CPU_AllocFromStackBottom(size_t size)
+size_t CPU_GetStackSize(void)
 {
-  if (size < sizeof(stack))
-    return stack;
-
-  return NULL;
+  return 1;
 }
 
-void CPU_FreeStackBottom(void)
+void CPU_RefillStack(void)
 {
+}
+
+size_t CPU_GetStackFree(void)
+{
+  return 0;
 }
 
 void *systick_thread(void *arg)

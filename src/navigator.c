@@ -34,6 +34,8 @@
 /* Private typedef ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private function prototypes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+static void Navigator_NextFileCurrentDir(NavigatorContext_Typedef *ctx);
+
 /* Private variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 static FATFS fatfs;
 static FRESULT res;
@@ -59,7 +61,7 @@ static int NumEntries(char *dir_path)
   FILINFO file_info;
   file_info.lfsize = 0;
 
-  char *name;
+  char *name = 0;
 
   res = f_opendir(&dir, dir_path);
   if (res != FR_OK)
@@ -95,6 +97,28 @@ static int NumEntries(char *dir_path)
   return ret;
 }
 
+void Navigator_ResetDir(NavigatorContext_Typedef *ctx)
+{
+  NavigatorDir_Typedef *ndir = &ctx->dir_[ctx->dir_nesting_];
+
+  ndir->dir_entry_ix_new = -1;
+  ndir->dir_entry_prev_interesting_ix = -1;
+
+  res = f_readdir(&ndir->dir, 0);
+  if (res != FR_OK)
+  {
+    trace("navigator: error opening %s (%u)\n", ctx->dir_path, res);
+    return;
+  }
+}
+
+static void DirPosLastPlusOne(NavigatorContext_Typedef *ctx)
+{
+  NavigatorDir_Typedef *ndir = &ctx->dir_[ctx->dir_nesting_];
+
+  ndir->dir_entry_prev_interesting_ix = ndir->dir_entry_ix_new = ndir->dir_entry_ix_count-1;
+}
+
 static void OpenDir(NavigatorContext_Typedef *ctx, char *dir_path)
 {
   NavigatorDir_Typedef *ndir = &ctx->dir_[ctx->dir_nesting_];
@@ -114,16 +138,9 @@ static void OpenDir(NavigatorContext_Typedef *ctx, char *dir_path)
     return;
   }
 
-  res = f_readdir(&ndir->dir, 0);
-  if (res != FR_OK)
-  {
-    trace("navigator: error opening %s (%u)\n", dir_path, res);
-    return;
-  }
+  Navigator_ResetDir(ctx);
 
-  ndir->dir_entry_ix = -1;
   ndir->dir_entry_ix_count = NumEntries(ctx->dir_path);
-  ndir->dir_entry_prev_interesting_ix = -1;
 
   trace("navigator: ============= cd %s\n", ctx->dir_path);
 }
@@ -146,6 +163,8 @@ bool Navigator_CdUp(NavigatorContext_Typedef *ctx)
     }
   }
   ctx->dir_nesting_--;
+
+  trace("navigator: ============= cd %s\n", ctx->dir_path);
 
   return true;
 }
@@ -271,10 +290,11 @@ bool Navigator_Cd(NavigatorContext_Typedef *ctx, char *path)
     return false;
   }
 
-  while (Navigator_CdUp(ctx)) //todo find common ancestor
+  while (Navigator_CdUp(ctx))
+    //todo find common ancestor
     ;
 
-  OpenDir(ctx, ctx->dir_path);
+  Navigator_ResetDir(ctx);
 
   char dir_temp[256];
   char *dir_begin;
@@ -284,7 +304,6 @@ bool Navigator_Cd(NavigatorContext_Typedef *ctx, char *path)
 
   if (!dir_begin)
   {
-    OpenDir(ctx, ctx->dir_path);
     return Navigator_IsOnline();
   }
 
@@ -310,7 +329,7 @@ bool Navigator_Cd(NavigatorContext_Typedef *ctx, char *path)
     {
       FILINFO *file_info = &(ctx->file_info_);
       NavigatorDir_Typedef *ndir = &ctx->dir_[ctx->dir_nesting_];
-      char *name;
+      char *name = 0;
 
       while (1)
       {
@@ -322,13 +341,13 @@ bool Navigator_Cd(NavigatorContext_Typedef *ctx, char *path)
 
         name = *(file_info->lfname) ? file_info->lfname : file_info->fname;
 
-        ndir->dir_entry_ix++;
-
         if (name[0] == 0)
         {
           trace("navigator: ERROR Navigator_Cd rewinding reached the end \"%s\"\n", path);
           return false;
         }
+
+        ndir->dir_entry_ix_new++;
 
         //if (name[0] == '.')
         //  continue; /* Ignore dot entry */
@@ -345,6 +364,8 @@ bool Navigator_Cd(NavigatorContext_Typedef *ctx, char *path)
           }
           break;
         }
+
+        ndir->dir_entry_prev_interesting_ix++;
       }
     }
 
@@ -363,10 +384,12 @@ bool Navigator_TryFile(NavigatorContext_Typedef *ctx, char *filename)
   //todo debug
   char filepath[512];
 
+  ctx->fname = 0;
+
   snprintf(filepath, sizeof(filepath), "%s/%s", ctx->dir_path, filename);
 
   if (f_stat(filepath, &ctx->file_info_) != FR_OK || ctx->file_info_.fattrib
-      & AM_DIR)
+          & AM_DIR)
   {
     trace("navigator: jumping to %s failed\n", filename);
     return false;
@@ -382,32 +405,32 @@ bool Navigator_TryFile(NavigatorContext_Typedef *ctx, char *filename)
   {
     FILINFO *file_info = &(ctx->file_info_);
     NavigatorDir_Typedef *ndir = &ctx->dir_[ctx->dir_nesting_];
-    char *name;
+    char *name = 0;
 
     while (1)
     {
       res = f_readdir(&ndir->dir, file_info);
       if (res != FR_OK)
       {
-	return false;
+        return false;
       }
 
       name = *(file_info->lfname) ? file_info->lfname : file_info->fname;
 
-      ndir->dir_entry_ix++;
-
       if (name[0] == 0)
       {
-	trace("navigator: ERROR Navigator_TryFile rewinding reached the end\n");
-	return false;
+        trace("navigator: ERROR Navigator_TryFile rewinding reached the end\n");
+        return false;
       }
+
+      ndir->dir_entry_ix_new++;
 
       //if (name[0] == '.')
       //  continue; /* Ignore dot entry */
 
       if (strcmp(name, filename))
       {
-	continue;
+        continue;
       }
 
       ctx->suffix_ix = CheckSuffix(name, ctx->suffixes_white_list_);
@@ -416,9 +439,7 @@ bool Navigator_TryFile(NavigatorContext_Typedef *ctx, char *filename)
       {
         ctx->fname = name;
 
-        ndir->dir_entry_prev_interesting_ix = ndir->dir_entry_ix;
-
-        trace("file: %s/%s\n", ctx->dir_path, name);
+//        trace("file: %s/%s\n", ctx->dir_path, name);
 
         return true;
       }
@@ -436,7 +457,7 @@ void Navigator_NextFile(NavigatorContext_Typedef *ctx)
   FILINFO *file_info = &(ctx->file_info_);
   NavigatorDir_Typedef *ndir;
 
-  char *name;
+  char *name = 0;
 
   ctx->fname = 0;
 
@@ -450,42 +471,40 @@ void Navigator_NextFile(NavigatorContext_Typedef *ctx)
       return;
     }
 
-    //XXX ???
+    ndir->dir_entry_prev_interesting_ix = ndir->dir_entry_ix_new;
 
     name = *(file_info->lfname) ? file_info->lfname : file_info->fname;
-
-    ndir->dir_entry_ix++;
 
     if (name[0] == 0)
     {
       int prev_leaf_ix = ctx->dir_nesting_;
       for (int ix = ctx->dir_nesting_; ix >= 0; ix--)
       {
-	if (ctx->dir_[ix].dir_entry_ix < (int) ctx->dir_[ix].dir_entry_ix_count)
-	{
-	  /*fixme debug*/
-	  for (int i = prev_leaf_ix; i > ix; i--)
-	  {
-	    Navigator_CdUp(ctx);
-	  }
-	  Navigator_NextFile(ctx);
-	  return;
-	}
+        if (ctx->dir_[ix].dir_entry_ix_new < (int) ctx->dir_[ix].dir_entry_ix_count - 1)
+        {
+          /*fixme debug*/
+          for (int i = prev_leaf_ix; i > ix; i--)
+          {
+            Navigator_CdUp(ctx);
+          }
+          Navigator_NextFile(ctx);
+          return;
+        }
       }
 
       /* we are at the end */
       return;
     }
 
+    ndir->dir_entry_ix_new++;
+
     //if (name[0] == '.')
     //  continue; /* Ignore dot entry */
 
     if (file_info->fattrib & AM_DIR)
     {
-      ndir->dir_entry_prev_interesting_ix = ndir->dir_entry_ix;
-
       if (!CdDown(ctx))
-	return;
+        return;
 
       continue;
     }
@@ -496,9 +515,7 @@ void Navigator_NextFile(NavigatorContext_Typedef *ctx)
     {
       ctx->fname = name;
 
-      ndir->dir_entry_prev_interesting_ix = ndir->dir_entry_ix;
-
-      trace("file: %s/%s\n", ctx->dir_path, name);
+//      trace("file: %s/%s\n", ctx->dir_path, name);
 
       return;
     }
@@ -510,7 +527,7 @@ static void Navigator_NextFileCurrentDir(NavigatorContext_Typedef *ctx)
   FILINFO *file_info = &(ctx->file_info_);
   NavigatorDir_Typedef *ndir;
 
-  char *name;
+  char *name = 0;
 
   ctx->fname = 0;
 
@@ -526,12 +543,12 @@ static void Navigator_NextFileCurrentDir(NavigatorContext_Typedef *ctx)
 
     name = *(file_info->lfname) ? file_info->lfname : file_info->fname;
 
-    ndir->dir_entry_ix++;
-
     if (name[0] == 0)
     {
       return;
     }
+
+    ndir->dir_entry_ix_new++;
 
     //if (name[0] == '.')
     //  continue; /* Ignore dot entry */
@@ -547,7 +564,6 @@ static void Navigator_NextFileCurrentDir(NavigatorContext_Typedef *ctx)
     {
       ctx->fname = name;
 
-      ndir->dir_entry_prev_interesting_ix = ndir->dir_entry_ix;
       return;
     }
   }
@@ -557,58 +573,71 @@ static void Navigator_PrevFileCurrentDir(NavigatorContext_Typedef *ctx)
 {
   FILINFO *file_info = &(ctx->file_info_);
   NavigatorDir_Typedef *ndir = &ctx->dir_[ctx->dir_nesting_];
-  char *name;
+  char *name = 0;
   int new_ix;
 
-//  trace("enter %2d/%2d: %s\n", ndir->dir_entry_ix, ndir->dir_entry_ix_count, ctx->dir_path);
+  trace("   (i%d,%d)_%d\n",
+      ndir->dir_entry_prev_interesting_ix, ndir->dir_entry_ix_new, ndir->dir_entry_ix_count
+      );
 
-//  if (ndir->dir_entry_ix == 0)
-//  {
-//    OpenDir(ctx, ctx->dir_path);
-//  }
-
-//  if (ndir->dir_entry_ix > 0)
+  if (ndir->dir_entry_ix_new == 0 && ndir->dir_entry_prev_interesting_ix > 0)
   {
-    if (ndir->dir_entry_prev_interesting_ix > ndir->dir_entry_ix)
+    Navigator_ResetDir(ctx);
+  }
+
+  if (ndir->dir_entry_ix_new < 0)
+  {
+    return;
+  }
+
+  //  if (ndir->dir_entry_ix > 0)
+  {
+    if (ndir->dir_entry_prev_interesting_ix > ndir->dir_entry_ix_new)
     {
-      trace("navigator: WARNING ndir->dir_entry_prev_interesting_ix >= ndir->dir_entry_ix (%d,%d)\n", ndir->dir_entry_prev_interesting_ix, ndir->dir_entry_ix);
-      ndir->dir_entry_prev_interesting_ix = ndir->dir_entry_ix;
+      trace("navigator: WARNING ndir->dir_entry_prev_interesting_ix > ndir->dir_entry_ix (%d,%d)\n",
+	  ndir->dir_entry_prev_interesting_ix, ndir->dir_entry_ix_new);
+      ndir->dir_entry_prev_interesting_ix = ndir->dir_entry_ix_new - 1;
     }
 
-    if (ndir->dir_entry_ix < 0)
+    if (ndir->dir_entry_prev_interesting_ix >= ndir->dir_entry_ix_count)
     {
-      new_ix = ndir->dir_entry_ix_count;
+      trace("navigator: WARNING ndir->dir_entry_prev_interesting_ix >= ndir->dir_entry_ix_count (%d,%d)\n",
+	  ndir->dir_entry_prev_interesting_ix, ndir->dir_entry_ix_count);
+      ndir->dir_entry_prev_interesting_ix = ndir->dir_entry_ix_count - 1;
+    }
+
+    if (ndir->dir_entry_prev_interesting_ix < 0)
+    {
+      new_ix = ndir->dir_entry_ix_new;
     }
     else
     {
-      new_ix = ndir->dir_entry_prev_interesting_ix;
+      new_ix = ndir->dir_entry_prev_interesting_ix + 1;
     }
 
-    ndir->dir_entry_ix = -1;
-    res = f_readdir(&ndir->dir, 0); /* reset dir state */
-    if (res != FR_OK)
-    {
-      return;
-    }
+    Navigator_ResetDir(ctx);
 
-    while (new_ix--)
+    while (new_ix-- > 0)
     {
       res = f_readdir(&ndir->dir, file_info);
       assert_param(res == FR_OK);
-
-      ndir->dir_entry_ix++;
 
       if (file_info->fname[0] == 0)
       {
         assert_param(!"navigator: dir EOF when rewinding");
       }
 
+      ndir->dir_entry_ix_new++;
+
       //if (name[0] == '.')
       //  continue; /* Ignore dot entry */
 
       if (file_info->fattrib & AM_DIR)
       {
-        ndir->dir_entry_prev_interesting_ix = ndir->dir_entry_ix;
+	if (new_ix > 0)
+	{
+	  ndir->dir_entry_prev_interesting_ix = ndir->dir_entry_ix_new;
+	}
         continue;
       }
 
@@ -616,23 +645,38 @@ static void Navigator_PrevFileCurrentDir(NavigatorContext_Typedef *ctx)
 
       if (CheckSuffix(name, ctx->suffixes_white_list_) != -1)
       {
-        ndir->dir_entry_prev_interesting_ix = ndir->dir_entry_ix;
+	if (new_ix > 0)
+	{
+	  ndir->dir_entry_prev_interesting_ix = ndir->dir_entry_ix_new;
+	}
       }
     }
+
+    trace("-> (i%d,%d)_%d\n",
+        ndir->dir_entry_prev_interesting_ix, ndir->dir_entry_ix_new, ndir->dir_entry_ix_count
+        );
 
     if (file_info->fattrib & AM_DIR)
     {
       return;
     }
 
-    ctx->suffix_ix = CheckSuffix(name, ctx->suffixes_white_list_);
-
-    if (ctx->suffix_ix != -1)
+    if (name)
     {
-      ctx->fname = name;
+      ctx->suffix_ix = CheckSuffix(name, ctx->suffixes_white_list_);
 
-      trace("file: %s/%s\n", ctx->dir_path, name);
+      if (ctx->suffix_ix != -1)
+      {
+	ctx->fname = name;
+
+	//      trace("file: %s/%s\n", ctx->dir_path, name);
+
+	return;
+      }
     }
+
+    if (ndir->dir_entry_prev_interesting_ix < 0)
+      Navigator_ResetDir(ctx);
   }
 }
 
@@ -641,7 +685,7 @@ void Navigator_PrevFile(NavigatorContext_Typedef *ctx)
   FILINFO *file_info = &(ctx->file_info_);
   NavigatorDir_Typedef *ndir;
 
-  char *name;
+  char *name = 0;
 
   ctx->fname = 0;
 
@@ -652,6 +696,31 @@ void Navigator_PrevFile(NavigatorContext_Typedef *ctx)
     ndir = &ctx->dir_[ctx->dir_nesting_];
 
     file_info->fattrib = 0;
+
+    if (ndir->dir_entry_ix_new == -1)
+    {
+      /* CdUp if we are at the beginning of the current dir */
+
+      if (ctx->dir_nesting_ == 0)
+        return; /* we are at the end */
+
+      int start_from = ctx->dir_nesting_;
+
+      for (int ix = start_from; ix >= 0; ix--)
+      {
+        if (ctx->dir_[ix].dir_entry_ix_new > 0)
+        {
+          for (int i = start_from; i > ix; i--)
+          {
+            Navigator_CdUp(ctx);
+          }
+
+          goto next;
+        }
+      }
+
+      return; /* we are at the end */
+    }
 
     Navigator_PrevFileCurrentDir(ctx);
 
@@ -669,48 +738,19 @@ void Navigator_PrevFile(NavigatorContext_Typedef *ctx)
 
         if (!Navigator_IsOnline())
           return;
+
+        continue;
       }
+
+      DirPosLastPlusOne(ctx);
 
       continue;
-    }
-
-    if (ndir->dir_entry_ix == 0 || ndir->dir_entry_ix == -1)
-    {
-      /* CdUp if we are at the beginning of the current dir */
-
-      if (ctx->dir_nesting_ == 0)
-        return; /* we are at the end */
-
-      int start_from = ctx->dir_nesting_;
-
-      for (int ix = start_from; ix >= 0; ix--)
-      {
-        if (ctx->dir_[ix].dir_entry_ix > 0)
-        {
-          for (int i = start_from; i > ix; i--)
-          {
-            Navigator_CdUp(ctx);
-          }
-
-          goto next;
-        }
-      }
-
-      return; /* we are at the end */
     }
   }
 }
 
 void Navigator_LastFileCurrentDir(NavigatorContext_Typedef *ctx)
 {
-  NavigatorDir_Typedef *ndir = &ctx->dir_[ctx->dir_nesting_];
-
-  do
-  {
-    Navigator_NextFileCurrentDir(ctx);
-  } while (ndir->dir_entry_ix < ndir->dir_entry_ix_count);
-
-  ndir->dir_entry_prev_interesting_ix++;
-
+  DirPosLastPlusOne(ctx);
   Navigator_PrevFileCurrentDir(ctx);
 }

@@ -200,17 +200,22 @@ int ogg_stream_init(ogg_stream_state *os,int serialno){
     memset(os,0,sizeof(*os));
     os->oy = oy;
 
-//    os->body_storage=16*1024;
-    os->lacing_storage=1024;
+    os->lacing_storage=256;
 
-//    os->body_data=_ogg_malloc(os->body_storage*sizeof(*os->body_data));
     os->lacing_vals=_ogg_malloc(os->lacing_storage*sizeof(*os->lacing_vals));
-    os->granule_vals=_ogg_malloc(os->lacing_storage*sizeof(*os->granule_vals));
-
-    if(/*!os->body_data || */!os->lacing_vals || !os->granule_vals){
+    if(!os->lacing_vals){
       ogg_stream_clear(os);
       return -1;
     }
+
+#ifdef MINOGG_GRANULEPOS_CACHE
+    os->granule_vals=_ogg_malloc(os->lacing_storage*sizeof(*os->granule_vals));
+
+    if(!os->granule_vals){
+      ogg_stream_clear(os);
+      return -1;
+    }
+#endif
 
     os->serialno=serialno;
 
@@ -230,7 +235,9 @@ int ogg_stream_clear(ogg_stream_state *os){
   if(os){
     /*if(os->body_data)_ogg_free(os->body_data);*/
     if(os->lacing_vals)_ogg_free(os->lacing_vals);
+#ifdef MINOGG_GRANULEPOS_CACHE
     if(os->granule_vals)_ogg_free(os->granule_vals);
+#endif
 
     memset(os,0,sizeof(*os));
   }
@@ -273,6 +280,7 @@ static int _os_lacing_expand(ogg_stream_state *os,int needed){
       return -1;
     }
     os->lacing_vals=ret;
+#ifdef MINOGG_GRANULEPOS_CACHE
     ret=_ogg_realloc(os->granule_vals,(os->lacing_storage+needed+32)*
                      sizeof(*os->granule_vals));
     if(!ret){
@@ -280,6 +288,7 @@ static int _os_lacing_expand(ogg_stream_state *os,int needed){
       return -1;
     }
     os->granule_vals=ret;
+#endif
     os->lacing_storage+=(needed+32);
   }
   return 0;
@@ -599,18 +608,20 @@ int ogg_stream_pagein(ogg_stream_state *os, ogg_page *og){
   }*/
 
   {
-    int saved=-1;
+//    int saved=-1;
     while(segptr<segments){
       int val=header[27+segptr];
       os->lacing_vals[os->lacing_fill]=val;
+#ifdef MINOGG_GRANULEPOS_CACHE
       os->granule_vals[os->lacing_fill]=-1;
+#endif
 
       if(bos){
         os->lacing_vals[os->lacing_fill]|=0x100;
         bos=0;
       }
 
-      if(val<255)saved=os->lacing_fill;
+//      if(val<255)saved=os->lacing_fill;
 
       os->lacing_fill++;
       segptr++;
@@ -618,10 +629,12 @@ int ogg_stream_pagein(ogg_stream_state *os, ogg_page *og){
       if(val<255)os->lacing_packet=os->lacing_fill;
     }
 
+#ifdef MINOGG_GRANULEPOS_CACHE
     /* set the granulepos on the last granuleval of the last full packet */
     if(saved!=-1){
       os->granule_vals[saved]=granulepos;
     }
+#endif
 
   }
 
@@ -715,10 +728,13 @@ static int _packetout(ogg_stream_state *os,ogg_packet *op,int adv){
       op->e_o_s=eos;
       op->b_o_s=bos;
       op->packetno=os->packetno;
+#ifdef MINOGG_GRANULEPOS_CACHE
       op->granulepos=os->granule_vals[ptr];
+#endif
       op->bytes=bytes;
 
       assert_param(op->bytes <= os->oy.storage); //fixme
+
       if (op->bytes > os->oy.fill - os->oy.returned)
       {
         minogg_sync_refill(&os->oy);

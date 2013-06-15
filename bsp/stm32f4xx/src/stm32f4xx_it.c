@@ -290,7 +290,7 @@ void OTG_FS_WKUP_IRQHandler(void)
 void OTG_FS_IRQHandler(void)
 {
 #ifdef USE_DEVICE_MODE
- // USBD_OTG_ISR_Handler(&USB_OTG_Core);
+  USBD_OTG_ISR_Handler(&USB_OTG_Core);
 #endif
 
 #ifdef USE_HOST_MODE

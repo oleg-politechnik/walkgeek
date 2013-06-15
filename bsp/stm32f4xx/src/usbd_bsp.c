@@ -110,7 +110,7 @@ void BSP_USBD_DeInit(void)
 
   /* Configure SOF VBUS ID DM DP Pins */
   GPIO_InitStructure.GPIO_Pin = /*GPIO_Pin_8  |*/
-          GPIO_Pin_9  |
+          /*GPIO_Pin_9  |*/
           GPIO_Pin_11 |
           GPIO_Pin_12;
 
@@ -120,6 +120,12 @@ void BSP_USBD_DeInit(void)
   GPIO_Init(GPIOA, &GPIO_InitStructure);
 
   /* this for ID line debug */
+
+  /* Reset */
+  RCC_AHB2PeriphResetCmd(RCC_AHB2Periph_OTG_FS, ENABLE);
+
+  /* Release reset signal */
+  RCC_AHB2PeriphResetCmd(RCC_AHB2Periph_OTG_FS, DISABLE);
 
   RCC_AHB2PeriphClockCmd(RCC_AHB2Periph_OTG_FS, DISABLE);
 

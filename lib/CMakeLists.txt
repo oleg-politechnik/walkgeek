@@ -29,7 +29,6 @@ set (LIBS_SOURCES
 )
 
 if(USE_MP3)
-  add_definitions(-DUSE_MP3)
   set (MP3_SOURCES
       mp3-fixpt-helix/real/stproc.c
       mp3-fixpt-helix/real/dct32.c

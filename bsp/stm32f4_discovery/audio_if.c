@@ -29,13 +29,15 @@
 #include "audio_if.h"
 #include "bsp.h"
 #include "audio_buffer.h"
+//#include "stm324xg_usb_audio_codec.h"
+#include "stm32f4_discovery_audio_codec.h"
 
 /* Imported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private define ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private typedef ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-static volatile AudioState_Typedef AudioState = AS_INACTIVE;
+static volatile AudioState_Typedef AudioState = AS_STOPPED;
 static uint32_t Volume;
 static uint32_t SampleRate;
 static uint32_t NeglectedDMA_Count;
@@ -65,21 +67,19 @@ AudioBuffer_Typedef *AudioBuffer_TryGetConsumer(void);
 void AudioBuffer_MoveConsumer(void);
 
 /* Private functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-static void AudioError(void)
+static void Audio_Error(void)
 {
   SetVariable(VAR_AudioStatus, AudioState, AS_ERROR);
 }
 
 FuncResult Audio_Init(u32 AudioFreq)
 {
-  /* Check if the low layer has already been initialized */
-  EVAL_AUDIO_SetAudioInterface(AUDIO_INTERFACE_I2S);
 
   /* Call low layer function */
   if (EVAL_AUDIO_Init(OUTPUT_DEVICE_HEADPHONE, ConvertVolume(Volume), AudioFreq)
           != 0)
   {
-    AudioError();
+    Audio_Error();
     return FUNC_ERROR;
   }
 
@@ -93,14 +93,12 @@ FuncResult Audio_Init(u32 AudioFreq)
 
 void Audio_DeInit(void)
 {
-  if (AudioState == AS_INACTIVE)
+  if (AudioState == AS_STOPPED)
     return;
 
   /* TODO: take a look at the correct codec shutdown sequence in the datasheet */
 
   Audio_CommandSync(AC_STOP);
-
-  SetVariable(VAR_AudioStatus, AudioState, AS_INACTIVE);
 }
 
 static FuncResult Audio_DoCommand(AudioCommand_Typedef cmd)
@@ -117,23 +115,10 @@ static FuncResult Audio_DoCommand(AudioCommand_Typedef cmd)
       switch (AudioState)
       {
         case AS_PAUSED:
-          if (EVAL_AUDIO_PauseResume(AUDIO_RESUME) != 0)
-          {
-            AudioError();
-            return FUNC_ERROR;
-          }
-          SetVariable(VAR_AudioStatus, AudioState, AS_PLAYING);
-          return FUNC_SUCCESS;
-
         case AS_PLAYING:
-          return FUNC_SUCCESS;
-
-        case AS_INACTIVE:
         case AS_STOPPED:
-          SetVariable(VAR_AudioStatus, AudioState, AS_SUSPENDED_PLAYBACK);
-          return FUNC_SUCCESS;
-
-        case AS_SUSPENDED_PLAYBACK:
+          DMA_Starving_Flag = true;
+          SyncVariable(VAR_AudioStatus);
           return FUNC_SUCCESS;
 
         case AS_ERROR:
@@ -150,26 +135,21 @@ static FuncResult Audio_DoCommand(AudioCommand_Typedef cmd)
       {
         return Audio_DoCommand(AC_PAUSE);
       }
-      else
-      {
-        return FUNC_NOT_SUCCESS;
-      }
+      return FUNC_NOT_SUCCESS;
 
       /* Process the STOP command ----------------------------*/
     case AC_STOP:
       SetVariable(VAR_AudioPosition, SampleRate, 0);
 
-      if (EVAL_AUDIO_Stop(CODEC_PDWN_SW) != 0)
-      {
-        AudioError();
-        return FUNC_ERROR;
-      }
+      EVAL_AUDIO_Stop(CODEC_PDWN_SW); //XXX CODEC_PDWN_HW
 
       SetVariable(VAR_AudioStatus, AudioState, AS_STOPPED);
       return FUNC_SUCCESS;
 
       /* Process the PAUSE command ---------------------------*/
     case AC_SUSPEND:
+      DMA_Starving_Flag = true;
+      SyncVariable(VAR_AudioStatus);
       if (AudioState == AS_PLAYING)
       {
         fr = Audio_DoCommand(AC_PAUSE);
@@ -177,11 +157,6 @@ static FuncResult Audio_DoCommand(AudioCommand_Typedef cmd)
       else
       {
         fr = Audio_DoCommand(AC_STOP);
-      }
-
-      if (fr == FUNC_SUCCESS)
-      {
-        SetVariable(VAR_AudioStatus, AudioState, AS_SUSPENDED_PLAYBACK);
       }
       return fr;
 
@@ -196,9 +171,9 @@ static FuncResult Audio_DoCommand(AudioCommand_Typedef cmd)
         return FUNC_NOT_SUCCESS;
       }
 
-      if (EVAL_AUDIO_PauseResume(AUDIO_PAUSE) != 0)
+      if (EVAL_AUDIO_PauseResume(AUDIO_PAUSE/*, 0, 0*/) != 0)
       {
-        AudioError();
+        Audio_Error();
         return FUNC_ERROR;
       }
 
@@ -207,14 +182,10 @@ static FuncResult Audio_DoCommand(AudioCommand_Typedef cmd)
 
       /* Process the PAUSE command ---------------------------*/
     case AC_RESET_BUFFERS:
-//      fr = Audio_DoCommand(AC_STOP);
-//      if (fr != FUNC_SUCCESS)
-//      {
-//        return fr;
-//      }
+      fr = Audio_DoCommand(AC_PAUSE);
 
       AudioBuffer_Init();
-      return FUNC_SUCCESS;
+      return fr;
 
       /* Unsupported command ---------------------------------*/
     default:
@@ -249,7 +220,7 @@ u32 ConvertVolume(u32 NewVolume)
 
 FuncResult Audio_SetVolume(u8 NewVolume)
 {
-  if (AudioState == AS_INACTIVE)
+  if (AudioState == AS_STOPPED)
   {
     SetVariable(VAR_AudioVolume, Volume, NewVolume);
     return FUNC_SUCCESS;
@@ -257,7 +228,7 @@ FuncResult Audio_SetVolume(u8 NewVolume)
 
   if (EVAL_AUDIO_VolumeCtl(ConvertVolume(NewVolume)) != 0)
   {
-    AudioError();
+    Audio_Error();
     return FUNC_ERROR;
   }
 
@@ -288,16 +259,19 @@ FuncResult Audio_ChangeVolume(s8 delta) //todo async
 
 FuncResult Audio_PeriodicKick(void)
 {
-  bool main_thread_in_do_command_old;
   FuncResult fr = FUNC_SUCCESS;
 
   if (AudioState == AS_ERROR)
     return FUNC_ERROR;
 
-  if (AudioState == AS_SUSPENDED_PLAYBACK)
+  CPU_DisableInterrupts();
+
+  if (DMA_Starving_Flag && !AudioBuffer_TryGetProducer())
   {
     fr = FeedDMA();
   }
+
+  CPU_RestoreInterrupts();
 
   return fr;
 }
@@ -331,7 +305,7 @@ void EVAL_AUDIO_TransferComplete_CallBack(uint32_t pBuffer, uint32_t Size)
     AudioBuffer_MoveConsumer();
   }
 
-  if (FeedDMA() != FUNC_SUCCESS)
+  if (AudioState == AS_PLAYING && FeedDMA() != FUNC_SUCCESS)
   {
     NeglectedDMA_Count++;
 
@@ -341,9 +315,13 @@ void EVAL_AUDIO_TransferComplete_CallBack(uint32_t pBuffer, uint32_t Size)
   CPU_RestoreInterrupts();
 }
 
-FuncResult FeedDMA(void)
+FuncResult FeedDMA(void) //todo
 {
   AudioBuffer_Typedef *buffer;
+
+#ifdef PROFILING
+  return FUNC_SUCCESS;
+#endif
 
   buffer = AudioBuffer_TryGetConsumer();
   if (buffer)
@@ -360,18 +338,25 @@ FuncResult FeedDMA(void)
         return fr;
     }
 
-    Audio_MAL_Play((uint32_t) buffer->data, buffer->size * 2);
-    DMA_Starving_Flag = false;
-
-    if (AudioState != AS_PAUSED)
+    if (AudioState == AS_PAUSED)
     {
-      SetVariable(VAR_AudioStatus, AudioState, AS_PLAYING);
+      if (EVAL_AUDIO_PauseResume(AUDIO_RESUME/*, (uint32_t) buffer->data, buffer->size * 2*/) != 0)
+      {
+        Audio_Error();
+        return FUNC_ERROR;
+      }
     }
+//    else
+    {
+      Audio_MAL_Play((uint32_t) buffer->data, buffer->size * 2);
+//      ();
+    }
+
+    DMA_Starving_Flag = false;
+    SetVariable(VAR_AudioStatus, AudioState, AS_PLAYING);
 
     return FUNC_SUCCESS;
   }
-
-  trace("Unsucessful DMA feeding\n");
 
   return FUNC_NOT_SUCCESS;
 }

@@ -31,6 +31,7 @@
 
 /* Includes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 #include "software_conf.h"
+#include "cpu_config.h"
 
 /* Exported defines ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Exported macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -40,29 +41,66 @@
 typedef enum
 {
   PF_TOTAL,
-  PF_FS,
+  PF_PRELOAD,
   PF_CODEC_TOTAL,
-  PF_CODEC_CELT_DEEMPH,
-  PF_CODEC_CELT_IMDCT,
-  PF_CODEC_CELT_BANDS,
-  PF_CODEC_CELT_13,
-  PF_CODEC_CELT_PART_2,
-  PF_CODEC_CELT_PART_3,
-  PF_CODEC_CELT,
-  PF_CODEC_CELT_BANDS_1,
-  PF_CODEC_CELT_BANDS_2,
-  PF_CODEC_CELT_BANDS_3,
-  PF_CODEC_CELT_BANDS_4,
+  PF_CODEC_DECODE,
+
+//  PF_CELT_EBANDS,
+//  PF_CELT_1,
+//  PF_CELT_2,
+//  PF_CELT_3,
+//  PF_CELT_4,
+//  PF_CELT_5,
+//  PF_CELT_6,
+  PF_CELT_7,
+//  PF_CELT_8,
+//  PF_CELT_9,
+//  PF_CELT_10,
+//  PF_CELT_11,
+//  PF_CELT_12,
+//  PF_CELT_13,
+//  PF_CELT_14,
+  PF_CELT_15,
+//  PF_CELT_16,
+//  PF_CELT_17,
+//  PF_CELT_18,
+//  PF_CELT_19,
+//  PF_CELT_20,
+
   PF_MAX
 } ProfileFunction_Typedef;
 
 /* Exported functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 #ifdef PROFILING
-void Profiler_DoEnterFunc(char *func_name, ProfileFunction_Typedef func);
-void Profiler_ExitFunc(ProfileFunction_Typedef func);
+void Profiler_Init(void);
+void Profiler_SetTotal(u32 total);
 void Profiler_Print(void);
+
+static inline void Profiler_DoEnterFunc(char *func_name, ProfileFunction_Typedef func)
+{
+  extern u32 profile_entry_points[PF_MAX];
+  extern char* profile_func_names[PF_MAX];
+
+  assert_param(func < PF_MAX);
+
+  profile_func_names[func] = func_name;
+
+  profile_entry_points[func] = uS_Profiler_GetValue();
+}
+
+static inline void Profiler_ExitFunc(ProfileFunction_Typedef func)
+{
+  extern u32 profile_entry_points[PF_MAX];
+  extern u32 profile_results[PF_MAX];
+
+  assert_param(func < PF_MAX);
+
+  profile_results[func] += uS_Profiler_GetDiff(profile_entry_points[func]);
+}
+
 unsigned int Profiler_GetResult(ProfileFunction_Typedef func);
 #else
+#define Profiler_Init()
 #define Profiler_DoEnterFunc(...)
 #define Profiler_ExitFunc(...)
 #define Profiler_Print()

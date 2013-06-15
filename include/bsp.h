@@ -74,6 +74,7 @@ void *user_zalloc(size_t size);
 void user_free(void *mem);
 void *user_calloc(size_t n, size_t elem_size);
 void *user_realloc(void *oldmem, size_t size);
+void print_user_heap_mallinfo(void);
 
 /* AUDIO */
 
@@ -81,7 +82,7 @@ void EVAL_AUDIO_SetAudioInterface(uint32_t Interface);
 uint32_t EVAL_AUDIO_Init(uint16_t OutputDevice, uint8_t Volume, uint32_t AudioFreq);
 uint32_t EVAL_AUDIO_DeInit(void);
 uint32_t EVAL_AUDIO_Play(uint16_t* pBuffer, uint32_t Size);
-uint32_t EVAL_AUDIO_PauseResume(uint32_t Cmd);
+uint32_t EVAL_AUDIO_PauseResume(uint32_t Cmd/*, uint32_t Addr, uint32_t Size*/);
 uint32_t EVAL_AUDIO_Stop(uint32_t CodecPowerDown_Mode);
 uint32_t EVAL_AUDIO_VolumeCtl(uint8_t Volume);
 uint32_t EVAL_AUDIO_Mute(uint32_t Command);

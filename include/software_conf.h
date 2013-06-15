@@ -48,7 +48,9 @@
 #define AUDIO_BUFFER_COUNT                  4
 
 /* CDC buf size */
-#define APP_RX_DATA_SIZE                    1024
+#define APP_RX_DATA_SIZE                    8192
+
+//#define MINOGG_GRANULEPOS_CACHE
 
 #ifdef SIMULATOR
 # undef ENABLE_TRACE

@@ -38,7 +38,7 @@
 /* Exported types ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 typedef struct
 {
-  char file_name[256];
+  char file_name[512];
 
   u8 channel_count;
   int bitrate;
