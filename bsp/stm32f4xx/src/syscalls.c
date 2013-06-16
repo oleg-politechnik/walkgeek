@@ -111,12 +111,16 @@ int newlib_heap_size;
 void *_sbrk(int nbytes)
 {
   extern unsigned int _sheap_newlib;
-  extern unsigned int _eheap_newlib;
+  extern unsigned int _ssram1;
+
+  /* stm32f42/43 uCs have 2048K Flash and 192K non-CCM SRAM */
+  int has_256K_sram = (*(volatile uint16_t *) 0x1FFF7A22 == 2048);
+  char *_eheap_newlib = (char *) &_ssram1 + (has_256K_sram ? 64 : 0) * 1024;
 
   /* The statically held previous end of the heap, with its initialization. */
   static void *heap_ptr = (void *) &_sheap_newlib; /* Previous end */
 
-  if ((unsigned int) heap_ptr + nbytes <= (unsigned int) &_eheap_newlib)
+  if ((unsigned int) heap_ptr + nbytes <= (unsigned int) _eheap_newlib)
   {
     void *base = heap_ptr;
     heap_ptr += nbytes;

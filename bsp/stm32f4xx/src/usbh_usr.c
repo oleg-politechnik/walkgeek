@@ -30,9 +30,6 @@
   */
 
 /* External variables --------------------------------------------------------*/
-extern PlayerStatus_Typedef PlayerStatus;
-extern PlayerState_Typedef PlayerState;
-
 /* Private typedef -----------------------------------------------------------*/
 /* Private defines -----------------------------------------------------------*/
 /* Private macros ------------------------------------------------------------*/
@@ -260,20 +257,6 @@ int USBH_USR_MSC_Application(void)
   System_SetState(SS_PLAYER);
 
   System_MainThread();
-
-  if (PlayerStatus == PS_PLAYING)
-  {
-    if (PlayerState.metadata.mstime_curr > last_ms + 1000 ||
-            PlayerState.metadata.mstime_curr < last_ms)
-    {
-      STM_EVAL_LEDToggle(LED6);
-      last_ms = PlayerState.metadata.mstime_curr;
-    }
-  }
-  else
-  {
-    STM_EVAL_LEDOff(LED6);
-  }
 
   return(0);
 }

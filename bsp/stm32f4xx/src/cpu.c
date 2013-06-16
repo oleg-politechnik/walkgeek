@@ -115,6 +115,8 @@ void CPU_RestoreInterrupts(void)
 }
 
 extern unsigned int _sheap_user;
+extern unsigned int _eheap_user;
+
 void *CPU_GetUserHeapStart(void)
 {
   return &_sheap_user;
@@ -122,12 +124,7 @@ void *CPU_GetUserHeapStart(void)
 
 size_t CPU_GetUserHeapSize(void)
 {
-  extern unsigned int _ssram1;
-
-  int has_256K_sram = (*(volatile uint16_t *) 0x1FFF7A22 == 2048);
-  char *_eheap_user = (char *) &_ssram1 + (has_256K_sram ? 64 : 0) * 1024;
-
-  return (size_t) (_eheap_user - (char *) &_sheap_user);
+  return (size_t) ((char *) &_eheap_user - (char *) &_sheap_user);
 }
 
 size_t CPU_GetStackSize(void)

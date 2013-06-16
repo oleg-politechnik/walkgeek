@@ -36,12 +36,10 @@ ENTRY(Reset_Handler)
 MEMORY
 {
   FLASH (rx)      : ORIGIN = 0x08000000, LENGTH = 1024K
-  RAM (xrw)       : ORIGIN = 0x20000000, LENGTH = 0x11000
+  RAM (xrw)       : ORIGIN = 0x20000000, LENGTH = 112K
   CCM (xrw)       : ORIGIN = 0x10000000, LENGTH = 64K
   MEMORY_B1 (rx)  : ORIGIN = 0x60000000, LENGTH = 0K
 }
-
-_ssram1 = ORIGIN(RAM) + 128K;
 
 /* Define output sections */
 SECTIONS
@@ -135,15 +133,17 @@ SECTIONS
     _ebss = .;         /* define a global symbol at bss end */
     __bss_end__ = _ebss;
     
+    _sstack = .;
+    . += 0x1000;
+    _estack = .;
+    
     _sheap_newlib = .;
   } >RAM
-  
-  _eheap_newlib = ORIGIN(RAM) + LENGTH(RAM);
-  
-  _sheap_user = _eheap_newlib;
 
-  _sstack = ORIGIN(CCM);
-  _estack = ORIGIN(CCM) + LENGTH(CCM);
+  _ssram1 = ORIGIN(RAM) + LENGTH(RAM);
+
+  _sheap_user = ORIGIN(CCM);
+  _eheap_user = ORIGIN(CCM) + LENGTH(CCM);
 
   /* MEMORY_bank1 section, code must be located here explicitly            */
   /* Example: extern int foo(void) __attribute__ ((section (".mb1text"))); */

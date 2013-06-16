@@ -71,7 +71,7 @@ extern PlayerState_Typedef PlayerState;
 /* Private define ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* 20ms at 48000, TODO 120ms */
 #define MAX_FRAME_SIZE      960
-#define OPUS_STACK_SIZE     32000 /*31684*/
+#define OPUS_STACK_SIZE     31684 /**/
 
 /* Private typedef ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -388,9 +388,17 @@ void OPUS_LoadFile(char *filepath)
   print_user_heap_mallinfo();
 
   og = user_zalloc(sizeof(ogg_page));
+  assert_param(og);
   op = user_zalloc(sizeof(ogg_packet));
+  assert_param(op);
   os = user_zalloc(sizeof(ogg_stream_state));
-  file = user_zalloc(sizeof(FIL));
+  assert_param(os);
+
+  print_user_heap_mallinfo();
+
+  file = malloc(sizeof(FIL));
+  assert_param(file);
+  bzero(file, sizeof(FIL));
 
 #ifdef NONTHREADSAFE_PSEUDOSTACK
   global_stack = user_malloc(OPUS_STACK_SIZE);
@@ -675,7 +683,7 @@ void OPUS_MainThread(void)
 void OPUS_Seek(u32 msec)
 {
   //todo debug
-
+#if 0
   assert_param(msec < PlayerState.metadata.mstime_max);
 
   trace("Opus: trying to seek to %us... ", msec / 1000);
@@ -701,14 +709,24 @@ void OPUS_Seek(u32 msec)
   audio_size = PlayerState.metadata.mstime_curr * (rate / 1000);
 
   trace("got %us\n", PlayerState.metadata.mstime_curr / 1000);
+#endif
 }
 
 void OPUS_Stop(void)
 {
 #ifdef NONTHREADSAFE_PSEUDOSTACK
   if (global_stack)
+  {
     user_free(global_stack);
+    global_stack = 0;
+  }
 #endif
 
   f_close(file);
+
+  if (file)
+  {
+    free(file);
+    file = 0;
+  }
 }

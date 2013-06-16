@@ -15,4 +15,5 @@ TODO:
 - I2S frequency is inaccurate
 - sd card double buffering bug -> temp. workaround -> reduce size
 - SD card DMA timeouts
-- memzero when de-init
+- memzero when de-init Player
+- Audio DMA Circular Mode

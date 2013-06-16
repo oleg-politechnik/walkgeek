@@ -25,8 +25,11 @@
 #include "usbh_core.h"
 #include "usbh_msc_core.h"
 #include "powermanager.h"
+#include "player.h"
 
 extern USBH_Usr_cb_TypeDef USR_Callbacks;
+extern PlayerStatus_Typedef PlayerStatus;
+extern PlayerState_Typedef PlayerState;
 
 /** @addtogroup STM32F4-Discovery_Audio_Player_Recorder
   * @{
@@ -70,6 +73,28 @@ USBH_HOST           USB_Host;
  static void USB_OTG_BSP_TimeInit ( void );
 #endif
 
+static void DisplayPlayerStatus(void)
+{
+  static u32 last_ms;
+
+  if (PlayerStatus == PS_PLAYING)
+  {
+    STM_EVAL_LEDOff(LED3);
+
+    if (PlayerState.metadata.mstime_curr > last_ms + 500 ||
+            PlayerState.metadata.mstime_curr < last_ms)
+    {
+      STM_EVAL_LEDToggle(LED6);
+      last_ms = PlayerState.metadata.mstime_curr;
+    }
+  }
+  else
+  {
+    STM_EVAL_LEDOn(LED3);
+    STM_EVAL_LEDOff(LED6);
+  }
+}
+
 void PowerManager_Init(void)
 {
   /* Initialize LEDS */
@@ -78,11 +103,13 @@ void PowerManager_Init(void)
   STM_EVAL_LEDInit(LED5);
   STM_EVAL_LEDInit(LED6);
 
-  /* Green Led On: start of application */
+  /* Red Led On: start of application */
   STM_EVAL_LEDOn(LED5);
 
   /* Init Host Library */
   USBH_Init(&USB_OTG_Core, USB_OTG_FS_CORE_ID, &USB_Host, &USBH_MSC_cb, &USR_Callbacks);
+
+  Scheduler_PutTask(100, DisplayPlayerStatus, REPEAT);
 
   /* Configure PA0 pin: User Key pin */
   STM_EVAL_PBInit(BUTTON_USER, BUTTON_MODE_GPIO);

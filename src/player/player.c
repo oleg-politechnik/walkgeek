@@ -184,8 +184,6 @@ void Player_Play(void)
             sizeof(PlayerState.metadata.file_name), "%s/%s",
             PlayerContext.dir_path, PlayerContext.fname);
 
-    PlayerStatus = PS_PLAYING;
-
     trace("player: loading %s\n", PlayerState.metadata.file_name);
 
 #ifndef SIMULATOR
@@ -196,8 +194,9 @@ void Player_Play(void)
     Profiler_ExitFunc(PF_PRELOAD);
 #endif
 
-    if (PlayerStatus == PS_PLAYING)
+    if (PlayerStatus == PS_STOPPED)
     {
+      SetVariable(VAR_PlayerState, PlayerStatus, PS_PLAYING);
       Audio_CommandSync(AC_PLAY);
     }
   }
