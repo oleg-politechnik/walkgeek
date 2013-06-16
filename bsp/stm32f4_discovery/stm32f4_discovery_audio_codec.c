@@ -697,8 +697,6 @@ static uint32_t Codec_PauseResume(uint32_t Cmd)
     /* Unmute the output first */
     counter += Codec_Mute(AUDIO_MUTE_OFF);
 
-    counter += Codec_WriteRegister(0x04, OutputDev);
-
     /* Exit the Power save mode */
     counter += Codec_WriteRegister(0x02, 0x9E);
   }
@@ -1038,6 +1036,27 @@ static void Codec_CtrlInterface_DeInit(void)
 {
   /* Disable the I2C peripheral */
   I2C_DeInit(CODEC_I2C);
+}
+
+/**
+ * @brief  Codec_TIMEOUT_UserCallback
+ * @param  None
+ * @retval None
+ */
+uint32_t Codec_TIMEOUT_UserCallback(void)
+{
+  I2C_InitTypeDef I2C_InitStructure;
+
+  /* I2C Timeout error (CS43L22) */
+
+  I2C_GenerateSTOP(CODEC_I2C, ENABLE);
+  I2C_SoftwareResetCmd(CODEC_I2C, ENABLE);
+  I2C_SoftwareResetCmd(CODEC_I2C, DISABLE);
+
+  Codec_CtrlInterface_DeInit();
+  Codec_CtrlInterface_Init();
+
+  return 1;
 }
 
 /**

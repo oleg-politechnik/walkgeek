@@ -3481,20 +3481,13 @@ Source: LIS302DL.txt</description>
 <part name="+3V9" library="walkgeek-eagle" deviceset="+3V3" device=""/>
 <part name="R34" library="walkgeek-eagle" deviceset="R-EU_" device="R0805" value="47K"/>
 <part name="DD3" library="walkgeek-eagle" deviceset="LTC4054ES5-4.2" device=""/>
-<part name="R35" library="walkgeek-eagle" deviceset="R-EU_" device="R0805" value="1.65K 1%"/>
-<part name="R36" library="walkgeek-eagle" deviceset="R-EU_" device="R0805" value="N/A"/>
-<part name="R37" library="walkgeek-eagle" deviceset="R-EU_" device="R0805" value="0"/>
+<part name="R35" library="walkgeek-eagle" deviceset="R-EU_" device="R0805" value="2K 1%"/>
 <part name="GND17" library="supply1" deviceset="GND" device=""/>
-<part name="GND19" library="supply1" deviceset="GND" device=""/>
 <part name="GND20" library="supply1" deviceset="GND" device=""/>
-<part name="C19" library="walkgeek-eagle" deviceset="C-EU" device="C0805" value="N/A"/>
-<part name="GND21" library="supply1" deviceset="GND" device=""/>
 <part name="GND22" library="supply1" deviceset="GND" device=""/>
-<part name="R38" library="walkgeek-eagle" deviceset="R-EU_" device="R0805" value="220K"/>
-<part name="R39" library="walkgeek-eagle" deviceset="R-EU_" device="R0805" value="220K"/>
+<part name="R38" library="walkgeek-eagle" deviceset="R-EU_" device="R0805" value="10K 1%"/>
+<part name="R39" library="walkgeek-eagle" deviceset="R-EU_" device="R0805" value="10K 1%"/>
 <part name="GND23" library="supply1" deviceset="GND" device=""/>
-<part name="C20" library="walkgeek-eagle" deviceset="C-EU" device="C0805" value="N/A"/>
-<part name="GND24" library="supply1" deviceset="GND" device=""/>
 <part name="C21" library="walkgeek-eagle" deviceset="C-EU" device="C0805" value="1uF"/>
 <part name="GND25" library="supply1" deviceset="GND" device=""/>
 <part name="R40" library="walkgeek-eagle" deviceset="R-EU_" device="R1206" value="1.8"/>
@@ -3713,16 +3706,8 @@ Source: LIS302DL.txt</description>
 <attribute name="NAME" x="488.442" y="208.7626" size="1.778" layer="95" rot="MR0"/>
 <attribute name="VALUE" x="488.442" y="207.772" size="1.778" layer="96" rot="R180"/>
 </instance>
-<instance part="R36" gate="G$1" x="467.36" y="208.28" smashed="yes" rot="MR90">
-<attribute name="NAME" x="465.582" y="208.7626" size="1.778" layer="95" rot="MR0"/>
-<attribute name="VALUE" x="465.582" y="207.772" size="1.778" layer="96" rot="R180"/>
-</instance>
-<instance part="R37" gate="G$1" x="480.06" y="215.9" rot="MR0"/>
 <instance part="GND17" gate="1" x="490.22" y="200.66" smashed="yes" rot="MR0"/>
-<instance part="GND19" gate="1" x="467.36" y="200.66" smashed="yes" rot="MR0"/>
 <instance part="GND20" gate="1" x="477.52" y="226.06" smashed="yes"/>
-<instance part="C19" gate="G$1" x="454.66" y="210.82" rot="MR0"/>
-<instance part="GND21" gate="1" x="454.66" y="200.66" smashed="yes" rot="MR0"/>
 <instance part="GND22" gate="1" x="508" y="200.66" smashed="yes"/>
 <instance part="R38" gate="G$1" x="530.86" y="208.28" smashed="yes" rot="R90">
 <attribute name="NAME" x="532.638" y="208.7626" size="1.778" layer="95"/>
@@ -3730,8 +3715,6 @@ Source: LIS302DL.txt</description>
 </instance>
 <instance part="R39" gate="G$1" x="518.16" y="215.9"/>
 <instance part="GND23" gate="1" x="530.86" y="200.66" smashed="yes"/>
-<instance part="C20" gate="G$1" x="543.56" y="210.82"/>
-<instance part="GND24" gate="1" x="543.56" y="200.66" smashed="yes"/>
 <instance part="C21" gate="G$1" x="467.36" y="233.68"/>
 <instance part="GND25" gate="1" x="467.36" y="226.06" smashed="yes"/>
 <instance part="R40" gate="G$1" x="462.28" y="238.76"/>
@@ -4060,10 +4043,6 @@ Source: LIS302DL.txt</description>
 <junction x="680.72" y="327.66"/>
 </segment>
 <segment>
-<pinref part="R36" gate="G$1" pin="1"/>
-<pinref part="GND19" gate="1" pin="GND"/>
-</segment>
-<segment>
 <pinref part="DD3" gate="G$1" pin="GND"/>
 <wire x1="480.06" y1="233.68" x2="477.52" y2="233.68" width="0.1524" layer="91"/>
 <pinref part="GND20" gate="1" pin="GND"/>
@@ -4074,11 +4053,6 @@ Source: LIS302DL.txt</description>
 <pinref part="GND17" gate="1" pin="GND"/>
 </segment>
 <segment>
-<pinref part="C19" gate="G$1" pin="2"/>
-<pinref part="GND21" gate="1" pin="GND"/>
-<wire x1="454.66" y1="203.2" x2="454.66" y2="205.74" width="0.1524" layer="91"/>
-</segment>
-<segment>
 <pinref part="B1" gate="B$1" pin="-"/>
 <wire x1="505.46" y1="210.82" x2="508" y2="210.82" width="0.1524" layer="91"/>
 <pinref part="GND22" gate="1" pin="GND"/>
@@ -4087,11 +4061,6 @@ Source: LIS302DL.txt</description>
 <segment>
 <pinref part="R38" gate="G$1" pin="1"/>
 <pinref part="GND23" gate="1" pin="GND"/>
-</segment>
-<segment>
-<pinref part="C20" gate="G$1" pin="2"/>
-<pinref part="GND24" gate="1" pin="GND"/>
-<wire x1="543.56" y1="203.2" x2="543.56" y2="205.74" width="0.1524" layer="91"/>
 </segment>
 <segment>
 <pinref part="C21" gate="G$1" pin="2"/>
@@ -5280,11 +5249,11 @@ Source: LIS302DL.txt</description>
 <pinref part="DD2" gate=".2" pin="PC10"/>
 </segment>
 </net>
-<net name="N$15" class="0">
+<net name="ADC_CHG" class="0">
 <segment>
-<pinref part="R37" gate="G$1" pin="1"/>
+<wire x1="441.96" y1="215.9" x2="490.22" y2="215.9" width="0.1524" layer="91"/>
+<label x="441.96" y="215.9" size="1.778" layer="95"/>
 <pinref part="R35" gate="G$1" pin="2"/>
-<wire x1="490.22" y1="215.9" x2="485.14" y2="215.9" width="0.1524" layer="91"/>
 <wire x1="490.22" y1="213.36" x2="490.22" y2="215.9" width="0.1524" layer="91"/>
 <pinref part="DD3" gate="G$1" pin="PROG"/>
 <wire x1="502.92" y1="233.68" x2="505.46" y2="233.68" width="0.1524" layer="91"/>
@@ -5292,21 +5261,6 @@ Source: LIS302DL.txt</description>
 <wire x1="505.46" y1="223.52" x2="490.22" y2="223.52" width="0.1524" layer="91"/>
 <wire x1="490.22" y1="223.52" x2="490.22" y2="215.9" width="0.1524" layer="91"/>
 <junction x="490.22" y="215.9"/>
-</segment>
-</net>
-<net name="ADC_CHG" class="0">
-<segment>
-<pinref part="R37" gate="G$1" pin="2"/>
-<wire x1="474.98" y1="215.9" x2="467.36" y2="215.9" width="0.1524" layer="91"/>
-<pinref part="R36" gate="G$1" pin="2"/>
-<wire x1="467.36" y1="215.9" x2="467.36" y2="213.36" width="0.1524" layer="91"/>
-<pinref part="C19" gate="G$1" pin="1"/>
-<wire x1="454.66" y1="213.36" x2="454.66" y2="215.9" width="0.1524" layer="91"/>
-<wire x1="454.66" y1="215.9" x2="467.36" y2="215.9" width="0.1524" layer="91"/>
-<junction x="467.36" y="215.9"/>
-<wire x1="454.66" y1="215.9" x2="441.96" y2="215.9" width="0.1524" layer="91"/>
-<junction x="454.66" y="215.9"/>
-<label x="441.96" y="215.9" size="1.778" layer="95"/>
 </segment>
 <segment>
 <pinref part="DD2" gate=".1" pin="PB1"/>
@@ -5320,12 +5274,8 @@ Source: LIS302DL.txt</description>
 <wire x1="523.24" y1="215.9" x2="530.86" y2="215.9" width="0.1524" layer="91"/>
 <pinref part="R38" gate="G$1" pin="2"/>
 <wire x1="530.86" y1="215.9" x2="530.86" y2="213.36" width="0.1524" layer="91"/>
-<pinref part="C20" gate="G$1" pin="1"/>
-<wire x1="543.56" y1="213.36" x2="543.56" y2="215.9" width="0.1524" layer="91"/>
-<wire x1="543.56" y1="215.9" x2="530.86" y2="215.9" width="0.1524" layer="91"/>
 <junction x="530.86" y="215.9"/>
-<wire x1="543.56" y1="215.9" x2="556.26" y2="215.9" width="0.1524" layer="91"/>
-<junction x="543.56" y="215.9"/>
+<wire x1="530.86" y1="215.9" x2="556.26" y2="215.9" width="0.1524" layer="91"/>
 <label x="556.26" y="215.9" size="1.778" layer="95" rot="MR0"/>
 </segment>
 <segment>
@@ -5347,10 +5297,7 @@ Source: LIS302DL.txt</description>
 <net name="VBAT0" class="1">
 <segment>
 <pinref part="B1" gate="B$1" pin="+"/>
-<pinref part="R39" gate="G$1" pin="1"/>
-<wire x1="513.08" y1="215.9" x2="508" y2="215.9" width="0.1524" layer="91"/>
 <wire x1="508" y1="215.9" x2="505.46" y2="215.9" width="0.1524" layer="91"/>
-<junction x="508" y="215.9"/>
 <pinref part="VT3" gate="VT$1" pin="D"/>
 <pinref part="DD3" gate="G$1" pin="BAT"/>
 <wire x1="502.92" y1="238.76" x2="508" y2="238.76" width="0.1524" layer="91"/>
@@ -5371,6 +5318,12 @@ Source: LIS302DL.txt</description>
 <pinref part="VD1" gate="G$1" pin="C"/>
 <wire x1="523.24" y1="248.92" x2="525.78" y2="248.92" width="0.1524" layer="91"/>
 <junction x="525.78" y="248.92"/>
+<wire x1="525.78" y1="238.76" x2="525.78" y2="231.14" width="0.1524" layer="91"/>
+<junction x="525.78" y="238.76"/>
+<wire x1="525.78" y1="231.14" x2="510.54" y2="231.14" width="0.1524" layer="91"/>
+<wire x1="510.54" y1="231.14" x2="510.54" y2="215.9" width="0.1524" layer="91"/>
+<pinref part="R39" gate="G$1" pin="1"/>
+<wire x1="510.54" y1="215.9" x2="513.08" y2="215.9" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="VBUS" class="1">

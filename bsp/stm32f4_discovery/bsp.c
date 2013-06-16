@@ -551,8 +551,8 @@ void CheckHeadsetInserted(void)
 
   if (HeadsetStatus == HS_QUALIFYING)
   {
-    HeadsetStatus = (head_mV < HANDSET_LOW_THRESHOLD_MV && head_mV
-            < BTN_PRESSED_HIGH_THRESHOLD_MV) ? HS_PRESENT : HS_NOT_PRESENT;
+    HeadsetStatus = (head_mV < HANDSET_LOW_THRESHOLD_MV
+            && head_mV > BTN_PRESSED_HIGH_THRESHOLD_MV) ? HS_PRESENT : HS_NOT_PRESENT;
     HeadsetButtonPressed = false;
 
     trace("Headset was inserted\n");
@@ -568,7 +568,7 @@ void UpdateHeadsetStatus(void)
 
   /* Apply hysteresis */
   if (HeadsetStatus == HS_NOT_PRESENT && head_mV < HANDSET_LOW_THRESHOLD_MV
-          && head_mV < BTN_PRESSED_HIGH_THRESHOLD_MV)
+          && head_mV > BTN_PRESSED_HIGH_THRESHOLD_MV)
   {
     /* ... and wait while pulling off / inserting */
     HeadsetStatus = HS_QUALIFYING;
@@ -594,40 +594,6 @@ void UpdateHeadsetStatus(void)
   }
 }
 #endif
-
-/**
- * @brief  Codec_TIMEOUT_UserCallback
- * @param  None
- * @retval None
- */
-uint32_t Codec_TIMEOUT_UserCallback(void)
-{
-  I2C_InitTypeDef I2C_InitStructure;
-
-  /* I2C Timeout error (CS43L22) */
-
-  I2C_GenerateSTOP(I2C1, ENABLE);
-  I2C_SoftwareResetCmd(I2C1, ENABLE);
-  I2C_SoftwareResetCmd(I2C1, DISABLE);
-
-  I2C_DeInit(I2C1);
-
-  /* CODEC_I2C peripheral configuration */
-  I2C_DeInit(I2C1);
-  I2C_InitStructure.I2C_Mode = I2C_Mode_I2C;
-  I2C_InitStructure.I2C_DutyCycle = I2C_DutyCycle_2;
-  I2C_InitStructure.I2C_OwnAddress1 = 0x33;
-  I2C_InitStructure.I2C_Ack = I2C_Ack_Enable;
-  I2C_InitStructure.I2C_AcknowledgedAddress = I2C_AcknowledgedAddress_7bit;
-  I2C_InitStructure.I2C_ClockSpeed = I2C_SPEED;
-  /* Enable the I2C peripheral */
-  I2C_Cmd(I2C1, ENABLE);
-  I2C_Init(I2C1, &I2C_InitStructure);
-
-  /* I2C error recovered */
-
-  return 1;
-}
 
 /**
  * @brief  Get next data sample callback
