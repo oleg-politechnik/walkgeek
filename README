@@ -1,17 +1,149 @@
-== Compiling
-= Patching CMake
+= About walkgeek ===============================================================
 
-If you see something like this:
+This is walkgeek, another portable music player based upon STM32F4-Discovery
+board hardware, which contains STM32F407VGT6 microcontroller and CS43L22 audio
+codec.
 
--- Check for working C compiler: /home/oleg/Local/gcc-arm-none-eabi-4_6-2012q2/bin/arm-none-eabi-gcc -- broken
-  exit.c:(.text.exit+0x2c): undefined reference to `_exit'
-  collect2: ld returned 1 exit status
+The goal of this project is to create a fully functional yet very simple
+portable player, optimized for easy navigation across a lot of pretty long audio
+files (podcasts).
 
-Please try:
+= Hardware =====================================================================
 
+There are 2 pretty similar HW platforms supported (or rather variations of a
+one platform) called N1100 and F4DISCOVERY.
+
+--- F4DISCOVERY ----------------------------------------------------------------
+
+This platform is represented by STM32F4-Discovery board. It gives you an easy
+way to try out and develop walkgeek. No HW modifications are necessary in a very
+basic case. You only need to put some audio files supported by walkgeek on a USB
+Flash drive and attach in to the USB Micro connector (CN6). User interface is
+limited to a "User" button which acts as button "3", and .
+
+--- N1100 ----------------------------------------------------------------------
+
+There is also a more portable HW version that fits into Nokia 1100 cell phone
+case. Design resources for it are also available in pcb/ directory of this
+project in EAGLE CAD format.
+
+= Software =====================================================================
+
+1. Checkout the latest version of the source code by following the instructions
+   here: http://code.google.com/p/walkgeek/source/checkout
+
+2. In order to build the source code, you need:
+ - Git
+ - CMake of a version of 2.8.4 or higher.
+ - ARM GNU Toolchain: CodeSourcery, Linaro, etc.
+ 
+3. You probably will find useful to have openocd as a gdb server which supports
+   many cheap JTAG probes, including STLink v2 which is found in all the
+   Discovery boards by ST.
+
+= Example steps for Linux-based desktop ========================================
+
+1. Checkout latest version of player's source code.
+
+$ git clone 
+
+2. It seems that CMake doesn't like embedded arm gnu toolchains (which is the
+   case for at least CodeSourcery and Linaro on Ubuntu GNU/Linux) and shows
+   errors at the project configure stage. You may solve them by typing: 
+
+$ cd walkgeek
 $ sudo ./patch_cmake.sh
 
-OR
+   Dollar sign stands for command line prompt, do not type it.
+   Please note that on OS other than GNU/Linux it may be different file or even
+   may be unnecessary. Probably there is more proper way but this one has worked
+   for me.
 
-$ su
-# ./patch_cmake.sh
+3. You should be at this moment in walkgeek directory. Type:
+
+$ mkdir Build
+$ cd Build
+
+4. Next step is to invoke cmake in order to generate Makefiles. You can specify
+   a list of parameters where syntax for each item is -D%param_name%=%param_value%.
+   Among other standard cmake parameters, you can specify:
+   - TOOLCHAIN_PREFIX -- full path to the root directory of your toolchain.
+     Default is $ENV{HOME}/Local/gcc-arm-none-eabi-4_6-2012q2
+   - TARGET_TRIPLET -- prefic for toolchain programs, default is arm-none-eabi.
+   - STM32_USBLib_DIR -- full path to the STM32 USB Host Device Lib.
+     Default is ${CMAKE_SOURCE_DIR}/bsp/3rd_party/STM32_USB-Host-Device_Lib_V2.1.0
+   - CMAKE_BUILD_TYPE -- Release or Debug or others (please refer to the CMake
+     documentation). Default is Debug.
+
+   - PLATFORM -- choose one of the supported HW platforms: N1100, F4DISCOVERY,
+     SIMULATOR (see below). Default is N1100.
+   - PROFILING -- enable measurement of the CPU consumption of the audio codecs.
+     1 enables, 0 disables. Default is 0.
+   - ENABLE_TRACE -- enable trace() functions output via USB CDC. Default is 0.
+   - USE_MP3 -- enable MP3 support. Default is 0.
+   - RPROG_OHM -- if your platform is N1100, this is the value of resistor
+     which sets LTC4054 charge current. Default is 2000.
+   - SD_CARD_FILE -- if your platform is SIMULATOR, enter a full path to the
+     file which contains FAT file system. See below for details. No default here.
+
+   So if your toolchain and paths are the same, you don't need to specify all of
+   them. In this example the default values are passed explicitly.
+
+$ cmake -DTOOLCHAIN_PREFIX=/home/oleg/Local/CodeSourcery/Sourcery_CodeBench_Lite_for_ARM_EABI \
+-DUSE_MP3=1 ../ -G"Unix Makefiles"
+
+$ make
+
+   Now you can build .hex, .bin or .dis (disassembly) files
+
+$ make walkgeek.hex
+
+   My Ubuntu even auto-completes Makefile targets.
+
+6. (Optional) You can also debug it. Open one console, cd to the walkgeek's
+   source root dir and
+
+$ openocd -f openocd_luminary.cfg
+
+   Switch to another console, cd to the walkgeek's source root dir and
+
+$ arm-none-eabi-gdb --quiet --tui -x debug.gdb
+
+= SIMULATOR ====================================================================
+
+  There's a way to launch walkgeek on your PC (currently only POSIX OS'es are
+  supported, at least GNU/Linux). PCM Audio output is not yet implemented.
+  But console IO works and keyboard is simulated via stdin (just press a key
+  and hit enter). If you press a number of keys and press enter, each of them
+  will be handled consequently. Also, SD card IO simulation works, so that
+  FAT FS module of walkgeek sees no difference compared to real HW. The idea is
+  to manually create a file of some MB of a size, create FAT FS inside it
+  (just like if it were an SD card), mount it, put some audio or whatever files
+  in it and feed it to walkgeek application.
+
+1. To do it, first create a file (this example will create a
+   bs*count=128 MB file)
+
+ $ dd if=/dev/zero of=sd_card.bin bs=1024 count=131072
+ 
+2. Make FAT FS here
+ 
+ $ /sbin/mkdosfs -F 16 sd_card.bin
+ 
+3. Mount it
+ 
+ $ mkdir fatmount
+ $ sudo mount -t vfat -o umask=0000 -o loop sd_card.bin fatmount
+ 
+4. Put some files into fatmount/ dir.
+
+5. Unmount it in order to drain write buffers.
+
+ $ sudo umount fatmount
+
+6. When launching CMake (see above), choose -DPLATFORM=SIMULATOR -D%path-to%/sd_card.bin
+
+  This is a good way to debug higher-level algorithms (for example, Navigator
+  module was tested that way).
+
+Thank you for your attention.
