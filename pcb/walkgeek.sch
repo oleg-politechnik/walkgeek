@@ -3594,9 +3594,7 @@ Source: LIS302DL.txt</description>
 <sheets>
 <sheet>
 <plain>
-<text x="683.26" y="274.32" size="1.778" layer="98">I2C Address = 0011100b</text>
-<text x="510.54" y="274.32" size="1.778" layer="98">I2C Address = 0x94</text>
-<text x="775.97" y="323.85" size="1.778" layer="98" align="bottom-center">Adjust backlight current</text>
+<text x="716.28" y="223.52" size="1.778" layer="91">SWD</text>
 </plain>
 <instances>
 <instance part="D1" gate="D$1" x="754.38" y="365.76"/>

@@ -2,7 +2,7 @@
 
 This is walkgeek, another portable music player based upon STM32F4-Discovery
 board hardware, which contains STM32F407VGT6 microcontroller and CS43L22 audio
-codec.
+codec. For now, it can play MP3 and Opus files.
 
 The goal of this project is to create a fully functional yet very simple
 portable player, optimized for easy navigation across a lot of pretty long audio
@@ -18,13 +18,17 @@ one platform) called N1100 and F4DISCOVERY.
 This platform is represented by STM32F4-Discovery board. It gives you an easy
 way to try out and develop walkgeek. No HW modifications are necessary in a very
 basic case. You only need to put some audio files supported by walkgeek on a USB
-Flash drive and attach in to the USB Micro connector (CN6). User interface is
-limited to a "User" button which acts as button "3", and .
+Flash drive and attach in to the USB Micro connector (CN5). User interface is
+limited to a on-board "User" button which acts as button "3", and 4 leds:
+ - Red means no Flash drive connected;
+ - Green means Flash drive has enumerated and Player is started;
+ - Orange means Player is stopped or loading current track;
+ - Blue (blinking) means Player is playing current track.
 
 --- N1100 ----------------------------------------------------------------------
 
 There is also a more portable HW version that fits into Nokia 1100 cell phone
-case. Design resources for it are also available in pcb/ directory of this
+case. Design resources for it are also available in a pcb/ directory of this
 project in EAGLE CAD format.
 
 = Software =====================================================================
