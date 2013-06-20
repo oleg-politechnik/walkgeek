@@ -322,6 +322,7 @@ void UI_VariableChangedHandler(VAR_Index var)
 
     case SS_PLAYER:
       SetVariable(VAR_ScreenMode, ScreenMode, UIM_Player);
+      SyncVariable(VAR_AudioVolume);
       break;
 
     case SS_USB_MSC:

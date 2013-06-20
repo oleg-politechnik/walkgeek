@@ -45,6 +45,8 @@
 #endif
 
 #define ICODE_ATTR      /*__attribute__ ((section(".fastcode")))*/
+#define ICONST_ATTR
+#define IBSS_ATTR
 
 #define _BV(shift)  (1 << shift)
 

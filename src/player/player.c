@@ -99,14 +99,18 @@ void Player_Init(void)
   if (len)
   {
     if (Navigator_Cd(&PlayerContext, buf))
+    {
       trace("settings: restored last dir (%s)\n", PlayerContext.dir_path);
+    }
   }
 
   len = ini_gets("file", "name", "", buf, sizeof(buf), PLAYER_INI_FILE);
   if (len)
   {
     if (Navigator_TryFile(&PlayerContext, buf))
+    {
       trace("settings: restored last file (%s)\n", PlayerContext.fname);
+    }
   }
 
   if (PlayerContext.fname)

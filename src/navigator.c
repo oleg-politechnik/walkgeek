@@ -522,6 +522,7 @@ void Navigator_NextFile(NavigatorContext_Typedef *ctx)
   }
 }
 
+#if 0
 static void Navigator_NextFileCurrentDir(NavigatorContext_Typedef *ctx)
 {
   FILINFO *file_info = &(ctx->file_info_);
@@ -568,6 +569,7 @@ static void Navigator_NextFileCurrentDir(NavigatorContext_Typedef *ctx)
     }
   }
 }
+#endif
 
 static void Navigator_PrevFileCurrentDir(NavigatorContext_Typedef *ctx)
 {
@@ -576,9 +578,11 @@ static void Navigator_PrevFileCurrentDir(NavigatorContext_Typedef *ctx)
   char *name = 0;
   int new_ix;
 
+  ctx->fname = 0;
+
   trace("   (i%d,%d)_%d\n",
-      ndir->dir_entry_prev_interesting_ix, ndir->dir_entry_ix_new, ndir->dir_entry_ix_count
-      );
+          ndir->dir_entry_prev_interesting_ix, ndir->dir_entry_ix_new, ndir->dir_entry_ix_count
+  );
 
   if (ndir->dir_entry_ix_new == 0 && ndir->dir_entry_prev_interesting_ix > 0)
   {
@@ -590,19 +594,19 @@ static void Navigator_PrevFileCurrentDir(NavigatorContext_Typedef *ctx)
     return;
   }
 
-  //  if (ndir->dir_entry_ix > 0)
+  while (1)
   {
     if (ndir->dir_entry_prev_interesting_ix > ndir->dir_entry_ix_new)
     {
       trace("navigator: WARNING ndir->dir_entry_prev_interesting_ix > ndir->dir_entry_ix (%d,%d)\n",
-	  ndir->dir_entry_prev_interesting_ix, ndir->dir_entry_ix_new);
+              ndir->dir_entry_prev_interesting_ix, ndir->dir_entry_ix_new);
       ndir->dir_entry_prev_interesting_ix = ndir->dir_entry_ix_new - 1;
     }
 
     if (ndir->dir_entry_prev_interesting_ix >= ndir->dir_entry_ix_count)
     {
       trace("navigator: WARNING ndir->dir_entry_prev_interesting_ix >= ndir->dir_entry_ix_count (%d,%d)\n",
-	  ndir->dir_entry_prev_interesting_ix, ndir->dir_entry_ix_count);
+              ndir->dir_entry_prev_interesting_ix, ndir->dir_entry_ix_count);
       ndir->dir_entry_prev_interesting_ix = ndir->dir_entry_ix_count - 1;
     }
 
@@ -634,10 +638,10 @@ static void Navigator_PrevFileCurrentDir(NavigatorContext_Typedef *ctx)
 
       if (file_info->fattrib & AM_DIR)
       {
-	if (new_ix > 0)
-	{
-	  ndir->dir_entry_prev_interesting_ix = ndir->dir_entry_ix_new;
-	}
+        if (new_ix > 0)
+        {
+          ndir->dir_entry_prev_interesting_ix = ndir->dir_entry_ix_new;
+        }
         continue;
       }
 
@@ -645,16 +649,16 @@ static void Navigator_PrevFileCurrentDir(NavigatorContext_Typedef *ctx)
 
       if (CheckSuffix(name, ctx->suffixes_white_list_) != -1)
       {
-	if (new_ix > 0)
-	{
-	  ndir->dir_entry_prev_interesting_ix = ndir->dir_entry_ix_new;
-	}
+        if (new_ix > 0)
+        {
+          ndir->dir_entry_prev_interesting_ix = ndir->dir_entry_ix_new;
+        }
       }
     }
 
     trace("-> (i%d,%d)_%d\n",
-        ndir->dir_entry_prev_interesting_ix, ndir->dir_entry_ix_new, ndir->dir_entry_ix_count
-        );
+            ndir->dir_entry_prev_interesting_ix, ndir->dir_entry_ix_new, ndir->dir_entry_ix_count
+    );
 
     if (file_info->fattrib & AM_DIR)
     {
@@ -667,16 +671,21 @@ static void Navigator_PrevFileCurrentDir(NavigatorContext_Typedef *ctx)
 
       if (ctx->suffix_ix != -1)
       {
-	ctx->fname = name;
+        ctx->fname = name;
 
-	//      trace("file: %s/%s\n", ctx->dir_path, name);
+        //      trace("file: %s/%s\n", ctx->dir_path, name);
 
-	return;
+        return;
       }
     }
 
     if (ndir->dir_entry_prev_interesting_ix < 0)
+    {
+      //todo code coverage
+
       Navigator_ResetDir(ctx);
+      return;
+    }
   }
 }
 
