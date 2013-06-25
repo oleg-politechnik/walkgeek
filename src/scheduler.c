@@ -120,14 +120,9 @@ void Scheduler_RemoveTask(void(*callback)(void))
   CPU_DisableInterrupts();
   {
     task = Task_Find(callback);
-    if (task == NULL)
+    if (task != NULL)
     {
-      task = Task_Find(NULL);
-
-      if (task != NULL)
-      {
-        task->callback = NULL;
-      }
+      task->callback = NULL;
     }
   }
   CPU_RestoreInterrupts();
