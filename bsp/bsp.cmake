@@ -18,8 +18,9 @@ if(PLATFORM STREQUAL "N1100")
   endif()
   if(NOT RPROG_OHM)
     MESSAGE(STATUS "No RPROG_OHM specified, using default: 2000")
-    add_definitions(-DRPROG_OHM=2000)
+    set (RPROG_OHM 2000)
   endif()
+  add_definitions(-DRPROG_OHM=${RPROG_OHM})
 elseif(PLATFORM STREQUAL "F4DISCOVERY")
   add_definitions(-DF4DISCOVERY)
   set (USE_HOST_MODE 1)
@@ -55,9 +56,15 @@ if (PLATFORM STREQUAL "N1100" OR
       bsp/stm32f4xx/src/syscalls.c
       bsp/stm32f4xx/src/system_stm32f4xx.c
   )
-  
-  INCLUDE_DIRECTORIES(bsp/stm32f4_discovery)
 
+  INCLUDE_DIRECTORIES(bsp/stm32f4_discovery)
+  
+  set(CSP_SOURCES ${CSP_SOURCES}
+      bsp/freertos/GCC/ARM_CM3/port.c
+  )
+  
+  INCLUDE_DIRECTORIES(bsp/freertos/GCC/ARM_CM3)
+  
   set(BSP_SOURCES ${BSP_SOURCES}
       bsp/keypad.c
       bsp/stm32f4_discovery/audio_if.c

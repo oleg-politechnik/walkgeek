@@ -15,6 +15,7 @@ include_directories(
   lib/mp3-fixpt-helix/pub
   lib/minIni
   lib/opus/include
+  lib/freertos/include
 )
 
 add_definitions(-DUSE_FULL_ASSERT)
@@ -43,8 +44,6 @@ set (SOURCES
     src/player/player.c
     src/navigator.c
     src/nestedfilter.c
-    src/scheduler.c
-    src/system.c
     src/ui.c
     src/usbd.c
     

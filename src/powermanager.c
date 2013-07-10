@@ -27,7 +27,6 @@
 
 /* Includes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 #include "powermanager.h"
-#include "scheduler.h"
 #include "system.h"
 #include "nestedfilter.h"
 #include "audio_if.h"
@@ -53,7 +52,8 @@ void PowerManager_Init(void)
 
   /* results in 2^9=512 effective window size averaging filter */
   BatteryVoltageFilter = NestedFilter_Init(3, 3);
-  ChargeCurrentFilter = NestedFilter_Init(3, 3);
+  /* results in 2^12=4096 effective window size averaging filter */
+  ChargeCurrentFilter = NestedFilter_Init(3, 4);
 
   BSP_InitPowerManager();
 }

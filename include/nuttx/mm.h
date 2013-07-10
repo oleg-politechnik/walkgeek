@@ -43,7 +43,6 @@
 #include <nuttx/config.h>
 
 #include <sys/types.h>
-#include <semaphore.h>
 
 /****************************************************************************
  * Pre-Processor Definitions
@@ -182,7 +181,6 @@ struct mm_heap_s
    * the following un-named semaphore.
    */
 
-  sem_t mm_semaphore;
   pid_t mm_holder;
   int   mm_counts_held;
 

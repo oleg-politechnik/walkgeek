@@ -48,55 +48,55 @@ extern CDC_IF_Prop_TypeDef VCP_fops;
 
 int _write(int file, char *buf, int nbytes)
 {
-#ifndef ENABLE_TRACE
+//#ifndef ENABLE_TRACE
   return nbytes;
-#else
-  int tx_cnt = 0;
-
-  int room = APP_RX_DATA_SIZE - usbd_cdc_GetBufferCount();
-
-  int i;
-  int cr = 1;
-
-  /* We only handle stdout and stderr */
-  if ((file != STDOUT_FILENO) && (file != STDERR_FILENO))
-  {
-    errno = EBADF;
-    return -1;
-  }
-
-  while (nbytes && room && cr)
-  {
-    cr = 0;
-
-    for (i = 0; i < MIN(room - 1, nbytes); i++)
-    {
-      if (buf[i] == '\n')
-      {
-        cr = 1;
-
-        VCP_fops.pIf_DataTx(buf, i);
-        VCP_fops.pIf_DataTx("\r\n", 2);
-        i++;
-
-        nbytes -= i;
-        tx_cnt += i;
-        room -= i + 1;
-        buf += i;
-
-        break;
-      }
-    }
-  }
-
-  i = MIN(room, nbytes);
-  if (i && buf[i - 1] == '\n')
-  {
-    i--;
-  }
-  VCP_fops.pIf_DataTx(buf, i);
-  tx_cnt += i;
-
-  return tx_cnt;
-#endif
+//#else
+//  int tx_cnt = 0;
+//
+//  int room = APP_RX_DATA_SIZE - usbd_cdc_GetBufferCount();
+//
+//  int i;
+//  int cr = 1;
+//
+//  /* We only handle stdout and stderr */
+//  if ((file != STDOUT_FILENO) && (file != STDERR_FILENO))
+//  {
+//    errno = EBADF;
+//    return -1;
+//  }
+//
+//  while (nbytes && room && cr)
+//  {
+//    cr = 0;
+//
+//    for (i = 0; i < MIN(room - 1, nbytes); i++)
+//    {
+//      if (buf[i] == '\n')
+//      {
+//        cr = 1;
+//
+//        VCP_fops.pIf_DataTx(buf, i);
+//        VCP_fops.pIf_DataTx("\r\n", 2);
+//        i++;
+//
+//        nbytes -= i;
+//        tx_cnt += i;
+//        room -= i + 1;
+//        buf += i;
+//
+//        break;
+//      }
+//    }
+//  }
+//
+//  i = MIN(room, nbytes);
+//  if (i && buf[i - 1] == '\n')
+//  {
+//    i--;
+//  }
+//  VCP_fops.pIf_DataTx(buf, i);
+//  tx_cnt += i;
+//
+//  return tx_cnt;
+//#endif
 }

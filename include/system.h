@@ -33,7 +33,6 @@
 #include "common.h"
 #include "software_conf.h"
 #include "var.h"
-#include "scheduler.h"
 #include "bsp.h"
 #include "assert.h"
 

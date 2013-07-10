@@ -30,7 +30,6 @@
 #include "stm32f4xx_conf.h"
 #include "misc.h"
 #include <string.h>
-#include "scheduler.h"
 #include "system.h"
 
 /* Private typedef -----------------------------------------------------------*/
@@ -445,9 +444,7 @@ void Disp_Init()
 
   Disp_Interface_Init();
 
-  msDelay = 100;
-  while (msDelay)
-    ;
+  vTaskDelay(100);
 
   Disp_InitFinally();
 }

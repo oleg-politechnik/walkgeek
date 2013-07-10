@@ -6,6 +6,9 @@
  */
 
 /* Includes ------------------------------------------------------------------*/
+#include <FreeRTOS.h>
+#include <task.h>
+
 #include "nuttx/config.h"
 #include "nuttx/mm.h"
 #include "common.h"
@@ -26,15 +29,11 @@ void mm_seminitialize(FAR struct mm_heap_s *heap)
 void mm_takesemaphore(FAR struct mm_heap_s *heap)
 {
   UNUSED(heap);
+  vTaskSuspendAll();
 }
 
 void mm_givesemaphore(FAR struct mm_heap_s *heap)
 {
   UNUSED(heap);
-}
-
-int  mm_trysemaphore(FAR struct mm_heap_s *heap)
-{
-  UNUSED(heap);
-  return 0;
+  xTaskResumeAll();
 }

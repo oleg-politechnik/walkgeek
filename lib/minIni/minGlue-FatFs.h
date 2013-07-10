@@ -30,7 +30,7 @@
 #define ini_tell(file,pos)            (*(pos) = f_tell((file)))
 #define ini_seek(file,pos)            (f_lseek((file), *(pos)) == FR_OK)
 
-static int ini_rename(TCHAR *source, TCHAR *dest)
+static inline int ini_rename(TCHAR *source, TCHAR *dest)
 {
   /* Function f_rename() does not allow drive letters in the destination file */
   char *drive = strchr(dest, ':');

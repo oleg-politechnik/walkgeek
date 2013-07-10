@@ -7,10 +7,23 @@ set (FAT_FS_SOURCES
 
 set_source_files_properties(${FAT_FS_SOURCES} PROPERTIES COMPILE_FLAGS
     "-Wno-strict-aliasing ${LIBS_FLAGS}" )
-    
-set (LIBS_SOURCES
+
+set (MININI_SOURCES
     minIni/minIni.c
-    
+)
+
+set_source_files_properties(${MININI_SOURCES} PROPERTIES COMPILE_FLAGS
+    "-Wno-char-subscripts ${LIBS_FLAGS}" )
+
+set (LIBS_SOURCES ${LIBS_SOURCES}
+    freertos/portable/MemMang/heap_3.c
+    freertos/list.c
+    freertos/queue.c
+    freertos/tasks.c
+    freertos/timers.c
+)
+
+set (LIBS_SOURCES ${LIBS_SOURCES}
     mm/mm_addfreechunk.c
     mm/mm_calloc.c
     mm/mm_free.c
@@ -132,4 +145,4 @@ set (LIBS_SOURCES ${LIBS_SOURCES}
 
 set_source_files_properties(${LIBS_SOURCES} PROPERTIES COMPILE_FLAGS ${LIBS_FLAGS})
 
-add_library(lib STATIC ${LIBS_SOURCES} ${MP3_SOURCES} ${FAT_FS_SOURCES})
+add_library(lib STATIC ${LIBS_SOURCES} ${MP3_SOURCES} ${FAT_FS_SOURCES} ${MININI_SOURCES})

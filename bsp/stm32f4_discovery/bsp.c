@@ -236,7 +236,12 @@ void BSP_InitPowerManager(void)
 
   ADC_DMA_Config();
 
-  Scheduler_PutTask(10, BSP_StartADC, REPEAT);
+//  Scheduler_PutTask(10, BSP_StartADC, REPEAT);
+#endif
+
+#ifdef HAS_HEADSET
+
+
 #endif
 }
 
@@ -572,7 +577,7 @@ void UpdateHeadsetStatus(void)
   {
     /* ... and wait while pulling off / inserting */
     HeadsetStatus = HS_QUALIFYING;
-    Scheduler_PutTask(500, CheckHeadsetInserted, NO_REPEAT);
+//    Scheduler_PutTask(500, CheckHeadsetInserted, NO_REPEAT);
   }
   else if (HeadsetStatus == HS_PRESENT && head_mV > HANDSET_HIGH_THRESHOLD_MV)
   {

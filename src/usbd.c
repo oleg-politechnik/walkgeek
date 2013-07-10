@@ -49,7 +49,7 @@ void USB_MSC_DisplaySpeed_Int(void)
 {
   if (SystemState != SS_USB_MSC)
   {
-    Scheduler_RemoveTask(&USB_MSC_DisplaySpeed_Int);
+    //Scheduler_RemoveTask(&USB_MSC_DisplaySpeed_Int);
     return;
   }
 
@@ -68,7 +68,7 @@ void USB_MSC_Init(void)
 {
   trace("usb: MSC mode activated\n");
 
-  Scheduler_PutTask(1000 / USBD_MSC_SPEED_MPS, USB_MSC_DisplaySpeed_Int, REPEAT);
+  //Scheduler_PutTask(1000 / USBD_MSC_SPEED_MPS, USB_MSC_DisplaySpeed_Int, REPEAT);
 
   BSP_USBD_MSC_Init();
 }

@@ -1,11 +1,10 @@
 FIXME:
 - display sometimes adds some bytes after row/col is set, probably problem is
   with ISR timeouts
-- power-on fails if ppp key is prematurely released (even though screen backlight goes on)
 - trace via CDC goes insane after some amount of data
 - slow opus files LoadFile func
 - sd card > 4Gb reported capacity value is truncated to 4 Gb
-- limit min size
+- limit min audio file size
 
 TODO:
 - usb audio
@@ -22,3 +21,4 @@ TODO:
 - pause when headset is removed
 - when power-on by USB, go to USB mode, do not apply power???
 - when detached from USB, shutdown USB
+- FreeRTOS Simulator
