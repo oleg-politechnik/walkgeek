@@ -90,10 +90,8 @@ void Player_Init(void)
 
   Navigator_InitRoot(&PlayerContext, suffixes_white_list);
 
-#ifndef PROFILING
   char buf[256];
 
-  //todo len???, null-terminated???
   int len;
   len = ini_gets("file", "path", "", buf, sizeof(buf), PLAYER_INI_FILE);
   if (len)
@@ -140,7 +138,6 @@ void Player_Init(void)
     }
   }
   else
-#endif
   {
     Navigator_NextFile(&PlayerContext);
 
@@ -465,13 +462,13 @@ void Player_SaveState(void)
   {
     f_puts("[file]\n", &f);
 
-    f_printf(&f, "path=");
+    f_printf(&f, "path=\"");
     f_puts(PlayerContext.dir_path, &f);
-    f_printf(&f, "\n");
+    f_printf(&f, "\"\n");
 
-    f_printf(&f, "name=");
+    f_printf(&f, "name=\"");
     f_puts(PlayerContext.fname, &f);
-    f_printf(&f, "\n");
+    f_printf(&f, "\"\n");
 
     f_printf(&f, "mstime=%u\n", PlayerState.metadata.mstime_curr);
   }
