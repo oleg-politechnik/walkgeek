@@ -45,19 +45,9 @@ typedef enum {
   SS_SHUTDOWN
 } SystemState_Typedef;
 
-typedef enum {
-  CT_ASYNC,
-  CT_SYNC
-} CommandType_Typedef;
-
 /* Exported macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Exported functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-void System_Init(void);
-void RAM_FUNC System_MainThread(void);
 void System_SetState(SystemState_Typedef NewState);
-void System_PowerEnable(void);
-void RAM_FUNC System_SetState(SystemState_Typedef NewState);
-void RAM_FUNC System_SysTickHandler(void);
 void System_VbusApplied(void);
 void System_VbusDetached(void);
 
@@ -67,10 +57,7 @@ void USB_DeInit(void);
 
 /* Exported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 extern SystemState_Typedef SystemState;
-extern u32 msDelay;
 extern u32 MSC_RxSpeed, MSC_TxSpeed;
-
-extern u32 SysMsCounter;
 
 /* Exported static inline functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 

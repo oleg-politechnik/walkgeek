@@ -26,6 +26,9 @@
  */
 
 /* Includes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+#include "FreeRTOS.h"
+#include "semphr.h"
+
 #include "audio_buffer.h"
 
 /* Imported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -42,12 +45,16 @@ static AudioBuffer_Typedef buffers[AUDIO_BUFFER_COUNT];
 
 void AudioBuffer_Init(void)
 {
+  vPortEnterCritical();
+
   length = index_consumer = 0;
 
   for (int i = 0; i < AUDIO_BUFFER_COUNT; i++)
   {
     buffers[i].size = 0;
   }
+
+  vPortExitCritical();
 }
 
 u8 AudioBuffer_GetFullCount(void)
@@ -55,21 +62,21 @@ u8 AudioBuffer_GetFullCount(void)
   return length;
 }
 
-AudioBuffer_Typedef *AudioBuffer_TryGetProducer(void)
+AudioBuffer_Typedef *AudioBuffer_TryGetProducer(void) //todo ISR
 {
   if (length + 1 < AUDIO_BUFFER_COUNT)
   {
+    vPortEnterCritical();
+
     int ix;
 
-    CPU_DisableInterrupts();
-    {
-      ix = (index_consumer + length) % AUDIO_BUFFER_COUNT;
-    }
-    CPU_RestoreInterrupts();
+    ix = (index_consumer + length) % AUDIO_BUFFER_COUNT;
 
 #ifdef PROFILING
     buffers[ix].size = 0;
 #endif
+
+    vPortExitCritical();
 
     return (&buffers[ix]);
   }
@@ -83,11 +90,11 @@ void AudioBuffer_MoveProducer(void)
 {
 #ifndef PROFILING
   assert_param(length + 1 < AUDIO_BUFFER_COUNT);
-  CPU_DisableInterrupts();
+  vPortEnterCritical();
   {
     length++;
   }
-  CPU_RestoreInterrupts();
+  vPortExitCritical();
 #endif
 }
 
@@ -103,13 +110,13 @@ void AudioBuffer_MoveConsumer(void)
 #ifndef PROFILING
   assert_param(length > 0);
 
-  CPU_DisableInterrupts();
+  vPortEnterCritical();
   {
     length--;
     buffers[index_consumer].size = 0;
     index_consumer = (index_consumer + 1) % AUDIO_BUFFER_COUNT;
   }
-  CPU_RestoreInterrupts();
+  vPortExitCritical();
 #endif
   //    iprintf("con_length %i\n", length);
 }

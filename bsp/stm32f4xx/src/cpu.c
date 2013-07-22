@@ -28,31 +28,24 @@
 /* Includes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 #include "cpu.h"
 #include "system.h"
-#include "profile.h"
 
 /* Imported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private define ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private typedef ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-static volatile u32 nesting = 0;
-
-u32 profile_entry_points[PF_MAX];
-u32 profile_results[PF_MAX];
-char* profile_func_names[PF_MAX];
-
 extern unsigned int _sstack;
 extern unsigned int _estack;
 
+volatile int32_t ITM_RxBuffer;
+
 /* Private function prototypes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-void CPU_EnableSysTick(u16 hz)
+void CPU_PreInit(void)
 {
-  RCC_ClocksTypeDef RCC_Clocks;
-
-  /* SysTick end of count event each 1ms !!! */
-  RCC_GetClocksFreq(&RCC_Clocks);
-  SysTick_Config(RCC_Clocks.HCLK_Frequency / hz);
+  /* Set the Vector Table base address at 0x08000000 */
+  NVIC_SetVectorTable(NVIC_VectTab_FLASH, 0x0);
+  NVIC_PriorityGroupConfig(NVIC_PriorityGroup_4);
 }
 
 void CPU_EnterLowPowerState(void)
@@ -99,21 +92,6 @@ void CPU_EnterLowPowerState(void)
     ;
 }
 
-void CPU_DisableInterrupts(void)
-{
-  __disable_irq();
-  nesting++;
-}
-
-void CPU_RestoreInterrupts(void)
-{
-  if (nesting)
-  {
-    nesting--;
-    __enable_irq();
-  }
-}
-
 extern unsigned int _sheap_user;
 extern unsigned int _eheap_user;
 
@@ -126,76 +104,3 @@ size_t CPU_GetUserHeapSize(void)
 {
   return (size_t) ((char *) &_eheap_user - (char *) &_sheap_user);
 }
-
-size_t CPU_GetStackSize(void)
-{
-  return (size_t) ((char *) &_estack - (char *) &_sstack);
-}
-
-void CPU_RefillStack(void)
-{
-  char *p = (char *) &_sstack;
-  char *end = (char *) __get_MSP();
-
-  while (p < end)
-  {
-    *p = 0xa5;
-    p++;
-  }
-}
-
-size_t CPU_GetStackFree(void)
-{
-  char *p = (char *) &_sstack;
-  char *end = (char *) __get_MSP();
-
-  while (p < end)
-  {
-    if (*p != 0xa5)
-      break;
-
-    p++;
-  }
-
-  return (size_t) (p - (char *) &_sstack);
-}
-
-#ifdef PROFILING
-void Profiler_Init(void)
-{
-  memset(profile_entry_points, 0, sizeof(profile_entry_points));
-  memset(profile_results, 0, sizeof(profile_results));
-  memset(profile_func_names, 0, sizeof(profile_func_names));
-}
-
-unsigned int Profiler_GetResult(ProfileFunction_Typedef func)
-{
-  assert_param(func < PF_MAX);
-
-  return profile_results[func];
-}
-
-void Profiler_SetTotal(u32 total)
-{
-  profile_results[PF_TOTAL] = total;
-}
-
-void Profiler_Print(void)
-{
-  int i;
-
-  if (!profile_results[PF_TOTAL])
-  {
-    printf("Ooops... no profile results\n");
-    return;
-  }
-
-  printf("\nCPU profile results:\n");
-
-  for (i = 0; i < PF_MAX; i++)
-  {
-    printf("%s:\t%3u.%02u%%\n", profile_func_names[i],
-            FLOAT_TO_1_2((double) profile_results[i] / ((double) profile_results[PF_TOTAL] / 100)));
-  }
-}
-#endif

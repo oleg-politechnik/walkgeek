@@ -26,11 +26,15 @@
  */
 
 /* Includes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+#include "FreeRTOS.h"
+#include "semphr.h"
+
 #include "audio_if.h"
 #include "bsp.h"
 #include "audio_buffer.h"
 //#include "stm324xg_usb_audio_codec.h"
 #include "stm32f4_discovery_audio_codec.h"
+#include "player.h"
 
 /* Imported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private define ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -200,11 +204,11 @@ FuncResult Audio_CommandSync(AudioCommand_Typedef cmd)
   bool main_thread_in_do_command_old;
   FuncResult fr, fr2;
 
-  CPU_DisableInterrupts();
+  vPortEnterCritical();
 
   fr = Audio_DoCommand(cmd);
 
-  CPU_RestoreInterrupts();
+  vPortExitCritical();
 
   fr2 = Audio_PeriodicKick();
 
@@ -264,14 +268,14 @@ FuncResult Audio_PeriodicKick(void)
   if (AudioState == AS_ERROR)
     return FUNC_ERROR;
 
-  CPU_DisableInterrupts();
+  vPortEnterCritical();
 
   if (DMA_Starving_Flag && !AudioBuffer_TryGetProducer())
   {
     fr = FeedDMA();
   }
 
-  CPU_RestoreInterrupts();
+  vPortExitCritical();
 
   return fr;
 }
@@ -298,7 +302,7 @@ void EVAL_AUDIO_TransferComplete_CallBack(uint32_t pBuffer, uint32_t Size)
   UNUSED(pBuffer);
   UNUSED(Size);
 
-  CPU_DisableInterrupts();
+  vPortEnterCritical();
 
   if (AudioBuffer_GetFullCount() > 0)
   {
@@ -312,7 +316,9 @@ void EVAL_AUDIO_TransferComplete_CallBack(uint32_t pBuffer, uint32_t Size)
     Audio_DoCommand(AC_SUSPEND);
   }
 
-  CPU_RestoreInterrupts();
+  vPortExitCritical();
+
+  Player_AsyncCommandFromISR(PC_NEED_MORE_DATA, 0);
 }
 
 FuncResult FeedDMA(void) //todo

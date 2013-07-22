@@ -45,6 +45,8 @@ extern void BSP_USBD_DeInit(void);
 u32 MSC_DataIn;
 u32 MSC_DataOut;
 
+u32 MSC_RxSpeed, MSC_TxSpeed;
+
 void USB_MSC_DisplaySpeed_Int(void)
 {
   if (SystemState != SS_USB_MSC)
@@ -53,15 +55,11 @@ void USB_MSC_DisplaySpeed_Int(void)
     return;
   }
 
-  CPU_DisableInterrupts();
-
   SetVariable(VAR_MSC_Speed, MSC_RxSpeed, MSC_DataIn * USBD_MSC_SPEED_MPS);
   SetVariable(VAR_MSC_Speed, MSC_TxSpeed, MSC_DataOut * USBD_MSC_SPEED_MPS);
 
   MSC_DataIn = 0;
   MSC_DataOut = 0;
-
-  CPU_RestoreInterrupts();
 }
 
 void USB_MSC_Init(void)

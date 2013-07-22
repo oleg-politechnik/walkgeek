@@ -56,6 +56,14 @@ typedef enum
 /* Private define ------------------------------------------------------------*/
 #define DISP_LAST_ROW         (DISP_ROW_COUNT - 2)
 
+
+#define configUI_BACKLIGHT_TIMEOUT_MS   (10000 / portTICK_RATE_MS)
+
+#define configUI_PRESS_TICK_MS          (100 / portTICK_RATE_MS)
+#define configUI_PRESS_TIMEOUT_MS       (800 / portTICK_RATE_MS)
+
+#define configUI_LOCK_UNLOCK_TIMEOUT_MS (1000 / portTICK_RATE_MS)
+
 /* Private macro -------------------------------------------------------------*/
 #define DISP_ALIGN_CENTER(row, str) \
   Disp_String(MAX((int)(DISP_X_COUNT / 2) - ((int) strlen(str) - 1) * 6 / 2, (int)0), row, str, false)
@@ -76,6 +84,7 @@ static UI_State_Typedef UiState = UIS_NOT_INITIALIZED;
 
 static xTimerHandle xBacklightTimer;
 static xTimerHandle xKeyHoldTimer;
+static xTimerHandle xKeypadLockTimer;
 
 /* Private function prototypes -----------------------------------------------*/
 //
@@ -92,12 +101,24 @@ static void Keypad_HoldTimeoutCallback(xTimerHandle xTimer);
 static void TimePoint(u32 raw_mstime, TimePoint_Typedef *time);
 
 /* Private functions ---------------------------------------------------------*/
+void prvUiTask(void *pvParameters)
+{
+  UI_Init();
+
+  while (1)
+  {
+    UI_MainCycle();
+    vTaskDelay(1 / portTICK_RATE_MS);
+    Keypad_1msScan();
+  }
+}
+
 void UI_Init(void)
 {
   if (UiState != UIS_NOT_INITIALIZED)
     return;
 
-  trace("[init] UI\n");
+  trace("[init] UI\n"); //todo: INIT process (system)
 
   UiState = UIS_INITIALIZING;
 
@@ -107,15 +128,24 @@ void UI_Init(void)
 
   Vibrator_Init();
 
-  xBacklightTimer
-      = xTimerCreate("Backlight Timer", 10000, pdFALSE,
-	  (void *) Screen_DisableBacklightCallback,
-	  Screen_DisableBacklightCallback);
+  xBacklightTimer = xTimerCreate("Backlight Timer",
+          configUI_BACKLIGHT_TIMEOUT_MS, pdFALSE,
+          (void *) Screen_DisableBacklightCallback,
+          Screen_DisableBacklightCallback);
 
-  xKeyHoldTimer
-      = xTimerCreate("Key Hold Timer", 100, pdTRUE,
-	  (void *) Keypad_HoldTimeoutCallback,
-	  Keypad_HoldTimeoutCallback);
+  assert_param(xBacklightTimer);
+
+  xKeyHoldTimer = xTimerCreate("Key Hold Timer", configUI_PRESS_TIMEOUT_MS,
+          pdFALSE, (void *) Keypad_HoldTimeoutCallback,
+          Keypad_HoldTimeoutCallback);
+
+  assert_param(xKeyHoldTimer);
+
+  xKeypadLockTimer = xTimerCreate("Keypad Lock Timer",
+          configUI_LOCK_UNLOCK_TIMEOUT_MS, pdFALSE,
+          (void *) Keypad_LockTimeoutCallback, Keypad_LockTimeoutCallback);
+
+  assert_param(xKeypadLockTimer);
 
   xTimerStart(xBacklightTimer, configTIMER_API_TIMEOUT_TICKS);
 
@@ -127,8 +157,8 @@ void UI_DeInit(void)
   /* Must be called with disabled scheduler */
 
   xTimerDelete(xBacklightTimer, configTIMER_API_TIMEOUT_TICKS);
-
   xTimerDelete(xKeyHoldTimer, configTIMER_API_TIMEOUT_TICKS);
+  xTimerDelete(xKeypadLockTimer, configTIMER_API_TIMEOUT_TICKS);
 
   //Keyboard_DeInit();
   //Disp_DeInit();
@@ -448,8 +478,8 @@ void Keypad_KeyPressedCallback(KEY_Typedef key)
 
   if ((key == KEY_PPP && ScreenMode != UIM_Player_Locked) || key == KEY_BTN)
   {
-    xTimerChangePeriod(xKeyHoldTimer, 3000, configTIMER_API_TIMEOUT_TICKS);
-    xTimerStart(xKeyHoldTimer, configTIMER_API_TIMEOUT_TICKS);
+//    xTimerChangePeriod(xKeyHoldTimer, 3000 / portTICK_RATE_MS, configTIMER_API_TIMEOUT_TICKS);
+//    xTimerStart(xKeyHoldTimer, configTIMER_API_TIMEOUT_TICKS);
   }
 
   if (key == KEY_APP_PLAYER && SystemState != SS_PLAYER)
@@ -471,13 +501,13 @@ void Keypad_KeyPressedCallback(KEY_Typedef key)
     {
     case KEY_PREV:
       ScreenSubMode = -10;
-      xTimerChangePeriod(xKeyHoldTimer, 1000, configTIMER_API_TIMEOUT_TICKS);
+      xTimerChangePeriod(xKeyHoldTimer, configUI_PRESS_TIMEOUT_MS, configTIMER_API_TIMEOUT_TICKS);
       xTimerStart(xKeyHoldTimer, configTIMER_API_TIMEOUT_TICKS);
       break;
 
     case KEY_NEXT:
       ScreenSubMode = 10;
-      xTimerChangePeriod(xKeyHoldTimer, 1000, configTIMER_API_TIMEOUT_TICKS);
+      xTimerChangePeriod(xKeyHoldTimer, configUI_PRESS_TIMEOUT_MS, configTIMER_API_TIMEOUT_TICKS);
       xTimerStart(xKeyHoldTimer, configTIMER_API_TIMEOUT_TICKS);
       break;
 
@@ -492,21 +522,20 @@ void Keypad_KeyPressedCallback(KEY_Typedef key)
     case KEY_UP:
       ScreenSubMode = 1;
       Audio_ChangeVolume(ScreenSubMode);
-      xTimerChangePeriod(xKeyHoldTimer, 1000, configTIMER_API_TIMEOUT_TICKS);
+      xTimerChangePeriod(xKeyHoldTimer, configUI_PRESS_TIMEOUT_MS, configTIMER_API_TIMEOUT_TICKS);
       xTimerStart(xKeyHoldTimer, configTIMER_API_TIMEOUT_TICKS);
       break;
 
     case KEY_DOWN:
       ScreenSubMode = -1;
       Audio_ChangeVolume(ScreenSubMode);
-      xTimerChangePeriod(xKeyHoldTimer, 1000, configTIMER_API_TIMEOUT_TICKS);
+      xTimerChangePeriod(xKeyHoldTimer, configUI_PRESS_TIMEOUT_MS, configTIMER_API_TIMEOUT_TICKS);
       xTimerStart(xKeyHoldTimer, configTIMER_API_TIMEOUT_TICKS);
       break;
 
     case KEY_SEL:
       SetVariable(VAR_ScreenMode, ScreenMode, UIM_Player_HalfLocked);
-      xTimerChangePeriod(xKeyHoldTimer, 1000, configTIMER_API_TIMEOUT_TICKS);
-      xTimerStart(xKeyHoldTimer, configTIMER_API_TIMEOUT_TICKS);
+      xTimerStart(xKeypadLockTimer, configTIMER_API_TIMEOUT_TICKS);
       break;
 
     default:
@@ -533,8 +562,7 @@ void Keypad_KeyPressedCallback(KEY_Typedef key)
     {
     case KEY_SEL:
       SetVariable(VAR_ScreenMode, ScreenMode, UIM_Player_HalfUnlocked);
-      xTimerChangePeriod(xKeyHoldTimer, 1000, configTIMER_API_TIMEOUT_TICKS);
-      xTimerStart(xKeyHoldTimer, configTIMER_API_TIMEOUT_TICKS);
+      xTimerStart(xKeypadLockTimer, configTIMER_API_TIMEOUT_TICKS);
       break;
 
     default:
@@ -679,12 +707,19 @@ void Keypad_HoldTimeoutCallback(xTimerHandle xTimer)
     case KEY_NEXT:
     case KEY_PREV:
       SetVariable(VAR_ScreenMode, ScreenMode, UIM_Player_Seeking);
+
+      xTimerChangePeriod(xKeyHoldTimer, configUI_PRESS_TICK_MS, configTIMER_API_TIMEOUT_TICKS);
+      xTimerStart(xKeyHoldTimer, configTIMER_API_TIMEOUT_TICKS);
+
       Player_AsyncCommand(PC_SEEK, ScreenSubMode * 1000);
       break;
 
     case KEY_UP:
     case KEY_DOWN:
       Audio_ChangeVolume(ScreenSubMode);
+
+      xTimerChangePeriod(xKeyHoldTimer, configUI_PRESS_TICK_MS, configTIMER_API_TIMEOUT_TICKS);
+      xTimerStart(xKeyHoldTimer, configTIMER_API_TIMEOUT_TICKS);
       break;
 
     default:
@@ -699,7 +734,7 @@ void Keypad_HoldTimeoutCallback(xTimerHandle xTimer)
 
 void Screen_DisableBacklightCallback(xTimerHandle xTimer)
 {
-  Disp_SetBKL(DISABLE);
+//  Disp_SetBKL(DISABLE);
 }
 
 void Keypad_LockTimeoutCallback(void)

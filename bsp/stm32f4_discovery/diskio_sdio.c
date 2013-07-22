@@ -27,8 +27,6 @@
 
 extern SD_CardInfo SDCardInfo;
 
-u32 buff2[4096];//16384/4
-
 int8_t STORAGE_Init(uint8_t lun);
 int8_t STORAGE_GetCapacity(uint8_t lun, uint32_t *block_num,
         uint32_t *block_size);
@@ -164,11 +162,7 @@ BYTE count /* Number of sectors to write (1..255) */
   if (disk_status(drv) & STA_NOINIT)
     return RES_NOTRDY;
 
-//  if (STORAGE_Write(drv, (u8*) buff, sector << 9, count) != 0)
-//    return RES_ERROR;
-  memcpy(buff2, buff, SECTOR_SIZE);
-
-  SD_WriteMultiBlocks((u8*) buff2, sector << 9, SECTOR_SIZE, count);
+  SD_WriteMultiBlocks((u8*) buff, (uint64_t) sector << 9, SECTOR_SIZE, count);
   SD_WaitWriteOperation();
   while (SD_GetStatus() != SD_TRANSFER_OK) /*fixme CPU idle*/
     ;
@@ -245,13 +239,11 @@ BYTE count /* Number of sectors to read (1..255) */
 
   if (count == 1)
   {
-    SD_ReadBlock((u8*) buff2, sector << 9, SECTOR_SIZE);
+    SD_ReadBlock((u8*) buff, (uint64_t) sector << 9, SECTOR_SIZE);
 
     SD_WaitReadOperation();
     while ((state = SD_GetStatus()) == SD_TRANSFER_BUSY) /*fixme CPU idle*/
       ;
-
-    memcpy(buff, buff2, SECTOR_SIZE);
 
     if (state == SD_TRANSFER_ERROR)
     {
@@ -260,14 +252,10 @@ BYTE count /* Number of sectors to read (1..255) */
   }
   else
   {
-    assert_param(SECTOR_SIZE*count<=sizeof(buff2));
-
-    SD_ReadMultiBlocks((u8*) buff2, sector << 9, SECTOR_SIZE, count);
+    SD_ReadMultiBlocks((u8*) buff, (uint64_t) sector << 9, SECTOR_SIZE, count);
     SD_WaitReadOperation();
     while ((state = SD_GetStatus()) == SD_TRANSFER_BUSY) /*fixme CPU idle*/
       ;
-
-    memcpy(buff, buff2, SECTOR_SIZE*count);
 
     if (state == SD_TRANSFER_ERROR)
     {
@@ -338,6 +326,7 @@ void *buff) /* Buffer to send/receive control data */
 
     default:
       res = RES_PARERR;
+      break;
   }
 
   return res;

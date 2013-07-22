@@ -26,6 +26,9 @@
  */
 
 /* Includes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+#include "FreeRTOS.h"
+#include "timers.h"
+
 #include "system.h"
 #include "powermanager.h"
 #include "disp_1100.h"
@@ -51,6 +54,8 @@ static uint16_t adc_buff[128];
 extern uint16_t mV[ADCS_MAX];
 
 static ADC_Source_Typedef ADC_Source = ADCS_MAX;
+
+static xTimerHandle xADCTimer;
 #endif
 
 #ifdef HAS_HEADSET
@@ -186,7 +191,7 @@ static void ADC_DMA_Config(void)
   DMA_Cmd(DMA2_Stream0, ENABLE);
 
   NVIC_InitStructure.NVIC_IRQChannel = DMA2_Stream0_IRQn;
-  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 2;
+  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = configIRQ_PRIORITY_ADC;
   NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
   NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
   NVIC_Init(&NVIC_InitStructure);
@@ -215,7 +220,7 @@ static void ADC_DMA_Config(void)
   ADC_DMACmd(ADC1, ENABLE);
 }
 
-static void BSP_StartADC(void)
+static void BSP_StartADC(xTimerHandle xTimer)
 {
   if (ADC_Source < ADCS_MAX)
   {
@@ -236,7 +241,9 @@ void BSP_InitPowerManager(void)
 
   ADC_DMA_Config();
 
-//  Scheduler_PutTask(10, BSP_StartADC, REPEAT);
+  xADCTimer = xTimerCreate("ADC Timer", 10 / portTICK_RATE_MS, pdTRUE,
+    (void *) BSP_StartADC, BSP_StartADC);
+  xTimerStart(xADCTimer, configTIMER_API_TIMEOUT_TICKS);
 #endif
 
 #ifdef HAS_HEADSET
@@ -657,7 +664,7 @@ void assert_failed(uint8_t* file, uint32_t line, uint8_t* expr)
 
   //TODO: add application state
 
-  Audio_CommandSync(AC_STOP);
+  //fixme reset codec Audio_CommandSync(AC_STOP);
 
   Disp_Clear();
 

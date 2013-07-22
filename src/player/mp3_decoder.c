@@ -32,7 +32,6 @@
 #include "mp3_decoder.h"
 #include "mediafile.h"
 #include "bsp.h"
-#include "profile.h"
 
 extern PlayerStatus_Typedef PlayerStatus;
 
@@ -465,7 +464,8 @@ void MP3_LoadFile(char *filepath)
   trace("MP3 started");
   print_user_heap_mallinfo();
 
-  mfile = (MediaFile_Typedef *) user_zalloc(sizeof(MediaFile_Typedef));
+  mfile = (MediaFile_Typedef *) malloc(sizeof(MediaFile_Typedef));
+  memset(mfile, 0, sizeof(MediaFile_Typedef));
 
   trace("MP3 file buffers allocated");
   print_user_heap_mallinfo();
@@ -491,7 +491,8 @@ void MP3_MainThread(void)
 
   if (mfile->state == MFS_EOF) /*XXX ???*/
   {
-    PlayerStatus = PS_EOF;
+    Player_AsyncCommand(PC_NEXT, 0);
+    return;
   }
 
   AudioBuffer_Typedef *audio_buf;
@@ -536,14 +537,8 @@ void MP3_MainThread(void)
   bytesLeft = mfile->bytes_in_buf;
   f_buffer = &FILE_BUF(mfile, 0);
 
-  Profiler_EnterFunc(PF_CODEC_DECODE);
-//  CPU_DisableInterrupts();
-  {
-    err = MP3Decode(pMP3Decoder, &f_buffer, &bytesLeft, (s16*) audio_buf->data,
-	0);
-  }
-//  CPU_RestoreInterrupts();
-  Profiler_ExitFunc(PF_CODEC_DECODE);
+  err = MP3Decode(pMP3Decoder, &f_buffer, &bytesLeft, (s16*) audio_buf->data,
+      0);
 
   if (err != ERR_MP3_NONE)
   {
@@ -553,7 +548,6 @@ void MP3_MainThread(void)
       case ERR_MP3_MAINDATA_UNDERFLOW:
         if (mfile->state == MFS_EOF) /*XXX ???*/
         {
-          PlayerStatus = PS_EOF;
           return;
         }
         else
@@ -640,4 +634,6 @@ void MP3_Stop(void)
   print_user_heap_mallinfo();
 
   MediaFile_Close(mfile);
+
+  free(mfile);
 }

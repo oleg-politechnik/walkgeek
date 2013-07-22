@@ -26,6 +26,10 @@
  */
 
 /* Includes ------------------------------------------------------------------*/
+#include "FreeRTOS.h"
+#include "semphr.h"
+#include "task.h"
+
 #include "disp_1100.h"
 #include "stm32f4xx_conf.h"
 #include "misc.h"
@@ -211,14 +215,14 @@ static inline void Disp_SetRowDirty(uint8_t row, bool dirty)
 {
   assert_param(DISP_IS_VALID_ROW(row) || row == ALL_DISP_DIRTY);
 
-  CPU_DisableInterrupts();
+  vPortEnterCritical();
   {
     if (dirty)
       dirty_row_flags |= _BV(row);
     else
       dirty_row_flags &= ~_BV(row);
   }
-  CPU_RestoreInterrupts();
+  vPortExitCritical();
 }
 
 static inline void FeedDisp()
@@ -278,7 +282,7 @@ void Disp_MainThread()
 
 void Disp_IRQHandler()
 {
-  u16 temp;
+  volatile u16 temp;
 
   if (SPI_GetITStatus(DISP_SPI, SPI_IT_RXNE))
   {
@@ -410,7 +414,7 @@ static void Disp_InitFinally()
 
   NVIC_InitTypeDef NVIC_InitStructure;
   NVIC_InitStructure.NVIC_IRQChannel = DISP_SPI_IRQ;
-  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
+  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = configIRQ_PRIORITY_DISP;
   NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
   NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
   NVIC_Init(&NVIC_InitStructure);

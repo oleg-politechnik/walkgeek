@@ -6,7 +6,7 @@ IF(NOT CMAKE_BUILD_TYPE)
     MESSAGE(STATUS "No CMAKE_BUILD_TYPE specified, using default DEBUG")
 ENDIF()
 
-SET(CMAKE_C_FLAGS_DEBUG " -ggdb -O0 -Wno-unused-variable -Wno-unused-parameter")
+SET(CMAKE_C_FLAGS_DEBUG " -ggdb -O0 -Wno-unused-variable -Wno-unused-parameter -Wno-unused-function")
 SET(CMAKE_CXX_FLAGS_DEBUG " -ggdb -O0")
 SET(CMAKE_ASM_FLAGS_DEBUG " -ggdb")
 

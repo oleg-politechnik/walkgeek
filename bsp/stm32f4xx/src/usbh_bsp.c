@@ -20,6 +20,8 @@
   */
 
 /* Includes ------------------------------------------------------------------*/
+#include "FreeRTOSConfig.h"
+
 #include "usb_bsp.h"
 #include "stm32f4_discovery.h"
 #include "usbh_core.h"
@@ -109,7 +111,7 @@ void PowerManager_Init(void)
   /* Init Host Library */
   USBH_Init(&USB_OTG_Core, USB_OTG_FS_CORE_ID, &USB_Host, &USBH_MSC_cb, &USR_Callbacks);
 
-  Scheduler_PutTask(100, DisplayPlayerStatus, REPEAT);
+  /*fixme Scheduler_PutTask(100, DisplayPlayerStatus, REPEAT);*/
 
   /* Configure PA0 pin: User Key pin */
   STM_EVAL_PBInit(BUTTON_USER, BUTTON_MODE_GPIO);
@@ -313,18 +315,16 @@ void USB_OTG_BSP_EnableInterrupt(USB_OTG_CORE_HANDLE *pdev)
 
   NVIC_InitTypeDef NVIC_InitStructure;
   /* Enable USB Interrupt */
-  NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);
-
   NVIC_InitStructure.NVIC_IRQChannel = OTG_FS_IRQn;
-  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
-  NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;
+  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = configIRQ_PRIORITY_USB;
+  NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
   NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
   NVIC_Init(&NVIC_InitStructure);
 
   /* Enable the Overcurrent Interrupt */
   NVIC_InitStructure.NVIC_IRQChannel = HOST_OVRCURR_IRQn;
-  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
-  NVIC_InitStructure.NVIC_IRQChannelSubPriority = 2;
+  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = configIRQ_PRIORITY_USB;
+  NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
   NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
 
   NVIC_Init(&NVIC_InitStructure);
@@ -407,13 +407,10 @@ static void USB_OTG_BSP_TimeInit (void)
   /* Set the Vector Table base address at 0x08000000 */
   NVIC_SetVectorTable(NVIC_VectTab_FLASH, 0x00);
 
-  /* Configure the Priority Group to 2 bits */
-  NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
-
   /* Enable the TIM2 gloabal Interrupt */
   NVIC_InitStructure.NVIC_IRQChannel = TIM2_IRQn;
-  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
-  NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;
+  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = configIRQ_PRIORITY_USB_TIMER;
+  NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
   NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
 
   NVIC_Init(&NVIC_InitStructure);
