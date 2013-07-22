@@ -3,6 +3,7 @@ set (LIBS_FLAGS " -O3 ")
 set (FAT_FS_SOURCES
     fat_fs/ff.c
     fat_fs/option/ccsbcs.c
+    fat_fs/option/syscall.c
 )
 
 set_source_files_properties(${FAT_FS_SOURCES} PROPERTIES COMPILE_FLAGS
@@ -63,7 +64,7 @@ if(USE_MP3)
       "-Wno-unused-but-set-variable ${LIBS_FLAGS}" )
 endif()
 
-#set (LIBS_SOURCES ${LIBS_SOURCES} ${MP3_SOURCES})
+set (LIBS_SOURCES ${LIBS_SOURCES} ${MP3_SOURCES})
 
 # Opus stuff
 add_definitions(-DHAVE_CONFIG_H)

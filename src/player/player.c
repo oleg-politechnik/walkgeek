@@ -26,6 +26,10 @@
  */
 
 /* Includes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+#include "FreeRTOS.h"
+#include "queue.h"
+#include "task.h"
+
 #include "player.h"
 #include "audio_if.h"
 #include "navigator.h"
@@ -33,55 +37,106 @@
 #include "opus_decoder.h"
 #include "mp3_decoder.h"
 #include "minIni.h"
-#include "profile.h"
+#include "../../bsp/stm32f4_discovery/stm324xg_eval_sdio_sd.h"
 
 /* Imported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private define ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private typedef ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-typedef struct
-{
-//  bool IsSingleDirPlayback;
-} PlayerSettings_Typedef;
-
 /* Private macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private function prototypes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-void Player_SaveState(void);
-static void Player_SyncCommand(void);
+static void Player_SaveState(void);
+static void Player_SyncCommand(ePlayerCommand cmd, s32 arg);
+/*static */void Player_Init(void);
+static void Player_DeInit(void);
+static void Player_Play(void);
+static void Player_Stop(void);
 
 /* Private variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-static Decoder_Typedef
-        decoders[] =
-                {
+static Decoder_Typedef decoders[] =
+{
 #ifdef USE_MP3
-                        { .LoadFile = MP3_LoadFile, .MainThread = MP3_MainThread, .Seek = MP3_Seek, .Stop = MP3_Stop},
+        {
+                .LoadFile = MP3_LoadFile,
+                .MainThread = MP3_MainThread,
+                .Seek = MP3_Seek,
+                .Stop = MP3_Stop
+        },
 #endif
-                        { .LoadFile = OPUS_LoadFile, .MainThread =
-                                OPUS_MainThread, .Seek = OPUS_Seek, .Stop =
-                                OPUS_Stop },
-                        { .LoadFile = 0, .MainThread = 0, .Seek = 0, .Stop = 0 } };
+        {
+                .LoadFile = OPUS_LoadFile,
+                .MainThread = OPUS_MainThread,
+                .Seek = OPUS_Seek,
+                .Stop = OPUS_Stop
+        },
+        {
+                .LoadFile = 0,
+                .MainThread = 0,
+                .Seek = 0,
+                .Stop = 0
+        }
+};
 
 static char *suffixes_white_list[] =
 {
 #ifdef USE_MP3
         "mp3",
 #endif
-        "opus", 0 };
+        "opus",
+        0
+};
 
-PlayerStatus_Typedef PlayerStatus;
+static PlayerStatus_Typedef PlayerStatus;
 PlayerState_Typedef PlayerState;
 
 static Decoder_Typedef *decoder;
 
 static NavigatorContext_Typedef PlayerContext;
 
-static volatile u32 PlayerCommand = PC_DUMMY;
-static volatile s32 PlayerCommandArg;
-
 static char PlayerErrorString[128];
 
+xQueueHandle xPlayerCommandQueue;
+
 /* Private functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+void prvPlayerTask(void *pvParameters)
+{
+  xPlayerCommandQueue = xQueueCreate( 10, sizeof( sPlayerCommand ) );
+  assert_param(xPlayerCommandQueue);
+
+  while (1)
+  {
+    sPlayerCommand command;
+    if (xQueueReceive(xPlayerCommandQueue, &(command), (portTickType) 1)) //todo give from ISR
+    {
+      Player_SyncCommand(command.cmd, command.arg);
+    }
+
+    if (PlayerStatus == PS_PLAYING)
+    {
+      decoder->MainThread();
+
+      Audio_PeriodicKick();
+    }
+
+    if (PlayerStatus == PS_PLAYING || PlayerStatus == PS_SEEKING)
+    {
+      if (PlayerState.metadata.time_curr != PlayerState.metadata.mstime_curr
+              / 1000)
+      {
+
+        SetVariable(VAR_AudioPosition, PlayerState.metadata.time_curr,
+                PlayerState.metadata.mstime_curr / 1000);
+      }
+    }
+  }
+}
+
+#include <inttypes.h>
+#include <stdio.h>
+
 void Player_Init(void)
 {
+  assert_param(PlayerStatus == PS_DEINITED);
+
   Navigator_Init();
 
   long int volume = ini_getl("", "volume", PLAYER_DEFAULT_VOLUME,
@@ -111,6 +166,8 @@ void Player_Init(void)
     }
   }
 
+  SetVariable(VAR_PlayerState, PlayerStatus, PS_STOPPED);
+
   if (PlayerContext.fname)
   {
     Player_Play();
@@ -125,15 +182,8 @@ void Player_Init(void)
 
       if (mstime < PlayerState.metadata.mstime_max)
       {
-        Player_AsyncCommand(PC_SEEK, mstime);
-      }
-
-      if (mstime < PlayerState.metadata.mstime_max)
-      {
-        Player_AsyncCommand(PC_SEEK, mstime);
-        Player_SyncCommand();
-        Player_AsyncCommand(PC_SEEK, 0);
-        Player_SyncCommand();
+        Player_SyncCommand(PC_SEEK, mstime);
+        Player_SyncCommand(PC_SEEK, 0);
       }
     }
   }
@@ -154,30 +204,27 @@ void Player_Init(void)
 
 void Player_DeInit(void)
 {
-  Player_SaveState();
+  assert_param(PlayerStatus != PS_DEINITED);
 
   Player_Stop();
 
   Navigator_DeInit();
+
+  SetVariable(VAR_PlayerState, PlayerStatus, PS_DEINITED);
 }
 
 void Player_Play(void)
 {
+  assert_param(PlayerStatus == PS_STOPPED);
+
   CPU_InitUserHeap();
-
-  PlayerCommand = PC_DUMMY;
-
-  Profiler_Init();
-  CPU_RefillStack();
 
   memset(&PlayerState, 0, sizeof(PlayerState));
 
   if (PlayerContext.fname)
   {
-    assert_param(
-            (PlayerContext.suffix_ix >= 0)
-                    && ((unsigned) PlayerContext.suffix_ix < SIZE_OF(decoders)
-                            - 1));
+    assert_param(PlayerContext.suffix_ix >= 0);
+    assert_param((unsigned) PlayerContext.suffix_ix < SIZE_OF(decoders) - 1);
 
     decoder = &decoders[PlayerContext.suffix_ix];
 
@@ -187,13 +234,7 @@ void Player_Play(void)
 
     trace("player: loading %s\n", PlayerState.metadata.file_name);
 
-#ifndef SIMULATOR
-    Profiler_EnterFunc(PF_PRELOAD);
-    {
-      decoder->LoadFile(PlayerState.metadata.file_name);
-    }
-    Profiler_ExitFunc(PF_PRELOAD);
-#endif
+    decoder->LoadFile(PlayerState.metadata.file_name);
 
     if (PlayerStatus == PS_STOPPED)
     {
@@ -205,37 +246,48 @@ void Player_Play(void)
 
 void Player_Stop(void)
 {
-#ifndef SIMULATOR
-  if (decoder)
+  if (PlayerStatus >= PS_PLAYING)
   {
-    decoder->Stop();
+    if (decoder)
+    {
+      decoder->Stop();
+    }
+
+    trace("player: stopped\n");
+
+    Audio_CommandSync(AC_STOP);
+
+    SetVariable(VAR_PlayerState, PlayerStatus, PS_STOPPED);
   }
-#endif
-
-  /*
-   * todo: call AC_STOP after some idle in the paused state
-   *
-   */
-
-  //trace("player: stopped\n");
-
-  Audio_CommandSync(AC_STOP);
-
-  SetVariable(VAR_PlayerState, PlayerStatus, PS_STOPPED);
 }
 
-void Player_AsyncCommand(PlayerCommand_Typedef cmd, s32 arg)
+void Player_AsyncCommand(ePlayerCommand cmd, s32 arg)
 {
-  CPU_DisableInterrupts();
-  {
-    PlayerCommand = cmd;
-    PlayerCommandArg = arg;
-  }
-  CPU_RestoreInterrupts();
+  sPlayerCommand command;
+  command.cmd = cmd;
+  command.arg = arg;
+
+  xQueueSend( xPlayerCommandQueue, ( void * ) &command, portMAX_DELAY );
 }
 
-static void Player_Next(void)
+void Player_AsyncCommandFromISR(ePlayerCommand cmd, s32 arg)
 {
+  portBASE_TYPE xHigherPriorityTaskWoken = pdFALSE;
+  sPlayerCommand command;
+
+  command.cmd = cmd;
+  command.arg = arg;
+
+  xQueueSendFromISR( xPlayerCommandQueue, ( void * ) &command, &xHigherPriorityTaskWoken );
+
+  /* Switch context if necessary. */
+  portEND_SWITCHING_ISR( xHigherPriorityTaskWoken );
+}
+
+void Player_Next(void)
+{
+  assert_param(PlayerStatus >= PS_STOPPED);
+
   Player_Stop();
 
   trace("\n\nplayer: next\n");
@@ -252,8 +304,10 @@ static void Player_Next(void)
   }
 }
 
-static void Player_Prev(void)
+void Player_Prev(void)
 {
+  assert_param(PlayerStatus >= PS_STOPPED);
+
   Player_Stop();
 
   trace("player: prev\n");
@@ -269,171 +323,103 @@ static void Player_Prev(void)
   }
 }
 
-static void Player_SyncCommand(void)
+void Player_SyncCommand(ePlayerCommand cmd, s32 arg)
 {
-  u32 PlayerCommand_Cached;
-  s32 PlayerCommandArg_Cached;
-
-  while (PlayerCommand != PC_DUMMY)
+  switch (cmd)
   {
-    CPU_DisableInterrupts();
-    {
-      PlayerCommand_Cached = PlayerCommand;
-      PlayerCommandArg_Cached = PlayerCommandArg;
-    }
-    CPU_RestoreInterrupts();
+    case PC_INIT:
+      Player_Init();
+      break;
 
-    CPU_CompareExchange(&PlayerCommand, PlayerCommand_Cached, PC_DUMMY);
+    case PC_DEINIT:
+      Player_DeInit();
+      break;
 
-    switch (PlayerCommand_Cached)
-    {
-      case PC_NEXT:
-        Player_Next();
-        break;
+    case PC_NEXT:
+      Player_Next();
+      break;
 
-      case PC_PREV:
-        Player_Prev();
-        break;
+    case PC_PREV:
+      Player_Prev();
+      break;
 
-      case PC_DIR_START:
-	trace("player: first track in current dir\n");
-        Navigator_ResetDir(&PlayerContext);
-        Player_Next();
-        break;
+    case PC_DIR_START:
+      trace("player: first track in current dir\n");
+      Navigator_ResetDir(&PlayerContext);
+      Player_Next();
+      break;
 
-      case PC_DIR_END:
-	Player_Stop();
-	trace("player: last track in current dir\n");
+    case PC_DIR_END:
+      Player_Stop();
+      trace("player: last track in current dir\n");
 
-	Navigator_LastFileCurrentDir(&PlayerContext);
+      Navigator_LastFileCurrentDir(&PlayerContext);
 
-	if (PlayerContext.fname)
-	{
-	  trace("Player: Trying file %s\n", PlayerContext.fname);
-
-	  Player_Play();
-	}
-	else
-	{
-	  trace("Player: Cannot switch to the last file\n");
-	}
-	break;
-
-      case PC_SEEK:
-#ifndef PROFILING
-        if (PlayerStatus < PS_PLAYING)
-#endif
-          break;
-
-        assert_param(decoder->Seek);
-
-        if (PlayerCommandArg_Cached == 0)
-        {
-          Audio_CommandSync(AC_PLAY);
-          PlayerStatus = PS_PLAYING;
-          break;
-        }
-
-        PlayerStatus = PS_SEEKING;
-        Audio_CommandSync(AC_PAUSE);
-        Audio_CommandSync(AC_RESET_BUFFERS);
-
-        if (PlayerCommandArg_Cached > 0)
-        {
-          if (PlayerState.metadata.mstime_curr + PlayerCommandArg_Cached
-                  > PlayerState.metadata.mstime_max)
-          {
-            Player_Next();
-            break;
-          }
-        }
-        else if (PlayerCommandArg_Cached < 0)
-        {
-          if (PlayerState.metadata.mstime_curr < (u32) -PlayerCommandArg_Cached)
-          {
-            PlayerCommandArg_Cached += (PlayerState.metadata.mstime_curr);
-
-            Player_Prev();
-
-            if (PlayerStatus == PS_PLAYING)
-            {
-              Player_AsyncCommand(PC_SEEK,
-                      PlayerState.metadata.mstime_max + PlayerCommandArg_Cached);
-            }
-
-            break;
-          }
-        }
-
-        decoder->Seek(
-                PlayerState.metadata.mstime_curr + PlayerCommandArg_Cached);
-        break;
-
-      default:
-        break;
-    }
-  }
-}
-
-void Player_MainThread(void)
-{
-  Player_SyncCommand();
-
-  if (PlayerStatus == PS_PLAYING)
-  {
-#ifndef SIMULATOR
-    Profiler_EnterFunc(PF_CODEC_TOTAL);
-    {
-      decoder->MainThread();
-    }
-    Profiler_ExitFunc(PF_CODEC_TOTAL);
-#endif
-
-    Audio_PeriodicKick();
-  }
-
-  if (PlayerStatus == PS_PLAYING || PlayerStatus == PS_SEEKING)
-  {
-    if (PlayerState.metadata.time_curr != PlayerState.metadata.mstime_curr
-            / 1000)
-    {
-
-      SetVariable(VAR_AudioPosition, PlayerState.metadata.time_curr,
-              PlayerState.metadata.mstime_curr / 1000);
-
-      /*Display a progress spinner while decoding.*/
-//      static const char spinner[] = "|/-\\";
-//      static size_t last_spin;
-//
-//      trace("\r[%c]", spinner[last_spin & 3]);
-//
-////      trace("\r[%c] %02d:%02d:%02d", spinner[last_spin & 3],
-////              (int) (PlayerState.metadata.time_curr / 3600),
-////              (int) (PlayerState.metadata.time_curr / 60) % 60,
-////              (int) (PlayerState.metadata.time_curr) % 60);
-//      fflush(stdout);
-//      last_spin++;
-
-
-#ifdef PROFILING
-      if (PlayerState.metadata.time_curr == 60)
+      if (PlayerContext.fname)
       {
-        Profiler_SetTotal(60 * 1000000);
-        Profiler_Print();
+        trace("Player: Trying file %s\n", PlayerContext.fname);
 
-        trace("Stack: free %ub out of %ub (%u%%)\n",
-                CPU_GetStackFree(), CPU_GetStackSize(),
-                CPU_GetStackFree() * 100 / CPU_GetStackSize());
-
-        PlayerStatus = PS_EOF;
+        Player_Play();
       }
-#endif
-    }
-  }
+      else
+      {
+        trace("Player: Cannot switch to the last file\n");
+      }
+      break;
 
-  if (PlayerStatus == PS_EOF)
-  {
-    Player_AsyncCommand(PC_NEXT, 0);
+    case PC_SEEK:
+      if (PlayerStatus < PS_PLAYING)
+        break;
+
+      assert_param(decoder->Seek);
+
+      if (arg == 0)
+      {
+        Audio_CommandSync(AC_PLAY);
+        SetVariable(VAR_PlayerState, PlayerStatus, PS_PLAYING);
+        break;
+      }
+
+      SetVariable(VAR_PlayerState, PlayerStatus, PS_SEEKING);
+      Audio_CommandSync(AC_PAUSE);
+      Audio_CommandSync(AC_RESET_BUFFERS);
+
+      if (arg > 0)
+      {
+        if (PlayerState.metadata.mstime_curr + arg
+                > PlayerState.metadata.mstime_max)
+        {
+          Player_Next();
+          break;
+        }
+      }
+      else if (arg < 0)
+      {
+        if (PlayerState.metadata.mstime_curr < (u32) -arg)
+        {
+          arg += (PlayerState.metadata.mstime_curr);
+
+          Player_Prev();
+
+          if (PlayerStatus == PS_PLAYING)
+          {
+            Player_AsyncCommand(PC_SEEK,
+                    PlayerState.metadata.mstime_max + arg);
+          }
+
+          break;
+        }
+      }
+
+      decoder->Seek(PlayerState.metadata.mstime_curr + arg);
+      break;
+
+    case PC_SAVE_CURRENT_DIR:
+      Player_SaveState();
+      break;
+
+    default:
+      break;
   }
 }
 

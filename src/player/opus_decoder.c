@@ -38,7 +38,6 @@
 #include <ogg/ogg.h>
 #include "opus_types.h"
 #include <opus_multistream.h>
-#include "profile.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -65,7 +64,6 @@
 #include "opus/celt/stack_alloc.h"
 
 /* Imported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-extern PlayerStatus_Typedef PlayerStatus;
 extern PlayerState_Typedef PlayerState;
 
 /* Private define ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -579,14 +577,8 @@ void OPUS_MainThread(void)
           if (op->e_o_s && os->serialno == opus_serialno)
             eos = 1; /* don't care for anything except opus eos */
 
-          /*Decode Opus packet*/Profiler_EnterFunc(PF_CODEC_DECODE);
-          //            CPU_DisableInterrupts();
-          {
-            ret = opus_decode(st, (unsigned char*) op->packet, op->bytes,
-                    output, MAX_FRAME_SIZE, 0);
-          }
-          //            CPU_RestoreInterrupts();
-          Profiler_ExitFunc(PF_CODEC_DECODE);
+          ret = opus_decode(st, (unsigned char*) op->packet, op->bytes,
+              output, MAX_FRAME_SIZE, 0);
 
           /*If the decoder returned less than zero, we have an error.*/
           if (ret < 0)
@@ -674,7 +666,9 @@ void OPUS_MainThread(void)
 
         f_close(file);
 
-        PlayerStatus = PS_EOF;
+        Player_AsyncCommand(PC_NEXT, 0);
+
+//        vTaskDelete(NULL);
       }
     }
   }

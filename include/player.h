@@ -36,6 +36,7 @@
 /* Exported types ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 typedef enum
 {
+  PS_DEINITED,
   PS_STOPPED,
 
   PS_ERROR_FILE,
@@ -43,14 +44,15 @@ typedef enum
   PS_PLAYING,
   PS_SEEKING,
 
-  PS_EOF,
-
   PS_MAX
 } PlayerStatus_Typedef;
 
 typedef enum
 {
-  PC_DUMMY,
+  PC_NEED_MORE_DATA,
+
+  PC_INIT,
+  PC_DEINIT,
 
   PC_NEXT,
   PC_PREV,
@@ -60,8 +62,16 @@ typedef enum
 
   PC_SAVE_CURRENT_DIR,
 
-  PC_SEEK
-} PlayerCommand_Typedef;
+  PC_SEEK,
+
+  PC_AUDIO_FILE_ERROR
+} ePlayerCommand;
+
+typedef struct
+{
+  ePlayerCommand cmd;
+  s32 arg;
+} sPlayerCommand;
 
 typedef struct
 {
@@ -77,20 +87,15 @@ typedef struct
 } PlayerState_Typedef;
 
 /* Exported functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-void Player_Init(void);
-void Player_DeInit(void);
-
-void Player_Play(void);
-void Player_Stop(void);
-
-void Player_MainThread(void);
-void Player_AsyncCommand(PlayerCommand_Typedef cmd, s32 arg);
+void Player_AsyncCommand(ePlayerCommand cmd, s32 arg);
+void Player_AsyncCommandFromISR(ePlayerCommand cmd, s32 arg);
 
 PlayerState_Typedef *Player_GetState(void);
 PlayerStatus_Typedef Player_GetStatus(void);
 
-void Player_AudioFileError(char *error);
 char *Player_GetErrorString(void);
+
+void Player_AudioFileError(char *error); //fixme
 
 /* Exported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Exported static inline functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/

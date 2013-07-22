@@ -167,8 +167,8 @@ typedef struct {
 /* #define AUDIO_MAL_DMA_IT_TE_EN */  /* Uncomment this line to enable DMA Transfer Error interrupt */
 
 /* Select the interrupt preemption priority and subpriority for the DMA interrupt */
-#define EVAL_AUDIO_IRQ_PREPRIO           0   /* Select the preemption priority level(0 is the highest) */
-#define EVAL_AUDIO_IRQ_SUBRIO            0   /* Select the sub-priority level (0 is the highest) */
+//#define EVAL_AUDIO_IRQ_PREPRIO           2   /* Select the preemption priority level(0 is the highest) */
+//#define EVAL_AUDIO_IRQ_SUBRIO            0   /* Select the sub-priority level (0 is the highest) */
 
 /* Uncomment the following line to use the default Codec_TIMEOUT_UserCallback()
    function implemented in stm32f4_discovery_audio_codec.c file.

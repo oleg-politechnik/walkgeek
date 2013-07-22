@@ -124,6 +124,8 @@
  ===============================================================================================================================*/
 
 /* Includes ------------------------------------------------------------------*/
+#include "FreeRTOSConfig.h"
+
 #include "stm32f4_discovery_audio_codec.h"
 #include "stm32f4xx_i2c.h"
 #include "stm32f4xx_dac.h"
@@ -1358,8 +1360,8 @@ static void Audio_MAL_Init(void)
   NVIC_InitTypeDef NVIC_InitStructure;
 
   NVIC_InitStructure.NVIC_IRQChannel = SPI3_IRQn;
-  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
-  NVIC_InitStructure.NVIC_IRQChannelSubPriority =0;
+  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = configIRQ_PRIORITY_AUDIO;
+  NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
   NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
   NVIC_Init(&NVIC_InitStructure);
 
@@ -1418,8 +1420,8 @@ static void Audio_MAL_Init(void)
     /* I2S DMA IRQ Channel configuration */
     NVIC_InitStructure.NVIC_IRQChannel = AUDIO_MAL_DMA_IRQ;
     NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority
-            = EVAL_AUDIO_IRQ_PREPRIO;
-    NVIC_InitStructure.NVIC_IRQChannelSubPriority = EVAL_AUDIO_IRQ_SUBRIO;
+            = configIRQ_PRIORITY_AUDIO;
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
     NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
     NVIC_Init(&NVIC_InitStructure);
 #endif
@@ -1472,8 +1474,8 @@ static void Audio_MAL_Init(void)
 #if defined(AUDIO_MAL_DMA_IT_TC_EN) || defined(AUDIO_MAL_DMA_IT_HT_EN) || defined(AUDIO_MAL_DMA_IT_TE_EN)
     /* I2S DMA IRQ Channel configuration */
     NVIC_InitStructure.NVIC_IRQChannel = AUDIO_MAL_DMA_IRQ;
-    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = EVAL_AUDIO_IRQ_PREPRIO;
-    NVIC_InitStructure.NVIC_IRQChannelSubPriority = EVAL_AUDIO_IRQ_SUBRIO;
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = configIRQ_PRIORITY_AUDIO;
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
     NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
     NVIC_Init(&NVIC_InitStructure);
 #endif
@@ -1497,8 +1499,8 @@ static void Audio_MAL_Init(void)
     /* I2S DMA IRQ Channel configuration */
     NVIC_InitStructure.NVIC_IRQChannel = CODEC_I2S_IRQ;
     NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority
-            = EVAL_AUDIO_IRQ_PREPRIO;
-    NVIC_InitStructure.NVIC_IRQChannelSubPriority = EVAL_AUDIO_IRQ_SUBRIO;
+            = configIRQ_PRIORITY_AUDIO;
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
     NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
     NVIC_Init(&NVIC_InitStructure);
 #else
@@ -1521,8 +1523,8 @@ static void Audio_MAL_DeInit(void)
 
   /* Deinitialize the NVIC interrupt for the I2S DMA Stream */
   NVIC_InitStructure.NVIC_IRQChannel = AUDIO_MAL_DMA_IRQ;
-  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = EVAL_AUDIO_IRQ_PREPRIO;
-  NVIC_InitStructure.NVIC_IRQChannelSubPriority = EVAL_AUDIO_IRQ_SUBRIO;
+  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = configIRQ_PRIORITY_AUDIO;
+  NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
   NVIC_InitStructure.NVIC_IRQChannelCmd = DISABLE;
   NVIC_Init(&NVIC_InitStructure);
 #endif

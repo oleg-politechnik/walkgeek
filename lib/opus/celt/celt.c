@@ -2432,8 +2432,6 @@ int celt_decode_with_ec(CELTDecoder * OPUS_RESTRICT st, const unsigned char *dat
       return frame_size/st->downsample;
    }
 
-//   Profiler_EnterFunc(PF_CELT_EBANDS);
-
    ALLOC(freq, IMAX(CC,C)*N, celt_sig); /**< Interleaved signal MDCTs */
    ALLOC(X, C*N, celt_norm);   /**< Interleaved normalised MDCTs */
    ALLOC(bandE, st->mode->nbEBands*C, celt_ener);
@@ -2457,10 +2455,6 @@ int celt_decode_with_ec(CELTDecoder * OPUS_RESTRICT st, const unsigned char *dat
       for (i=0;i<st->mode->nbEBands;i++)
          oldBandE[i]=MAX16(oldBandE[i],oldBandE[st->mode->nbEBands+i]);
    }
-
-//   Profiler_ExitFunc(PF_CELT_EBANDS);
-
-//   Profiler_EnterFunc(PF_CELT_1);
 
    total_bits = len*8;
    tell = ec_tell(dec);
@@ -2509,19 +2503,11 @@ int celt_decode_with_ec(CELTDecoder * OPUS_RESTRICT st, const unsigned char *dat
    else
       shortBlocks = 0;
 
-//   Profiler_ExitFunc(PF_CELT_1);
-
-//   Profiler_EnterFunc(PF_CELT_2);
-
    /* Decode the global flags (first symbols in the stream) */
    intra_ener = tell+3<=total_bits ? ec_dec_bit_logp(dec, 3) : 0;
    /* Get band energies */
    unquant_coarse_energy(st->mode, st->start, st->end, oldBandE,
          intra_ener, dec, C, LM);
-
-//   Profiler_ExitFunc(PF_CELT_2);
-
-//   Profiler_EnterFunc(PF_CELT_3);
 
    ALLOC(tf_res, st->mode->nbEBands, int);
    tf_decode(st->start, st->end, isTransient, tf_res, LM, dec);
@@ -2535,10 +2521,6 @@ int celt_decode_with_ec(CELTDecoder * OPUS_RESTRICT st, const unsigned char *dat
    ALLOC(cap, st->mode->nbEBands, int);
    ALLOC(offsets, st->mode->nbEBands, int);
    ALLOC(fine_priority, st->mode->nbEBands, int);
-
-//   Profiler_ExitFunc(PF_CELT_3);
-
-//   Profiler_EnterFunc(PF_CELT_4);
 
    init_caps(st->mode,cap,LM,C);
 
@@ -2573,10 +2555,6 @@ int celt_decode_with_ec(CELTDecoder * OPUS_RESTRICT st, const unsigned char *dat
          dynalloc_logp = IMAX(2, dynalloc_logp-1);
    }
 
-//   Profiler_ExitFunc(PF_CELT_4);
-
-//   Profiler_EnterFunc(PF_CELT_5);
-
    ALLOC(fine_quant, st->mode->nbEBands, int);
    alloc_trim = tell+(6<<BITRES) <= total_bits ?
          ec_dec_icdf(dec, trim_icdf, 7) : 5;
@@ -2588,15 +2566,9 @@ int celt_decode_with_ec(CELTDecoder * OPUS_RESTRICT st, const unsigned char *dat
          alloc_trim, &intensity, &dual_stereo, bits, &balance, pulses,
          fine_quant, fine_priority, C, LM, dec, 0, 0);
 
-//   Profiler_ExitFunc(PF_CELT_5);
-
-//   Profiler_EnterFunc(PF_CELT_6);
-
    unquant_fine_energy(st->mode, st->start, st->end, oldBandE, fine_quant, dec, C);
 
-//   Profiler_ExitFunc(PF_CELT_6);
-
-   Profiler_EnterFunc(PF_CELT_7);
+   /*Profiler_EnterFunc(PF_CELT_7);*/
 
    /* Decode fixed codebook */
    ALLOC(collapse_masks, C*st->mode->nbEBands, unsigned char);
@@ -2609,24 +2581,14 @@ int celt_decode_with_ec(CELTDecoder * OPUS_RESTRICT st, const unsigned char *dat
       anti_collapse_on = ec_dec_bits(dec, 1);
    }
 
-   Profiler_ExitFunc(PF_CELT_7);
-
-//   Profiler_EnterFunc(PF_CELT_8);
+   /*Profiler_ExitFunc(PF_CELT_7);*/
 
    unquant_energy_finalise(st->mode, st->start, st->end, oldBandE,
          fine_quant, fine_priority, len*8-ec_tell(dec), dec, C);
 
-//   Profiler_ExitFunc(PF_CELT_8);
-
-//   Profiler_EnterFunc(PF_CELT_9);
-
    if (anti_collapse_on)
       anti_collapse(st->mode, X, collapse_masks, LM, C, N,
             st->start, st->end, oldBandE, oldLogE, oldLogE2, pulses, st->rng);
-
-//   Profiler_ExitFunc(PF_CELT_9);
-
-//   Profiler_EnterFunc(PF_CELT_10);
 
    log2Amp(st->mode, st->start, st->end, bandE, oldBandE, C);
 
@@ -2639,24 +2601,12 @@ int celt_decode_with_ec(CELTDecoder * OPUS_RESTRICT st, const unsigned char *dat
       }
    }
 
-//   Profiler_ExitFunc(PF_CELT_10);
-
-//   Profiler_EnterFunc(PF_CELT_11);
-
    /* Synthesis */
    denormalise_bands(st->mode, X, freq, bandE, effEnd, C, M);
-
-//   Profiler_ExitFunc(PF_CELT_11);
-
-//   Profiler_EnterFunc(PF_CELT_12);
 
    OPUS_MOVE(decode_mem[0], decode_mem[0]+N, DECODE_BUFFER_SIZE-N);
    if (CC==2)
       OPUS_MOVE(decode_mem[1], decode_mem[1]+N, DECODE_BUFFER_SIZE-N);
-
-//   Profiler_ExitFunc(PF_CELT_12);
-
-//   Profiler_EnterFunc(PF_CELT_13);
 
    c=0; do
       for (i=0;i<M*st->mode->eBands[st->start];i++)
@@ -2669,10 +2619,6 @@ int celt_decode_with_ec(CELTDecoder * OPUS_RESTRICT st, const unsigned char *dat
       for (i=bound;i<N;i++)
          freq[c*N+i] = 0;
    } while (++c<C);
-
-//   Profiler_ExitFunc(PF_CELT_13);
-
-//   Profiler_EnterFunc(PF_CELT_14);
 
    out_syn[0] = out_mem[0]+MAX_PERIOD-N;
    if (CC==2)
@@ -2689,16 +2635,12 @@ int celt_decode_with_ec(CELTDecoder * OPUS_RESTRICT st, const unsigned char *dat
          freq[i] = HALF32(ADD32(freq[i],freq[N+i]));
    }
 
-//   Profiler_ExitFunc(PF_CELT_14);
-
-   Profiler_EnterFunc(PF_CELT_15);
+   /*Profiler_EnterFunc(PF_CELT_15);*/
 
    /* Compute inverse MDCTs */
    compute_inv_mdcts(st->mode, shortBlocks, freq, out_syn, overlap_mem, CC, LM);
 
-   Profiler_ExitFunc(PF_CELT_15);
-
-//   Profiler_EnterFunc(PF_CELT_16);
+   /*Profiler_ExitFunc(PF_CELT_15);*/
 
    c=0; do {
       st->postfilter_period=IMAX(st->postfilter_period, COMBFILTER_MINPERIOD);
@@ -2730,10 +2672,6 @@ int celt_decode_with_ec(CELTDecoder * OPUS_RESTRICT st, const unsigned char *dat
          oldBandE[st->mode->nbEBands+i]=oldBandE[i];
    }
 
-//   Profiler_ExitFunc(PF_CELT_16);
-
-//   Profiler_EnterFunc(PF_CELT_17);
-
    /* In case start or end were to change */
    if (!isTransient)
    {
@@ -2762,10 +2700,6 @@ int celt_decode_with_ec(CELTDecoder * OPUS_RESTRICT st, const unsigned char *dat
    } while (++c<2);
    st->rng = dec->rng;
 
-//   Profiler_ExitFunc(PF_CELT_17);
-
-//   Profiler_EnterFunc(PF_CELT_18);
-
    deemphasis(out_syn, pcm, N, CC, st->downsample, st->mode->preemph, st->preemph_memD);
    st->loss_count = 0;
    RESTORE_STACK;
@@ -2773,8 +2707,6 @@ int celt_decode_with_ec(CELTDecoder * OPUS_RESTRICT st, const unsigned char *dat
       return OPUS_INTERNAL_ERROR;
    if(ec_get_error(dec))
       st->error = 1;
-
-//   Profiler_ExitFunc(PF_CELT_18);
 
    return frame_size/st->downsample;
 }

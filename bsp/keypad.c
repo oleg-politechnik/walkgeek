@@ -90,9 +90,6 @@ void Keypad_1msScan(void)
   u8 key_ix;
   u8 *p_debounce;
 
-  if (SystemState == SS_START)
-    return;
-
   for (key_ix = 0; key_ix < KEY_MAX; key_ix++)
   {
     p_debounce = &_debounce_matrix[key_ix];

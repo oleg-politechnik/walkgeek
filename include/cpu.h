@@ -37,19 +37,13 @@
 /* Public variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Public macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Public functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+void CPU_PreInit(void);
+
 void CPU_EnterLowPowerState(void);
-void CPU_EnableSysTick(u16 hz);
 void CPU_InitUserHeap(void);
 
 void *CPU_GetUserHeapStart(void);
 size_t CPU_GetUserHeapSize(void);
-size_t CPU_GetStackSize(void);
-
-void CPU_RefillStack(void);
-size_t CPU_GetStackFree(void);
-
-void CPU_DisableInterrupts(void) RAM_FUNC;
-void CPU_RestoreInterrupts(void) RAM_FUNC;
 
 /* Public static inline functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 

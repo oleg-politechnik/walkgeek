@@ -1,7 +1,7 @@
 /*
  * mp3_decoder.c
  *
- * Copyright (c) 2012, Oleg Tsaregorodtsev
+ * Copyright (c) 2012, 2013 Oleg Tsaregorodtsev
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,7 +32,9 @@
 #include "mp3_decoder.h"
 #include "mediafile.h"
 #include "bsp.h"
-#include "profile.h"
+#include <malloc.h>
+#include <unistd.h>
+#include <limits.h>
 
 extern PlayerStatus_Typedef PlayerStatus;
 
@@ -243,9 +245,6 @@ FuncResult MediaFile_ReFill(MediaFile_Typedef *mfile)
   return FUNC_SUCCESS;
 }
 
-
-
-
 FuncResult MP3_ReadMetadata(MediaFile_Typedef *mfile)
 {
   uint32_t offset, frame_size, frame_header_size;
@@ -256,13 +255,26 @@ FuncResult MP3_ReadMetadata(MediaFile_Typedef *mfile)
 
   vbr = true;
 
+
+
+
+
+
+
+
+
+
+
+
+
+
   MF_EXEC(MediaFile_FillFromFile(mfile, 0));
 
   if (MP3_CHECK_TAG(mfile, "ID3"))
   { /* try ID3v2 */
     mfile->data_start = ((DWORD) FILE_BUF(mfile, 6) << 21)
             | ((DWORD) FILE_BUF(mfile, 7) << 14) | ((WORD) FILE_BUF(mfile, 8)
-            << 7) | FILE_BUF(mfile, 9);
+            << 7) | FILE_BUF(mfile, 9)/*XXX??? + 10*/;
 
     version_major = FILE_BUF(mfile, 3);
     //    version_release = FILE_BUF(mfile, 4);
@@ -326,15 +338,6 @@ FuncResult MP3_ReadMetadata(MediaFile_Typedef *mfile)
                 MIN(frame_size - 1, sizeof(meta->notes) - 1));
       }
 
-      //      TRCK    Track number
-      //      TENC    Encoded By
-      //      WXXX    URL
-      //      TCOP    Frame identifier
-      //      TOPE    Original Artist
-      //      TCOM    Composer
-      //      TCON    Genre
-      //      COMM    Comments
-      //          Year
       MF_EXEC(MediaFile_Seek(mfile, frame_size + frame_header_size));
     }
   }
@@ -465,7 +468,8 @@ void MP3_LoadFile(char *filepath)
   trace("MP3 started");
   print_user_heap_mallinfo();
 
-  mfile = (MediaFile_Typedef *) user_zalloc(sizeof(MediaFile_Typedef));
+  mfile = (MediaFile_Typedef *) malloc(sizeof(MediaFile_Typedef));
+  memset(mfile, 0, sizeof(MediaFile_Typedef));
 
   trace("MP3 file buffers allocated");
   print_user_heap_mallinfo();
@@ -491,7 +495,8 @@ void MP3_MainThread(void)
 
   if (mfile->state == MFS_EOF) /*XXX ???*/
   {
-    PlayerStatus = PS_EOF;
+    Player_AsyncCommand(PC_NEXT, 0);
+    return;
   }
 
   AudioBuffer_Typedef *audio_buf;
@@ -536,14 +541,8 @@ void MP3_MainThread(void)
   bytesLeft = mfile->bytes_in_buf;
   f_buffer = &FILE_BUF(mfile, 0);
 
-  Profiler_EnterFunc(PF_CODEC_DECODE);
-//  CPU_DisableInterrupts();
-  {
-    err = MP3Decode(pMP3Decoder, &f_buffer, &bytesLeft, (s16*) audio_buf->data,
-	0);
-  }
-//  CPU_RestoreInterrupts();
-  Profiler_ExitFunc(PF_CODEC_DECODE);
+  err = MP3Decode(pMP3Decoder, &f_buffer, &bytesLeft, (s16*) audio_buf->data,
+      0);
 
   if (err != ERR_MP3_NONE)
   {
@@ -553,7 +552,6 @@ void MP3_MainThread(void)
       case ERR_MP3_MAINDATA_UNDERFLOW:
         if (mfile->state == MFS_EOF) /*XXX ???*/
         {
-          PlayerStatus = PS_EOF;
           return;
         }
         else
@@ -640,4 +638,7 @@ void MP3_Stop(void)
   print_user_heap_mallinfo();
 
   MediaFile_Close(mfile);
+
+  free(mfile);
 }
+

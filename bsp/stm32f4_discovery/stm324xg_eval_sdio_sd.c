@@ -222,6 +222,12 @@
  ******************************************************************************
  */
 
+/*
+ * Including modifications taken from:
+ * https://my.st.com/public/STe2ecommunities/mcu/Lists/cortex_mx_stm32/DispForm.aspx?ID=21134&Source=/public/STe2ecommunities/mcu/Tags.aspx?tags=freertos
+ * https://my.st.com/public/STe2ecommunities/mcu/Lists/cortex_mx_stm32/DispForm.aspx?ID=17428&Source=/public/STe2ecommunities/Tags.aspx?tags=sdio
+ */
+
 /* Includes ------------------------------------------------------------------*/
 #include "system.h"
 #include "stm324xg_eval_sdio_sd.h"
@@ -344,7 +350,7 @@
 
 static uint32_t CardType = SDIO_STD_CAPACITY_SD_CARD_V1_1;
 static uint32_t CSD_Tab[4], CID_Tab[4], RCA = 0;
-static uint8_t SDSTATUS_Tab[16];
+static uint8_t SDSTATUS_Tab[64];
 __IO uint32_t StopCondition = 0;
 __IO SD_Error TransferError = SD_OK;
 __IO uint32_t TransferEnd = 0, DMAEndOfTransfer = 0;
@@ -931,7 +937,7 @@ SD_Error SD_GetCardInfo(SD_CardInfo *cardinfo)
         /*!< Byte 10 */
         tmp = (uint8_t)((CSD_Tab[2] & 0x0000FF00) >> 8);
 
-        cardinfo->CardCapacity = (cardinfo->SD_csd.DeviceSize + 1) * 512 * 1024;
+        cardinfo->CardCapacity = ((uint64_t) cardinfo->SD_csd.DeviceSize + 1) * 512 * 1024;
         cardinfo->CardBlockSize = 512;
     }
 
@@ -1220,7 +1226,7 @@ SD_Error SD_SelectDeselect(uint32_t addr)
  * @param  BlockSize: the SD card Data block size. The Block size should be 512.
  * @retval SD_Error: SD Card Error code.
  */
-SD_Error SD_ReadBlock(uint8_t *readbuff, uint32_t ReadAddr, uint16_t BlockSize)
+SD_Error SD_ReadBlock(uint8_t *readbuff, uint64_t ReadAddr, uint16_t BlockSize)
 {
     SD_Error errorstatus = SD_OK;
 #if defined (SD_POLLING_MODE)
@@ -1259,20 +1265,6 @@ SD_Error SD_ReadBlock(uint8_t *readbuff, uint32_t ReadAddr, uint16_t BlockSize)
     SDIO_DataInitStructure.SDIO_TransferMode = SDIO_TransferMode_Block;
     SDIO_DataInitStructure.SDIO_DPSM = SDIO_DPSM_Enable;
     SDIO_DataConfig(&SDIO_DataInitStructure);
-
-    /*!< Send CMD17 READ_SINGLE_BLOCK */
-    SDIO_CmdInitStructure.SDIO_Argument = (uint32_t) ReadAddr;
-    SDIO_CmdInitStructure.SDIO_CmdIndex = SD_CMD_READ_SINGLE_BLOCK;
-    SDIO_CmdInitStructure.SDIO_Response = SDIO_Response_Short;
-    SDIO_CmdInitStructure.SDIO_Wait = SDIO_Wait_No;
-    SDIO_CmdInitStructure.SDIO_CPSM = SDIO_CPSM_Enable;
-    SDIO_SendCommand(&SDIO_CmdInitStructure);
-
-    errorstatus = CmdResp1Error(SD_CMD_READ_SINGLE_BLOCK);
-
-    if (errorstatus != SD_OK) {
-        return (errorstatus);
-    }
 
 #if defined (SD_POLLING_MODE)
     /*!< In case of single block transfer, no need of stop transfer at all.*/
@@ -1332,6 +1324,20 @@ SD_Error SD_ReadBlock(uint8_t *readbuff, uint32_t ReadAddr, uint16_t BlockSize)
     SD_LowLevel_DMA_RxConfig((uint32_t *) readbuff, BlockSize);
 #endif
 
+    /*!< Send CMD17 READ_SINGLE_BLOCK */
+    SDIO_CmdInitStructure.SDIO_Argument = (uint32_t) ReadAddr;
+    SDIO_CmdInitStructure.SDIO_CmdIndex = SD_CMD_READ_SINGLE_BLOCK;
+    SDIO_CmdInitStructure.SDIO_Response = SDIO_Response_Short;
+    SDIO_CmdInitStructure.SDIO_Wait = SDIO_Wait_No;
+    SDIO_CmdInitStructure.SDIO_CPSM = SDIO_CPSM_Enable;
+    SDIO_SendCommand(&SDIO_CmdInitStructure);
+
+    errorstatus = CmdResp1Error(SD_CMD_READ_SINGLE_BLOCK);
+
+    if (errorstatus != SD_OK) {
+        return (errorstatus);
+    }
+
     return (errorstatus);
 }
 
@@ -1350,7 +1356,7 @@ SD_Error SD_ReadBlock(uint8_t *readbuff, uint32_t ReadAddr, uint16_t BlockSize)
  * @param  NumberOfBlocks: number of blocks to be read.
  * @retval SD_Error: SD Card Error code.
  */
-SD_Error SD_ReadMultiBlocks(uint8_t *readbuff, uint32_t ReadAddr,
+SD_Error SD_ReadMultiBlocks(uint8_t *readbuff, uint64_t ReadAddr,
         uint16_t BlockSize, uint32_t NumberOfBlocks)
 {
     SD_Error errorstatus = SD_OK;
@@ -1387,6 +1393,13 @@ SD_Error SD_ReadMultiBlocks(uint8_t *readbuff, uint32_t ReadAddr,
     SDIO_DataInitStructure.SDIO_DPSM = SDIO_DPSM_Enable;
     SDIO_DataConfig(&SDIO_DataInitStructure);
 
+    SDIO_ITConfig(
+            SDIO_IT_DCRCFAIL | SDIO_IT_DTIMEOUT | SDIO_IT_DATAEND
+                    | SDIO_IT_RXOVERR | SDIO_IT_STBITERR, ENABLE);
+    SDIO_DMACmd(ENABLE);
+    SD_LowLevel_DMA_RxConfig((uint32_t *) readbuff,
+            (NumberOfBlocks * BlockSize));
+
     /*!< Send CMD18 READ_MULT_BLOCK with argument data address */
     SDIO_CmdInitStructure.SDIO_Argument = (uint32_t) ReadAddr;
     SDIO_CmdInitStructure.SDIO_CmdIndex = SD_CMD_READ_MULT_BLOCK;
@@ -1400,13 +1413,6 @@ SD_Error SD_ReadMultiBlocks(uint8_t *readbuff, uint32_t ReadAddr,
     if (errorstatus != SD_OK) {
         return (errorstatus);
     }
-
-    SDIO_ITConfig(
-            SDIO_IT_DCRCFAIL | SDIO_IT_DTIMEOUT | SDIO_IT_DATAEND
-                    | SDIO_IT_RXOVERR | SDIO_IT_STBITERR, ENABLE);
-    SDIO_DMACmd(ENABLE);
-    SD_LowLevel_DMA_RxConfig((uint32_t *) readbuff,
-            (NumberOfBlocks * BlockSize));
 
     return (errorstatus);
 }
@@ -1471,7 +1477,7 @@ SD_Error SD_WaitReadOperation(void)
  * @param  BlockSize: the SD card Data block size. The Block size should be 512.
  * @retval SD_Error: SD Card Error code.
  */
-SD_Error SD_WriteBlock(uint8_t *writebuff, uint32_t WriteAddr,
+SD_Error SD_WriteBlock(uint8_t *writebuff, uint64_t WriteAddr,
         uint16_t BlockSize)
 {
     SD_Error errorstatus = SD_OK;
@@ -1519,14 +1525,6 @@ SD_Error SD_WriteBlock(uint8_t *writebuff, uint32_t WriteAddr,
     if (errorstatus != SD_OK) {
         return (errorstatus);
     }
-
-    SDIO_DataInitStructure.SDIO_DataTimeOut = SD_DATATIMEOUT;
-    SDIO_DataInitStructure.SDIO_DataLength = BlockSize;
-    SDIO_DataInitStructure.SDIO_DataBlockSize = (uint32_t) 9 << 4;
-    SDIO_DataInitStructure.SDIO_TransferDir = SDIO_TransferDir_ToCard;
-    SDIO_DataInitStructure.SDIO_TransferMode = SDIO_TransferMode_Block;
-    SDIO_DataInitStructure.SDIO_DPSM = SDIO_DPSM_Enable;
-    SDIO_DataConfig(&SDIO_DataInitStructure);
 
     /*!< In case of single data block transfer no need of stop command at all */
 #if defined (SD_POLLING_MODE)
@@ -1585,6 +1583,14 @@ SD_Error SD_WriteBlock(uint8_t *writebuff, uint32_t WriteAddr,
     SDIO_DMACmd(ENABLE);
 #endif
 
+    SDIO_DataInitStructure.SDIO_DataTimeOut = SD_DATATIMEOUT;
+    SDIO_DataInitStructure.SDIO_DataLength = BlockSize;
+    SDIO_DataInitStructure.SDIO_DataBlockSize = (uint32_t) 9 << 4;
+    SDIO_DataInitStructure.SDIO_TransferDir = SDIO_TransferDir_ToCard;
+    SDIO_DataInitStructure.SDIO_TransferMode = SDIO_TransferMode_Block;
+    SDIO_DataInitStructure.SDIO_DPSM = SDIO_DPSM_Enable;
+    SDIO_DataConfig(&SDIO_DataInitStructure);
+
     return (errorstatus);
 }
 
@@ -1603,7 +1609,7 @@ SD_Error SD_WriteBlock(uint8_t *writebuff, uint32_t WriteAddr,
  * @param  NumberOfBlocks: number of blocks to be written.
  * @retval SD_Error: SD Card Error code.
  */
-SD_Error SD_WriteMultiBlocks(uint8_t *writebuff, uint32_t WriteAddr,
+SD_Error SD_WriteMultiBlocks(uint8_t *writebuff, uint64_t WriteAddr,
         uint16_t BlockSize, uint32_t NumberOfBlocks)
 {
     SD_Error errorstatus = SD_OK;
@@ -1674,6 +1680,13 @@ SD_Error SD_WriteMultiBlocks(uint8_t *writebuff, uint32_t WriteAddr,
         return (errorstatus);
     }
 
+    SDIO_ITConfig(
+            SDIO_IT_DCRCFAIL | SDIO_IT_DTIMEOUT | SDIO_IT_DATAEND
+                    | SDIO_IT_RXOVERR | SDIO_IT_STBITERR, ENABLE);
+    SDIO_DMACmd(ENABLE);
+    SD_LowLevel_DMA_TxConfig((uint32_t *) writebuff,
+            (NumberOfBlocks * BlockSize));
+
     SDIO_DataInitStructure.SDIO_DataTimeOut = SD_DATATIMEOUT;
     SDIO_DataInitStructure.SDIO_DataLength = NumberOfBlocks * BlockSize;
     SDIO_DataInitStructure.SDIO_DataBlockSize = (uint32_t) 9 << 4;
@@ -1681,13 +1694,6 @@ SD_Error SD_WriteMultiBlocks(uint8_t *writebuff, uint32_t WriteAddr,
     SDIO_DataInitStructure.SDIO_TransferMode = SDIO_TransferMode_Block;
     SDIO_DataInitStructure.SDIO_DPSM = SDIO_DPSM_Enable;
     SDIO_DataConfig(&SDIO_DataInitStructure);
-
-    SDIO_ITConfig(
-            SDIO_IT_DCRCFAIL | SDIO_IT_DTIMEOUT | SDIO_IT_DATAEND
-                    | SDIO_IT_RXOVERR | SDIO_IT_STBITERR, ENABLE);
-    SDIO_DMACmd(ENABLE);
-    SD_LowLevel_DMA_TxConfig((uint32_t *) writebuff,
-            (NumberOfBlocks * BlockSize));
 
     return (errorstatus);
 }
@@ -1783,7 +1789,7 @@ SD_Error SD_StopTransfer(void)
  * @param  endaddr: the end address.
  * @retval SD_Error: SD Card Error code.
  */
-SD_Error SD_Erase(uint32_t startaddr, uint32_t endaddr)
+SD_Error SD_Erase(uint64_t startaddr, uint64_t endaddr)
 {
     SD_Error errorstatus = SD_OK;
     uint32_t delay = 0;

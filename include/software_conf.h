@@ -39,9 +39,6 @@
 
 #define USBD_MSC_SPEED_MPS                  4
 
-/* Speeds and delays */
-#define HZ                                  1000
-
 /* Memory */
 #define FILE_BUFFER_SIZE                    2048
 #define AUDIO_BUFFER_MAX_SIZE               2500
@@ -49,8 +46,6 @@
 
 /* CDC buf size */
 #define APP_RX_DATA_SIZE                    8192
-
-//#define MINOGG_GRANULEPOS_CACHE
 
 #ifdef SIMULATOR
 # undef ENABLE_TRACE

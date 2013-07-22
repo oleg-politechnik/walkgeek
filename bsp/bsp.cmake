@@ -60,11 +60,16 @@ if (PLATFORM STREQUAL "N1100" OR
   INCLUDE_DIRECTORIES(bsp/stm32f4_discovery)
   
   set(CSP_SOURCES ${CSP_SOURCES}
-      bsp/freertos/GCC/ARM_CM3/port.c
+      bsp/freertos/GCC/ARM_CM4F/port.c
   )
   
-  INCLUDE_DIRECTORIES(bsp/freertos/GCC/ARM_CM3)
+  add_definitions(-D GCC_ARMCM3)
+  add_definitions(-D inline=)
+  add_definitions("-D PACK_STRUCT_END=__attribute\\(\\(packed\\)\\)" )
+  add_definitions("-D ALIGN_STRUCT_END=__attribute\\(\\(aligned\\(4\\)\\)\\)")
   
+  INCLUDE_DIRECTORIES(bsp/freertos/GCC/ARM_CM4F)
+    
   set(BSP_SOURCES ${BSP_SOURCES}
       bsp/keypad.c
       bsp/stm32f4_discovery/audio_if.c
