@@ -1,7 +1,7 @@
 /*
- * main.c
+ * system.c
  *
- * Copyright (c) 2012, 2013, Oleg Tsaregorodtsev
+ * Copyright (c) 2012, Oleg Tsaregorodtsev
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,11 +26,6 @@
  */
 
 /* Includes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-#include "FreeRTOS.h"
-#include "task.h"
-#include "queue.h"
-#include "timers.h"
-
 #include "system.h"
 #include "keypad.h"
 #include "player.h"
@@ -40,31 +35,22 @@
 #include "cpu_config.h"
 
 /* Imported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-extern void prvPlayerTask(void *);
-extern void prvUiTask(void *);
-
 /* Private define ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-#define mainINIT_TASK_PRIORITY			( tskIDLE_PRIORITY + 1 )
-#define mainINIT_TASK_STACK_SIZE		( configMINIMAL_STACK_SIZE * 30 )
-
-#define mainPLAYER_TASK_STACK_SIZE		( configMINIMAL_STACK_SIZE * 50 )
-#define mainPLAYER_TASK_PRIORITY		( tskIDLE_PRIORITY + 2 )
-
-#define mainUI_TASK_STACK_SIZE			( configMINIMAL_STACK_SIZE * 30 )
-#define mainUI_TASK_PRIORITY			( tskIDLE_PRIORITY + 3 )
-
-#define mainSYSTEM_STATE_QUEUE_SIZE		( 2 )
-
 /* Private typedef ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-SystemState_Typedef SystemState = SS_START;
-u32 displayVariableFlags[MAX_DISPLAY_VARIABLES];
-static bool debug_mode = false;
-static bool can_sleep = false;
+SystemState_Typedef SystemState;
+static SystemState_Typedef SystemStateNew;
 
-static xQueueHandle xSystemStateQueue;
-static xTimerHandle xEnterLowPowerModeTimer;
+u32 msDelay;
+
+u32 SysMsCounter;
+
+u32 MSC_RxSpeed, MSC_TxSpeed;
+u32 displayVariableFlags[MAX_DISPLAY_VARIABLES];
+
+bool debug_mode = false;
+static bool can_sleep = false;
 
 static char *stateNames[] =
 {
@@ -75,79 +61,52 @@ static char *stateNames[] =
 };
 
 /* Private function prototypes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-static void SetState(SystemState_Typedef NewState);
-
 /* Private functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-static void System_EnterLowPowerModeCallback(xTimerHandle xTimer)
+void System_ForbidDebugging(void)
 {
+  //todo disable JTAG port in BSP
+
   if (!debug_mode)
   {
     can_sleep = true;
   }
 }
 
-static void prvInitTask(void *pvParameters)
+static void System_Check_PPP_Button(void)
 {
-  xSystemStateQueue = xQueueCreate( mainSYSTEM_STATE_QUEUE_SIZE, sizeof( SystemState_Typedef ) );
+  if (SystemState != SS_START)
+    return;
 
-  BSP_Keypad_Init();
-
-  PowerManager_Init();
-  PowerManager_MainThread();
-
-  if (PowerManager_GetState() != PM_ONLINE)
+  if (!BSP_Keypad_GetKeyStatus(KEY_PPP))
   {
-#ifdef HAS_BATTERY
-    portBASE_TYPE delay = 0;
+    BSP_PowerDisable();
+  }
+}
 
-    while (delay < 1000)
-    {
-      if (!BSP_Keypad_GetKeyStatus(KEY_PPP))
-      {
-        BSP_PowerDisable();
-      }
+void System_PowerEnable(void)
+{
+  BSP_PowerEnable();
 
-      vTaskDelay(10 / portTICK_RATE_MS); //todo const
-      delay += 10;
-    }
+  Scheduler_RemoveTask(System_Check_PPP_Button);
+#ifndef PROFILING
+  UI_Init();
 #endif
 
-    System_SetState(SS_PLAYER);
-  }
-  else
-  {
-    System_SetState(debug_mode ? SS_PLAYER : SS_USB_MSC);
-  }
+//  Vibrator_SendSignal(30);
+}
 
-  xTaskCreate(prvUiTask, (signed portCHAR *) "UI", mainUI_TASK_STACK_SIZE, NULL, mainUI_TASK_PRIORITY, NULL);
+static void System_StartPlayer(void)
+{
+//  if (SystemState != SS_START)
+//    return;
 
-  xTaskCreate(prvPlayerTask, (signed portCHAR *) "Player", mainPLAYER_TASK_STACK_SIZE, NULL, mainPLAYER_TASK_PRIORITY, NULL);
-
-  {
-    xEnterLowPowerModeTimer = xTimerCreate(
-            (signed portCHAR *) "Enter Low Power Mode Timer",
-            10000 / portTICK_RATE_MS, pdFALSE,
-            (void *) System_EnterLowPowerModeCallback,
-            System_EnterLowPowerModeCallback);
-    xTimerStart(xEnterLowPowerModeTimer, configTIMER_API_TIMEOUT_TICKS);
-  }
-
-  while (1)
-  {
-    SystemState_Typedef NewSystemState;
-
-    if (xQueueReceive(xSystemStateQueue, &(NewSystemState), (portTickType) 10))
-    {
-      SetState(NewSystemState);
-    }
-
-    PowerManager_MainThread();
-  }
+  System_SetState(SS_PLAYER);
 }
 
 void System_VbusApplied(void)
 {
+  System_StartPlayer();
+
   if (SystemState != SS_USB_MSC)
   {
     USB_CDC_Init();
@@ -162,20 +121,72 @@ void System_VbusDetached(void)
   USB_DeInit();
 }
 
-void System_SetState(SystemState_Typedef NewState)
+void System_Init(void)
+{
+  Scheduler_Reset();
+
+  CPU_EnableSysTick(HZ);
+
+  SystemState = SS_START;
+
+  BSP_Keypad_Init();
+
+  PowerManager_Init();
+  PowerManager_MainThread();
+
+#ifdef PROFILING
+  System_StartPlayer();
+  return;
+#endif
+
+  if (PowerManager_GetState() == PM_ONLINE)
+  {
+    System_StartPlayer();
+  }
+  else
+  {
+#ifdef HAS_BATTERY
+    Scheduler_PutTask(10, System_Check_PPP_Button, REPEAT);
+    Scheduler_PutTask(1000, System_StartPlayer, NO_REPEAT);
+#endif
+  }
+
+  Scheduler_PutTask(10000, System_ForbidDebugging, NO_REPEAT);
+}
+
+void RAM_FUNC System_SysTickHandler(void)
+{
+#ifndef PROFILING
+  Keypad_1msScan();
+
+  Scheduler_1msCycle();
+
+  if (msDelay)
+    msDelay--;
+#endif
+
+  SysMsCounter++;
+}
+
+/* TODO add check of calling from an isr */
+void RAM_FUNC System_SetState(SystemState_Typedef NewState)
 {
   if (NewState == SS_USB_MSC && PowerManager_GetState() != PM_ONLINE)
   {
     return;
   }
 
-  xQueueSend( xSystemStateQueue, ( void * ) &NewState, portMAX_DELAY );
+  SystemStateNew = NewState;
+  if (NewState == SS_SHUTDOWN)
+  {
+    //Scheduler_PutTask(1000, BSP_PowerDisable, NO_REPEAT);
+  }
 }
 
 /*
  * Can only be called from the main thread
  */
-void SetState(SystemState_Typedef NewState)
+static void SetState(SystemState_Typedef NewState)
 {
   trace("system: leaving state %s\n", stateNames[SystemState]);
 
@@ -187,8 +198,7 @@ void SetState(SystemState_Typedef NewState)
   switch (SystemState)
   {
     case SS_PLAYER:
-      Player_AsyncCommand(PC_SAVE_CURRENT_DIR, 0);
-      Player_AsyncCommand(PC_DEINIT, 0);
+      Player_DeInit();
       break;
 
     case SS_USB_MSC:
@@ -204,12 +214,13 @@ void SetState(SystemState_Typedef NewState)
   switch (NewState)
   {
     case SS_SHUTDOWN:
+      CPU_DisableInterrupts();
       BSP_PowerDisable();
       break;
 
     case SS_PLAYER:
-      BSP_PowerEnable();
-      Player_AsyncCommand(PC_INIT, 0);
+      System_PowerEnable();
+      Player_Init();
       break;
 
     case SS_USB_MSC:
@@ -223,42 +234,35 @@ void SetState(SystemState_Typedef NewState)
   SetVariable(VAR_SystemState, SystemState, NewState);
 }
 
-extern void Player_Init(void);
-
-int main(void)
+void System_MainThread(void)
 {
-  CPU_PreInit();
+  u32 NewStateCached = SystemStateNew;
 
-  xTaskCreate(prvInitTask, (signed portCHAR *) "Init", mainINIT_TASK_STACK_SIZE, NULL, mainINIT_TASK_PRIORITY, NULL);
+  if (NewStateCached != SystemState)
+  {
+    SetState(NewStateCached);
+  }
 
-  /* Start the scheduler. */
-  vTaskStartScheduler();
+  /* Main work */
+#ifndef PROFILING
+  UI_MainCycle();
+#endif
+  PowerManager_MainThread();
 
-  assert_param(!"Fatal RTOS startup error");
+  switch (SystemState)
+  {
+    case SS_PLAYER:
+      Player_MainThread();
+      break;
 
-  return 42;
-}
+    case SS_USB_MSC:
+    default:
+      break;
+  }
 
-void vApplicationIdleHook(void)
-{
+  /* Finally */
   if (can_sleep)
   {
     CPU_WaitForInterrupt();
   }
 }
-
-void vApplicationTickHook(void)
-{
-}
-
-void vApplicationMallocFailedHook(void)
-{
-  assert_param(!"Malloc failed");
-}
-
-void vApplicationStackOverflowHook(xTaskHandle *pxTask,
-    signed portCHAR *pcTaskName)
-{
-  assert_param(!"Stack overflow");
-}
-

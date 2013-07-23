@@ -659,12 +659,14 @@ void assert_failed(uint8_t* file, uint32_t line, uint8_t* expr)
   /* User can add his own implementation to report the file name and line number,
    ex: printf("Wrong parameters value: file %s on line %d\n", file, line) */
 
-  char buf[1024];
+  vTaskSuspendAll();
+
+  char buf[256];
   int row = 0;
 
   //TODO: add application state
 
-  //fixme reset codec Audio_CommandSync(AC_STOP);
+  EVAL_AUDIO_DeInit();
 
   Disp_Clear();
 
@@ -676,11 +678,28 @@ void assert_failed(uint8_t* file, uint32_t line, uint8_t* expr)
   /*todo: test on windows*/
   Disp_String(0, row, buf, true);
 
+  portBASE_TYPE delay = 0;
+
   /* Infinite loop */
   while (1)
   {
     Disp_IRQHandler();
     Disp_MainThread();
+
+    if (BSP_Keypad_GetKeyStatus(KEY_PPP))
+    {
+      vTaskDelay(10 / portTICK_RATE_MS); //todo const
+      delay += 10;
+
+      if (delay < 1000)
+      {
+	BSP_PowerDisable();
+      }
+    }
+    else
+    {
+      delay = 0;
+    }
   }
 }
 #endif

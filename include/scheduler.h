@@ -1,5 +1,5 @@
 /*
- * ui.h
+ * scheduler.h
  *
  * Copyright (c) 2012, Oleg Tsaregorodtsev
  * All rights reserved.
@@ -26,44 +26,28 @@
  */
 
 /* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef UI_H_
-#define UI_H_
+#ifndef SCHEDULER_H_
+#define SCHEDULER_H_
 
 /* Includes ------------------------------------------------------------------*/
+#include "common.h"
+
 /* Exported constants --------------------------------------------------------*/
-#define KEY_PREV        KEY_1
-#define KEY_NEXT        KEY_3
-
-#define KEY_DIR_START   KEY_4
-#define KEY_DIR_END     KEY_6
-
-#define KEY_APP_PLAYER  KEY_7
-#define KEY_APP_MSC     KEY_8
-
-#define KEY_RESET_PLAYER 	KEY_C
-#define KEY_SAVE_PLAYER_STATE	KEY_5
+#define SCHEDULER_MS_GRANULARITY 10
 
 /* Exported types ------------------------------------------------------------*/
 typedef enum
 {
-  UIM_Init,
-
-  UIM_Player,
-  UIM_Player_Seeking,
-
-  UIM_Player_HalfLocked,
-  UIM_Player_Locked,
-  UIM_Player_HalfUnlocked,
-
-  UIM_MSC
-} UserInterfaceMode_Typedef;
+  REPEAT,
+  NO_REPEAT
+} RepeatPolicy;
 
 /* Exported macro ------------------------------------------------------------*/
 /* Exported functions ------------------------------------------------------- */
-void UI_Init(void);
-void UI_MainCycle(void);
-void UI_DeInit(void);
+void Scheduler_Reset(void);
+FuncResult Scheduler_PutTask(u32 timeout_ms, void(*callback)(void),
+        RepeatPolicy repeat);
+void Scheduler_RemoveTask(void(*callback)(void));
+void RAM_FUNC Scheduler_1msCycle(void);
 
-void Vibrator_SendSignal(u16 ms);
-
-#endif /* UI_H_ */
+#endif /* SCHEDULER_H_ */

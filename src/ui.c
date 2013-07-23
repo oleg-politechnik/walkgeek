@@ -61,6 +61,7 @@ typedef enum
 
 #define configUI_PRESS_TICK_MS          (100 / portTICK_RATE_MS)
 #define configUI_PRESS_TIMEOUT_MS       (800 / portTICK_RATE_MS)
+#define configUI_SHUTDOWN_TIMEOUT_MS    (2000 / portTICK_RATE_MS)
 
 #define configUI_LOCK_UNLOCK_TIMEOUT_MS (1000 / portTICK_RATE_MS)
 
@@ -478,8 +479,9 @@ void Keypad_KeyPressedCallback(KEY_Typedef key)
 
   if ((key == KEY_PPP && ScreenMode != UIM_Player_Locked) || key == KEY_BTN)
   {
-//    xTimerChangePeriod(xKeyHoldTimer, 3000 / portTICK_RATE_MS, configTIMER_API_TIMEOUT_TICKS);
-//    xTimerStart(xKeyHoldTimer, configTIMER_API_TIMEOUT_TICKS);
+    xTimerChangePeriod(xKeyHoldTimer, configUI_SHUTDOWN_TIMEOUT_MS, configTIMER_API_TIMEOUT_TICKS);
+    xTimerStart(xKeyHoldTimer, configTIMER_API_TIMEOUT_TICKS);
+    return;
   }
 
   if (key == KEY_APP_PLAYER && SystemState != SS_PLAYER)
@@ -517,6 +519,15 @@ void Keypad_KeyPressedCallback(KEY_Typedef key)
 
     case KEY_DIR_END:
       Player_AsyncCommand(PC_DIR_END, 0);
+      break;
+
+    case KEY_RESET_PLAYER:
+      Player_AsyncCommand(PC_DEINIT, 0);
+      Player_AsyncCommand(PC_INIT, 0);
+      break;
+
+    case KEY_SAVE_PLAYER_STATE:
+      Player_AsyncCommand(PC_SAVE_CURRENT_DIR, 0);
       break;
 
     case KEY_UP:
@@ -594,33 +605,6 @@ void Keypad_KeyPressedCallback(KEY_Typedef key)
     break;
 
   case UIM_MSC:
-    //      switch (key)
-    //      {
-    //        case KEY_SEL:
-    //          switch (App_Mode())
-    //          {
-    //            case APP_MODE_MSC:
-    //              App_SetMode(APP_MODE_USB_AUDIO);
-    //              KeyProcessed = SET;
-    //              break;
-    //
-    //            case APP_MODE_USB_AUDIO:
-    //              App_SetMode(APP_MODE_MSC);
-    //              KeyProcessed = SET;
-    //              break;
-    //
-    //            default:
-    //              break;
-    //          }
-    //          break;
-    //
-    //        default:
-    //          break;
-    //      }
-    break;
-
-  case UIM_Player_Seeking:
-    //      Player_AsyncCommand(PC_PAUSE, 0);
     break;
 
   case UIM_Init:
@@ -734,7 +718,7 @@ void Keypad_HoldTimeoutCallback(xTimerHandle xTimer)
 
 void Screen_DisableBacklightCallback(xTimerHandle xTimer)
 {
-//  Disp_SetBKL(DISABLE);
+  Disp_SetBKL(DISABLE);
 }
 
 void Keypad_LockTimeoutCallback(void)

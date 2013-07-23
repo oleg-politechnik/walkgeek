@@ -55,25 +55,25 @@ static void Player_Stop(void);
 static Decoder_Typedef decoders[] =
 {
 #ifdef USE_MP3
-    {
-	.LoadFile = MP3_LoadFile,
-	.MainThread = MP3_MainThread,
-	.Seek = MP3_Seek,
-	.Stop = MP3_Stop
-    },
+        {
+                .LoadFile = MP3_LoadFile,
+                .MainThread = MP3_MainThread,
+                .Seek = MP3_Seek,
+                .Stop = MP3_Stop
+        },
 #endif
-//    {
-//	.LoadFile = OPUS_LoadFile,
-//	.MainThread = OPUS_MainThread,
-//	.Seek = OPUS_Seek,
-//	.Stop = OPUS_Stop
-//    },
-    {
-	.LoadFile = 0,
-	.MainThread = 0,
-	.Seek = 0,
-	.Stop = 0
-    }
+        {
+                .LoadFile = OPUS_LoadFile,
+                .MainThread = OPUS_MainThread,
+                .Seek = OPUS_Seek,
+                .Stop = OPUS_Stop
+        },
+        {
+                .LoadFile = 0,
+                .MainThread = 0,
+                .Seek = 0,
+                .Stop = 0
+        }
 };
 
 static char *suffixes_white_list[] =
@@ -206,11 +206,11 @@ void Player_DeInit(void)
 {
   assert_param(PlayerStatus != PS_DEINITED);
 
-  Player_SaveState();
-
   Player_Stop();
 
   Navigator_DeInit();
+
+  SetVariable(VAR_PlayerState, PlayerStatus, PS_DEINITED);
 }
 
 void Player_Play(void)
@@ -327,95 +327,99 @@ void Player_SyncCommand(ePlayerCommand cmd, s32 arg)
 {
   switch (cmd)
   {
-  case PC_INIT:
-    Player_Init();
-    break;
-
-  case PC_DEINIT:
-    Player_DeInit();
-    break;
-
-  case PC_NEXT:
-    Player_Next();
-    break;
-
-  case PC_PREV:
-    Player_Prev();
-    break;
-
-  case PC_DIR_START:
-    trace("player: first track in current dir\n");
-    Navigator_ResetDir(&PlayerContext);
-    Player_Next();
-    break;
-
-  case PC_DIR_END:
-    Player_Stop();
-    trace("player: last track in current dir\n");
-
-    Navigator_LastFileCurrentDir(&PlayerContext);
-
-    if (PlayerContext.fname)
-    {
-      trace("Player: Trying file %s\n", PlayerContext.fname);
-
-      Player_Play();
-    }
-    else
-    {
-      trace("Player: Cannot switch to the last file\n");
-    }
-    break;
-
-  case PC_SEEK:
-    if (PlayerStatus < PS_PLAYING)
+    case PC_INIT:
+      Player_Init();
       break;
 
-    assert_param(decoder->Seek);
-
-    if (arg == 0)
-    {
-      Audio_CommandSync(AC_PLAY);
-      PlayerStatus = PS_PLAYING;
+    case PC_DEINIT:
+      Player_DeInit();
       break;
-    }
 
-    PlayerStatus = PS_SEEKING;
-    Audio_CommandSync(AC_PAUSE);
-    Audio_CommandSync(AC_RESET_BUFFERS);
+    case PC_NEXT:
+      Player_Next();
+      break;
 
-    if (arg > 0)
-    {
-      if (PlayerState.metadata.mstime_curr + arg
-	  > PlayerState.metadata.mstime_max)
+    case PC_PREV:
+      Player_Prev();
+      break;
+
+    case PC_DIR_START:
+      trace("player: first track in current dir\n");
+      Navigator_ResetDir(&PlayerContext);
+      Player_Next();
+      break;
+
+    case PC_DIR_END:
+      Player_Stop();
+      trace("player: last track in current dir\n");
+
+      Navigator_LastFileCurrentDir(&PlayerContext);
+
+      if (PlayerContext.fname)
       {
-	Player_Next();
-	break;
+        trace("Player: Trying file %s\n", PlayerContext.fname);
+
+        Player_Play();
       }
-    }
-    else if (arg < 0)
-    {
-      if (PlayerState.metadata.mstime_curr < (u32) -arg)
+      else
       {
-	arg += (PlayerState.metadata.mstime_curr);
-
-	Player_Prev();
-
-	if (PlayerStatus == PS_PLAYING)
-	{
-	  Player_AsyncCommand(PC_SEEK,
-	      PlayerState.metadata.mstime_max + arg);
-	}
-
-	break;
+        trace("Player: Cannot switch to the last file\n");
       }
-    }
+      break;
 
-    decoder->Seek(PlayerState.metadata.mstime_curr + arg);
-    break;
+    case PC_SEEK:
+      if (PlayerStatus < PS_PLAYING)
+        break;
 
-  default:
-    break;
+      assert_param(decoder->Seek);
+
+      if (arg == 0)
+      {
+        Audio_CommandSync(AC_PLAY);
+        SetVariable(VAR_PlayerState, PlayerStatus, PS_PLAYING);
+        break;
+      }
+
+      SetVariable(VAR_PlayerState, PlayerStatus, PS_SEEKING);
+      Audio_CommandSync(AC_PAUSE);
+      Audio_CommandSync(AC_RESET_BUFFERS);
+
+      if (arg > 0)
+      {
+        if (PlayerState.metadata.mstime_curr + arg
+                > PlayerState.metadata.mstime_max)
+        {
+          Player_Next();
+          break;
+        }
+      }
+      else if (arg < 0)
+      {
+        if (PlayerState.metadata.mstime_curr < (u32) -arg)
+        {
+          arg += (PlayerState.metadata.mstime_curr);
+
+          Player_Prev();
+
+          if (PlayerStatus == PS_PLAYING)
+          {
+            Player_AsyncCommand(PC_SEEK,
+                    PlayerState.metadata.mstime_max + arg);
+          }
+
+          break;
+        }
+      }
+
+      decoder->Seek(PlayerState.metadata.mstime_curr + arg);
+      break;
+
+    case PC_SAVE_CURRENT_DIR:
+      Player_SaveState();
+      break;
+
+    default:
+      break;
   }
 }
 
