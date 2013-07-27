@@ -38,7 +38,7 @@
 #include "audio_if.h"
 
 extern uint32_t NeglectedDMA_Count;
-extern PlayerState_Typedef PlayerState;
+extern sPlayerState PlayerState;
 
 /* Private typedef -----------------------------------------------------------*/
 typedef struct
@@ -80,7 +80,7 @@ typedef enum
 static volatile u32 dispBKL_Timeout;
 static volatile u32 KeyProcessed;
 static UserInterfaceMode_Typedef ScreenMode;
-static s32 ScreenSubMode;
+static signed portBASE_TYPE ScreenSubMode;
 static UI_State_Typedef UiState = UIS_NOT_INITIALIZED;
 
 static xTimerHandle xBacklightTimer;
@@ -88,15 +88,9 @@ static xTimerHandle xKeyHoldTimer;
 static xTimerHandle xKeypadLockTimer;
 
 /* Private function prototypes -----------------------------------------------*/
-//
-//static void Screen_Clear(void);
-//static void ScreenPainter_Main(void);
-//static void ScreenPainter_PlayerMain(void);
-//static void ScreenPainter_MSC(void);
-//
 static void Screen_DisableBacklightCallback(xTimerHandle xTimer);
 
-static void Keypad_LockTimeoutCallback(void);
+static void Keypad_LockTimeoutCallback(xTimerHandle xTimer);
 static void Keypad_HoldTimeoutCallback(xTimerHandle xTimer);
 
 static void TimePoint(u32 raw_mstime, TimePoint_Typedef *time);
@@ -129,20 +123,20 @@ void UI_Init(void)
 
   Vibrator_Init();
 
-  xBacklightTimer = xTimerCreate("Backlight Timer",
+  xBacklightTimer = xTimerCreate((signed portCHAR *) "Backlight Timer",
           configUI_BACKLIGHT_TIMEOUT_MS, pdFALSE,
           (void *) Screen_DisableBacklightCallback,
           Screen_DisableBacklightCallback);
 
   assert_param(xBacklightTimer);
 
-  xKeyHoldTimer = xTimerCreate("Key Hold Timer", configUI_PRESS_TIMEOUT_MS,
+  xKeyHoldTimer = xTimerCreate((signed portCHAR *) "Key Hold Timer", configUI_PRESS_TIMEOUT_MS,
           pdFALSE, (void *) Keypad_HoldTimeoutCallback,
           Keypad_HoldTimeoutCallback);
 
   assert_param(xKeyHoldTimer);
 
-  xKeypadLockTimer = xTimerCreate("Keypad Lock Timer",
+  xKeypadLockTimer = xTimerCreate((signed portCHAR *) "Keypad Lock Timer",
           configUI_LOCK_UNLOCK_TIMEOUT_MS, pdFALSE,
           (void *) Keypad_LockTimeoutCallback, Keypad_LockTimeoutCallback);
 
@@ -194,6 +188,8 @@ void UI_VariableChangedHandler(VAR_Index var)
   TimePoint_Typedef time;
   char *str;
 
+  sMetadata *metadata = &Player_GetState()->metadata;
+
   if (SystemState == SS_PLAYER)
   {
     switch (var)
@@ -217,6 +213,7 @@ void UI_VariableChangedHandler(VAR_Index var)
         DISP_ALIGN_CENTER(DISP_LAST_ROW-1, str); //regions
         break;
 
+      case VAR_Metadata: /* FIXME  */
       case VAR_PlayerState:
         Disp_String(0, 1, "                       ", false);
         Disp_String(0, 2, "                       ", false);
@@ -225,15 +222,15 @@ void UI_VariableChangedHandler(VAR_Index var)
         Disp_String(0, 5, "                       ", false);
         Disp_String(0, DISP_LAST_ROW, "                       ", false);
 
-        if (ScreenMode == UIM_Player && Player_GetStatus() == PS_STOPPED)
+        if (ScreenMode == UIM_Player && Player_GetState()->status == PS_STOPPED)
         {
           Disp_String(0, 1, " STOPPED", true);
           break;
         }
 
-        if (ScreenMode == UIM_Player && Player_GetStatus() == PS_ERROR_FILE)
+        if (ScreenMode == UIM_Player && Player_GetState()->status == PS_ERROR_FILE)
         {
-          Disp_String(0, 1, Player_GetErrorString(), true);
+          Disp_String(0, 1, Player_GetState()->metadata.error_string, true);
           break;
         }
 
@@ -245,33 +242,29 @@ void UI_VariableChangedHandler(VAR_Index var)
 
         rem = sizeof(str_buf) - strlen(str_buf) - 1;
 
-//        if (*PlayerState.metadata.artist)
-//        {
-//          strncat(str_buf, PlayerState.metadata.artist, rem);
-//
-//          rem = sizeof(str_buf) - strlen(str_buf) - 1;
-//
-//          strncat(str_buf, " - ", rem);
-//        }
-//
-//        if (*PlayerState.metadata.title)
-//        {
-//          strncat(str_buf, PlayerState.metadata.title, rem);
-//        }
-//        else
-//        {
-          strncat(str_buf, PlayerState.metadata.file_name, rem);
-//        }
+        if (*metadata->artist)
+        {
+          strncat(str_buf, metadata->artist, rem);
+
+          rem = sizeof(str_buf) - strlen(str_buf) - 1;
+
+          strncat(str_buf, " - ", rem);
+        }
+
+        if (*metadata->title)
+        {
+          strncat(str_buf, metadata->title, rem);
+        }
 
         rem = sizeof(str_buf) - strlen(str_buf) - 1;
 
-        if (*PlayerState.metadata.notes)
+        if (*metadata->notes)
         {
           strncat(str_buf, " ", rem);
 
           rem = sizeof(str_buf) - strlen(str_buf) - 1;
 
-          strncat(str_buf, PlayerState.metadata.notes, rem);
+          strncat(str_buf, metadata->notes, rem);
 
           rem = sizeof(str_buf) - strlen(str_buf) - 1;
         }
@@ -284,7 +277,7 @@ void UI_VariableChangedHandler(VAR_Index var)
 
         Disp_String(0, row++, str_buf, true);
 
-        TimePoint(PlayerState.metadata.mstime_max, &time);
+        TimePoint(metadata->mstime_max, &time);
         if (time.hour)
           sprintf(str_buf, "%01i:%02i:%02i", time.hour, time.minute,
                   time.second);
@@ -295,10 +288,10 @@ void UI_VariableChangedHandler(VAR_Index var)
 
       case VAR_AudioPosition:
         slider_pos = 0;
-        if (PlayerState.metadata.mstime_max)
+        if (metadata->mstime_max)
         {
-          slider_pos = PlayerState.metadata.mstime_curr * DISP_X_COUNT
-                  / PlayerState.metadata.mstime_max;
+          slider_pos = metadata->mstime_curr * DISP_X_COUNT
+                  / metadata->mstime_max;
         }
 
         for (u8 i = 0; i < DISP_X_COUNT; i++)
@@ -306,7 +299,7 @@ void UI_VariableChangedHandler(VAR_Index var)
           Disp_SetData(i, DISP_LAST_ROW + 1, (i < slider_pos) ? 0xFF : 0x00);
         }
 
-        TimePoint(PlayerState.metadata.mstime_curr, &time);
+        TimePoint(metadata->mstime_curr, &time);
         if (time.hour)
           sprintf(str_buf, "%01i:%02i:%02i", time.hour, time.minute,
                   time.second);
@@ -563,7 +556,7 @@ void Keypad_KeyPressedCallback(KEY_Typedef key)
       /* fall through */
 
     default:
-      Keypad_LockTimeoutCallback();
+      Keypad_LockTimeoutCallback(0);
       break;
     }
     break;
@@ -596,7 +589,7 @@ void Keypad_KeyPressedCallback(KEY_Typedef key)
     case KEY_DOWN:
     case KEY_SEL:
     case KEY_C:
-      Keypad_LockTimeoutCallback();
+      Keypad_LockTimeoutCallback(0);
       break;
 
     default:
@@ -608,6 +601,9 @@ void Keypad_KeyPressedCallback(KEY_Typedef key)
     break;
 
   case UIM_Init:
+    break;
+
+  case UIM_Player_Seeking: /* XXX */
     break;
   }
 }
@@ -690,12 +686,15 @@ void Keypad_HoldTimeoutCallback(xTimerHandle xTimer)
     {
     case KEY_NEXT:
     case KEY_PREV:
-      SetVariable(VAR_ScreenMode, ScreenMode, UIM_Player_Seeking);
+      if (Player_IsSeekable())
+      {
+	SetVariable(VAR_ScreenMode, ScreenMode, UIM_Player_Seeking);
 
-      xTimerChangePeriod(xKeyHoldTimer, configUI_PRESS_TICK_MS, configTIMER_API_TIMEOUT_TICKS);
-      xTimerStart(xKeyHoldTimer, configTIMER_API_TIMEOUT_TICKS);
+	xTimerChangePeriod(xKeyHoldTimer, configUI_PRESS_TICK_MS, configTIMER_API_TIMEOUT_TICKS);
+	xTimerStart(xKeyHoldTimer, configTIMER_API_TIMEOUT_TICKS);
 
-      Player_AsyncCommand(PC_SEEK, ScreenSubMode * 1000);
+	Player_AsyncCommand(PC_SEEK, ScreenSubMode * 1000);
+      }
       break;
 
     case KEY_UP:
@@ -721,7 +720,7 @@ void Screen_DisableBacklightCallback(xTimerHandle xTimer)
   Disp_SetBKL(DISABLE);
 }
 
-void Keypad_LockTimeoutCallback(void)
+void Keypad_LockTimeoutCallback(xTimerHandle xTimer)
 {
   switch (ScreenMode)
   {

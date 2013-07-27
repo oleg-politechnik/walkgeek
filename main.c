@@ -44,17 +44,6 @@ extern void prvPlayerTask(void *);
 extern void prvUiTask(void *);
 
 /* Private define ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-#define mainINIT_TASK_PRIORITY			( tskIDLE_PRIORITY + 1 )
-#define mainINIT_TASK_STACK_SIZE		( configMINIMAL_STACK_SIZE * 30 )
-
-#define mainPLAYER_TASK_STACK_SIZE		( configMINIMAL_STACK_SIZE * 50 )
-#define mainPLAYER_TASK_PRIORITY		( tskIDLE_PRIORITY + 2 )
-
-#define mainUI_TASK_STACK_SIZE			( configMINIMAL_STACK_SIZE * 30 )
-#define mainUI_TASK_PRIORITY			( tskIDLE_PRIORITY + 3 )
-
-#define mainSYSTEM_STATE_QUEUE_SIZE		( 2 )
-
 /* Private typedef ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/

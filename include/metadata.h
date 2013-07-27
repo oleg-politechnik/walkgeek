@@ -38,8 +38,6 @@
 /* Exported types ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 typedef struct
 {
-  char file_name[512];
-
   u8 channel_count;
   int bitrate;
   //
@@ -48,10 +46,11 @@ typedef struct
   char title[40];
   char artist[40];
   char album[40];
+  char notes[128];
   char year[5];
-  char genre[40];
-  char notes[256];
-} Metadata_TypeDef;
+  //
+  char error_string[128];
+} sMetadata;
 
 /* Exported functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Exported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/

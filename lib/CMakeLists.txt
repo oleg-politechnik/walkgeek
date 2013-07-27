@@ -1,4 +1,4 @@
-set (LIBS_FLAGS " -O3 ")
+set (LIBS_FLAGS " -O0 ")
 
 set (FAT_FS_SOURCES
     fat_fs/ff.c
@@ -31,7 +31,6 @@ set (LIBS_SOURCES ${LIBS_SOURCES}
     mm/mm_initialize.c
     mm/mm_mallinfo.c
     mm/mm_malloc.c
-    mm/mm_memalign.c
     mm/mm_realloc.c
     mm/mm_sem.c
     mm/mm_shrinkchunk.c
@@ -63,8 +62,6 @@ if(USE_MP3)
   set_source_files_properties(${MP3_SOURCES} PROPERTIES COMPILE_FLAGS
       "-Wno-unused-but-set-variable ${LIBS_FLAGS}" )
 endif()
-
-set (LIBS_SOURCES ${LIBS_SOURCES} ${MP3_SOURCES})
 
 # Opus stuff
 add_definitions(-DHAVE_CONFIG_H)

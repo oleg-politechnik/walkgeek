@@ -89,7 +89,7 @@
 #define configUSE_TICK_HOOK				1
 #define configCPU_CLOCK_HZ				( SystemCoreClock )
 #define configTICK_RATE_HZ				( ( portTickType ) 1000 )
-#define configMAX_PRIORITIES			( ( unsigned portBASE_TYPE ) 5 )
+#define configMAX_PRIORITIES			( ( unsigned portBASE_TYPE ) 16 )
 #define configMINIMAL_STACK_SIZE		( ( unsigned short ) 130 )
 #define configTOTAL_HEAP_SIZE			( ( size_t ) ( 75 * 1024 ) )
 #define configMAX_TASK_NAME_LEN			( 64 )
@@ -112,7 +112,6 @@
 
 /* Software timer definitions. */
 #define configUSE_TIMERS				1
-#define configTIMER_TASK_PRIORITY		( 2 )
 #define configTIMER_QUEUE_LENGTH		10
 #define configTIMER_TASK_STACK_DEPTH	( configMINIMAL_STACK_SIZE * 2 )
 
@@ -173,5 +172,23 @@ standard names. */
 #define configIRQ_PRIORITY_USB				(configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY + 3)
 #define configIRQ_PRIORITY_DISP			(configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY + 4)
 #define configIRQ_PRIORITY_ADC				(configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY + 5)
+
+#define mainINIT_TASK_PRIORITY			( tskIDLE_PRIORITY + 1 )
+#define mainINIT_TASK_STACK_SIZE		( configMINIMAL_STACK_SIZE * 30 )
+
+#define mainUI_TASK_STACK_SIZE			( configMINIMAL_STACK_SIZE * 30 )
+#define mainUI_TASK_PRIORITY			( tskIDLE_PRIORITY + 2 )
+
+#define mainPLAYER_TASK_STACK_SIZE		( configMINIMAL_STACK_SIZE * 50 )
+#define mainPLAYER_TASK_PRIORITY		( tskIDLE_PRIORITY + 3 )
+
+#define mainSYSTEM_STATE_QUEUE_SIZE		( 2 )
+
+#define taskDECODER_STACK_SIZE			( configMINIMAL_STACK_SIZE * 30 )
+#define taskDECODER_PRIORITY			( tskIDLE_PRIORITY + 4 )
+#define taskDECODER_COMMAND_QUEUE_LENGTH	( 20 )
+#define taskDECODER_COMMAND_QUEUE_TIMEOUT	( 1000 / portTICK_RATE_MS )
+
+#define configTIMER_TASK_PRIORITY   ( tskIDLE_PRIORITY + 2 )
 
 #endif /* FREERTOS_CONFIG_H */

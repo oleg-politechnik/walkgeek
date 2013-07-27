@@ -42,6 +42,8 @@ set (SOURCES
 #    src/player/wav_decoder.c
     src/player/opus_decoder.c
     src/player/player.c
+    src/player/decoder.c
+    src/player/mediafile.c
     src/navigator.c
     src/nestedfilter.c
     src/ui.c

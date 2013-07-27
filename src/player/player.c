@@ -26,6 +26,9 @@
  */
 
 /* Includes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+#include <inttypes.h>
+#include <stdio.h>
+
 #include "FreeRTOS.h"
 #include "queue.h"
 #include "task.h"
@@ -37,42 +40,54 @@
 #include "opus_decoder.h"
 #include "mp3_decoder.h"
 #include "minIni.h"
-#include "../../bsp/stm32f4_discovery/stm324xg_eval_sdio_sd.h"
+#include "decoder.h"
 
 /* Imported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private define ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private typedef ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+typedef struct
+{
+  ePlayerCommand cmd;
+  int arg;
+} sPlayerCommand;
+
 /* Private macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private function prototypes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 static void Player_SaveState(void);
-static void Player_SyncCommand(ePlayerCommand cmd, s32 arg);
-/*static */void Player_Init(void);
+static void Player_SyncCommand(ePlayerCommand cmd, signed portBASE_TYPE arg);
+static void Player_Init(void);
 static void Player_DeInit(void);
 static void Player_Play(void);
 static void Player_Stop(void);
 
 /* Private variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-static Decoder_Typedef decoders[] =
+static sDecoder decoders[] =
 {
 #ifdef USE_MP3
         {
                 .LoadFile = MP3_LoadFile,
+                .Destroy = MP3_Destroy,
+                .LoadMetadata = MP3_LoadMetadata,
                 .MainThread = MP3_MainThread,
                 .Seek = MP3_Seek,
-                .Stop = MP3_Stop
+                .InitDecoder = MP3_InitDecoder,
         },
 #endif
-        {
-                .LoadFile = OPUS_LoadFile,
-                .MainThread = OPUS_MainThread,
-                .Seek = OPUS_Seek,
-                .Stop = OPUS_Stop
-        },
+        //    {
+        //	.LoadFile = OPUS_LoadFile,
+        //	.Destroy = OPUS_Destroy,
+        //	.LoadMetadata = OPUS_LoadMetadata,
+        //	.MainThread = OPUS_MainThread,
+        //	.Seek = OPUS_Seek,
+        //  .InitDecoder = OPUS_InitDecoder
+        //    },
         {
                 .LoadFile = 0,
+                .Destroy = 0,
+                .LoadMetadata = 0,
                 .MainThread = 0,
                 .Seek = 0,
-                .Stop = 0
+                .InitDecoder = 0
         }
 };
 
@@ -85,39 +100,42 @@ static char *suffixes_white_list[] =
         0
 };
 
-static PlayerStatus_Typedef PlayerStatus;
-PlayerState_Typedef PlayerState;
-
-static Decoder_Typedef *decoder;
+static sPlayerState PlayerState;
 
 static NavigatorContext_Typedef PlayerContext;
 
-static char PlayerErrorString[128];
+static xQueueHandle xPlayerCommandQueue;
 
-xQueueHandle xPlayerCommandQueue;
+static sDecoderContext *pMainDecoderContext;
+static sDecoderContext *pNextDecoderContext;
+
+static xTaskHandle pxDecoderTask;
 
 /* Private functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void prvPlayerTask(void *pvParameters)
 {
   xPlayerCommandQueue = xQueueCreate( 10, sizeof( sPlayerCommand ) );
-  assert_param(xPlayerCommandQueue);
+  configASSERT(xPlayerCommandQueue);
+
+  pMainDecoderContext = pvPortMalloc(sizeof(sDecoderContext));
+  bzero(pMainDecoderContext, sizeof(sDecoderContext));
+  pMainDecoderContext->psMetadata = &PlayerState.metadata;
+  pMainDecoderContext->xCommandQueue = xQueueCreate(taskDECODER_COMMAND_QUEUE_LENGTH, sizeof(sDecoderCommand));
+
+  pNextDecoderContext = pvPortMalloc(sizeof(sDecoderContext));
+  bzero(pNextDecoderContext, sizeof(sDecoderContext));
+  pNextDecoderContext->psMetadata = &PlayerState.metadata;
+  pNextDecoderContext->xCommandQueue = xQueueCreate(taskDECODER_COMMAND_QUEUE_LENGTH, sizeof(sDecoderCommand));
 
   while (1)
   {
     sPlayerCommand command;
-    if (xQueueReceive(xPlayerCommandQueue, &(command), (portTickType) 1)) //todo give from ISR
+    if (xQueueReceive(xPlayerCommandQueue, &(command), portMAX_DELAY))
     {
       Player_SyncCommand(command.cmd, command.arg);
     }
 
-    if (PlayerStatus == PS_PLAYING)
-    {
-      decoder->MainThread();
-
-      Audio_PeriodicKick();
-    }
-
-    if (PlayerStatus == PS_PLAYING || PlayerStatus == PS_SEEKING)
+    if (PlayerState.status == PS_PLAYING || PlayerState.status == PS_SEEKING)
     {
       if (PlayerState.metadata.time_curr != PlayerState.metadata.mstime_curr
               / 1000)
@@ -130,12 +148,9 @@ void prvPlayerTask(void *pvParameters)
   }
 }
 
-#include <inttypes.h>
-#include <stdio.h>
-
 void Player_Init(void)
 {
-  assert_param(PlayerStatus == PS_DEINITED);
+  assert_param(PlayerState.status == PS_DEINITED);
 
   Navigator_Init();
 
@@ -145,7 +160,7 @@ void Player_Init(void)
 
   Navigator_InitRoot(&PlayerContext, suffixes_white_list);
 
-  char buf[256];
+  char buf[MAX_FILE_PATH];
 
   int len;
   len = ini_gets("file", "path", "", buf, sizeof(buf), PLAYER_INI_FILE);
@@ -166,13 +181,13 @@ void Player_Init(void)
     }
   }
 
-  SetVariable(VAR_PlayerState, PlayerStatus, PS_STOPPED);
+  SetVariable(VAR_PlayerState, PlayerState.status, PS_STOPPED);
 
   if (PlayerContext.fname)
   {
     Player_Play();
 
-    if (PlayerStatus == PS_PLAYING)
+    if (PlayerState.status == PS_PLAYING)
     {
       unsigned int mstime = ini_getl("file", "mstime", 0, PLAYER_INI_FILE);
 
@@ -204,64 +219,129 @@ void Player_Init(void)
 
 void Player_DeInit(void)
 {
-  assert_param(PlayerStatus != PS_DEINITED);
+  assert_param(PlayerState.status != PS_DEINITED);
 
   Player_Stop();
 
   Navigator_DeInit();
 
-  SetVariable(VAR_PlayerState, PlayerStatus, PS_DEINITED);
+  SetVariable(VAR_PlayerState, PlayerState.status, PS_DEINITED);
 }
 
 void Player_Play(void)
 {
-  assert_param(PlayerStatus == PS_STOPPED);
+  assert_param(PlayerState.status == PS_STOPPED);
 
-  CPU_InitUserHeap();
-
-  memset(&PlayerState, 0, sizeof(PlayerState));
+  bzero(&PlayerState.metadata, sizeof(PlayerState.metadata));
 
   if (PlayerContext.fname)
   {
     assert_param(PlayerContext.suffix_ix >= 0);
     assert_param((unsigned) PlayerContext.suffix_ix < SIZE_OF(decoders) - 1);
 
-    decoder = &decoders[PlayerContext.suffix_ix];
-
-    snprintf(PlayerState.metadata.file_name,
-            sizeof(PlayerState.metadata.file_name), "%s/%s",
+    snprintf(pMainDecoderContext->pcFilePath,
+            sizeof(pMainDecoderContext->pcFilePath), "%s/%s",
             PlayerContext.dir_path, PlayerContext.fname);
 
-    trace("player: loading %s\n", PlayerState.metadata.file_name);
-
-    decoder->LoadFile(PlayerState.metadata.file_name);
-
-    if (PlayerStatus == PS_STOPPED)
+    if (pMainDecoderContext->pDecoderData)
     {
-      SetVariable(VAR_PlayerState, PlayerStatus, PS_PLAYING);
-      Audio_CommandSync(AC_PLAY);
+      configASSERT(pNextDecoderContext->pDecoder);
+      Decoder(pNextDecoderContext)->Destroy(pNextDecoderContext);
     }
+
+    if (pxDecoderTask)
+    {
+      vTaskDelete(pxDecoderTask);
+      pxDecoderTask = NULL;
+    }
+
+    if (pNextDecoderContext->pDecoderData && !strcmp(pMainDecoderContext->pcFilePath,
+            pNextDecoderContext->pcFilePath))
+    {
+      trace("player: use cached %s\n", pNextDecoderContext->pcFilePath);
+      configASSERT(pNextDecoderContext->pDecoder == &decoders[PlayerContext.suffix_ix]);
+
+      /* Swap contexts */
+      sDecoderContext *pTempDecoderContext = pMainDecoderContext;
+      pMainDecoderContext = pNextDecoderContext;
+      pNextDecoderContext = pTempDecoderContext;
+    }
+    else
+    {
+      trace("player: loading %s\n", pMainDecoderContext->pcFilePath);
+
+      pMainDecoderContext->pDecoder = &decoders[PlayerContext.suffix_ix];
+
+      if (Decoder(pMainDecoderContext)->LoadFile(pMainDecoderContext) != FUNC_SUCCESS)
+      {
+        Player_SyncCommand(PC_AUDIO_FILE_ERROR, 0);
+        return;
+      }
+    }
+
+    signed portBASE_TYPE xReturn;
+
+    /* Start playing current track ASAP */
+    if (pMainDecoderContext->pDecoderData)
+    {
+      SetVariable(VAR_PlayerState, PlayerState.status, PS_PLAYING);
+
+      xReturn = xTaskCreate(prvDecoderTask, (signed portCHAR *) "Decoder", taskDECODER_STACK_SIZE, pMainDecoderContext, taskDECODER_PRIORITY, &pxDecoderTask);
+      configASSERT(xReturn == pdPASS);
+    }
+
+    /* Load metadata for the current track */
+    pNextDecoderContext->pDecoder = pMainDecoderContext->pDecoder;
+    strncpy(pNextDecoderContext->pcFilePath, pMainDecoderContext->pcFilePath,
+            sizeof(pMainDecoderContext->pcFilePath));
+    xReturn = Decoder(pNextDecoderContext)->LoadFile(pNextDecoderContext);
+    configASSERT(xReturn == FUNC_SUCCESS);
+
+    Decoder(pNextDecoderContext)->LoadMetadata(pNextDecoderContext);
+
+    SyncVariable(VAR_Metadata);
+
+    Decoder(pNextDecoderContext)->Destroy(pNextDecoderContext);
+
+    /* Pre-cache next file */
+    Navigator_NextFile(&PlayerContext);
+
+    //todo store max time when pre-caching
+
+    if (PlayerContext.fname)
+    {
+      assert_param(PlayerContext.suffix_ix >= 0);
+      assert_param((unsigned) PlayerContext.suffix_ix < SIZE_OF(decoders) - 1);
+
+      snprintf(pNextDecoderContext->pcFilePath,
+              sizeof(pMainDecoderContext->pcFilePath), "%s/%s",
+              PlayerContext.dir_path, PlayerContext.fname);
+
+      trace("player: pre-caching %s\n", pNextDecoderContext->pcFilePath);
+
+      pNextDecoderContext->pDecoder = &decoders[PlayerContext.suffix_ix];
+
+      if (Decoder(pNextDecoderContext)->LoadFile(pNextDecoderContext) != FUNC_SUCCESS)
+      {
+        Decoder(pNextDecoderContext)->Destroy(pNextDecoderContext);
+      }
+    }
+
+    Navigator_PrevFile(&PlayerContext);
   }
 }
 
 void Player_Stop(void)
 {
-  if (PlayerStatus >= PS_PLAYING)
+  if (PlayerState.status >= PS_PLAYING)
   {
-    if (decoder)
-    {
-      decoder->Stop();
-    }
-
-    trace("player: stopped\n");
-
     Audio_CommandSync(AC_STOP);
-
-    SetVariable(VAR_PlayerState, PlayerStatus, PS_STOPPED);
+    SetVariable(VAR_PlayerState, PlayerState.status, PS_STOPPED);
+    trace("player: stopped\n");
   }
 }
 
-void Player_AsyncCommand(ePlayerCommand cmd, s32 arg)
+void Player_AsyncCommand(ePlayerCommand cmd, int arg)
 {
   sPlayerCommand command;
   command.cmd = cmd;
@@ -270,7 +350,7 @@ void Player_AsyncCommand(ePlayerCommand cmd, s32 arg)
   xQueueSend( xPlayerCommandQueue, ( void * ) &command, portMAX_DELAY );
 }
 
-void Player_AsyncCommandFromISR(ePlayerCommand cmd, s32 arg)
+void Player_AsyncCommandFromISR(ePlayerCommand cmd, int arg)
 {
   portBASE_TYPE xHigherPriorityTaskWoken = pdFALSE;
   sPlayerCommand command;
@@ -286,9 +366,7 @@ void Player_AsyncCommandFromISR(ePlayerCommand cmd, s32 arg)
 
 void Player_Next(void)
 {
-  assert_param(PlayerStatus >= PS_STOPPED);
-
-  Player_Stop();
+  assert_param(PlayerState.status >= PS_STOPPED);
 
   trace("\n\nplayer: next\n");
 
@@ -306,9 +384,7 @@ void Player_Next(void)
 
 void Player_Prev(void)
 {
-  assert_param(PlayerStatus >= PS_STOPPED);
-
-  Player_Stop();
+  assert_param(PlayerState.status >= PS_STOPPED);
 
   trace("player: prev\n");
 
@@ -319,12 +395,15 @@ void Player_Prev(void)
   }
   else
   {
+    Audio_CommandSync(AC_PAUSE);
     trace("Player: Cannot switch to the previous file\n");
   }
 }
 
-void Player_SyncCommand(ePlayerCommand cmd, s32 arg)
+void Player_SyncCommand(ePlayerCommand cmd, signed portBASE_TYPE arg)
 {
+  u32 mstime_curr;
+
   switch (cmd)
   {
     case PC_INIT:
@@ -368,25 +447,24 @@ void Player_SyncCommand(ePlayerCommand cmd, s32 arg)
       break;
 
     case PC_SEEK:
-      if (PlayerStatus < PS_PLAYING)
+      if (PlayerState.status < PS_PLAYING)
         break;
 
-      assert_param(decoder->Seek);
+      mstime_curr = PlayerState.metadata.mstime_curr;
 
       if (arg == 0)
       {
-        Audio_CommandSync(AC_PLAY);
-        SetVariable(VAR_PlayerState, PlayerStatus, PS_PLAYING);
+        //        Audio_CommandSync(AC_PLAY);
+        SetVariable(VAR_PlayerState, PlayerState.status, PS_PLAYING);
+        Decoder_AsyncCommand(DC_END_SEEKING, 0);
         break;
       }
 
-      SetVariable(VAR_PlayerState, PlayerStatus, PS_SEEKING);
-      Audio_CommandSync(AC_PAUSE);
-      Audio_CommandSync(AC_RESET_BUFFERS);
+      SetVariable(VAR_PlayerState, PlayerState.status, PS_SEEKING);
 
       if (arg > 0)
       {
-        if (PlayerState.metadata.mstime_curr + arg
+        if (mstime_curr + arg
                 > PlayerState.metadata.mstime_max)
         {
           Player_Next();
@@ -395,27 +473,31 @@ void Player_SyncCommand(ePlayerCommand cmd, s32 arg)
       }
       else if (arg < 0)
       {
-        if (PlayerState.metadata.mstime_curr < (u32) -arg)
+        if (mstime_curr < (u32) -arg)
         {
           arg += (PlayerState.metadata.mstime_curr);
 
           Player_Prev();
 
-          if (PlayerStatus == PS_PLAYING)
-          {
-            Player_AsyncCommand(PC_SEEK,
-                    PlayerState.metadata.mstime_max + arg);
-          }
+          //          if (PlayerState.status == PS_PLAYING)
+          //          {
+          //            Player_AsyncCommand(PC_SEEK,
+          //                    PlayerState.metadata.mstime_max + arg);
+          //          }
 
           break;
         }
       }
 
-      decoder->Seek(PlayerState.metadata.mstime_curr + arg);
+      Decoder_AsyncCommand(DC_SEEK, mstime_curr + arg);
       break;
 
     case PC_SAVE_CURRENT_DIR:
       Player_SaveState();
+      break;
+
+    case PC_AUDIO_FILE_ERROR:
+      SetVariable(VAR_PlayerState, PlayerState.status, PS_ERROR_FILE);
       break;
 
     default:
@@ -423,17 +505,15 @@ void Player_SyncCommand(ePlayerCommand cmd, s32 arg)
   }
 }
 
-PlayerState_Typedef *Player_GetState(void)
+bool Player_IsSeekable(void)
+{
+  return (PlayerState.status > PS_STOPPED && PlayerState.metadata.mstime_max > 0);
+}
+
+sPlayerState *Player_GetState(void)
 {
   return &PlayerState;
 }
-
-PlayerStatus_Typedef Player_GetStatus(void)
-{
-  return PlayerStatus;
-}
-
-/* Utils **********************************************************************/
 
 void Player_SaveState(void)
 {
@@ -462,18 +542,4 @@ void Player_SaveState(void)
   f_truncate(&f);
   f_sync(&f);
   f_close(&f);
-}
-
-void Player_AudioFileError(char *error)
-{
-  trace("Player ERROR: %s", error);
-
-  strncpy(PlayerErrorString, error, sizeof(PlayerErrorString));
-
-  SetVariable(VAR_PlayerState, PlayerStatus, PS_ERROR_FILE);
-}
-
-char *Player_GetErrorString(void)
-{
-  return PlayerErrorString;
 }

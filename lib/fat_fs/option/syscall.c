@@ -10,7 +10,7 @@
 
 #if _FS_REENTRANT
 /*------------------------------------------------------------------------*/
-/* Create a Synchronization Object
+/* Create a Synchronization Object */
 /*------------------------------------------------------------------------*/
 /* This function is called in f_mount function to create a new
 /  synchronization object, such as semaphore and mutex. When a zero is
@@ -61,6 +61,8 @@ int ff_del_syncobj (	/* TRUE:Function succeeded, FALSE:Could not delete due to a
 
 //	OSMutexDel(sobj, OS_DEL_ALWAYS, &err);	/* uC/OS-II */
 //	ret = (err == OS_NO_ERR);
+//fixme: what if tasks are pending
+	vSemaphoreDelete(sobj);
 
 	ret = 1;					/* FreeRTOS (nothing to do) */
 

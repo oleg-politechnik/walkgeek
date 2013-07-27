@@ -45,6 +45,8 @@ typedef enum
   VAR_AudioPosition,
   VAR_Audio_NeglectedDMA_Count,
 
+  VAR_Metadata,
+
   VAR_BatteryState,
 
   VAR_MSC_Speed,

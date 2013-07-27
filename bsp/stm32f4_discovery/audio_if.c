@@ -28,6 +28,7 @@
 /* Includes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 #include "FreeRTOS.h"
 #include "semphr.h"
+#include "task.h"
 
 #include "audio_if.h"
 #include "bsp.h"
@@ -58,7 +59,7 @@ static const u8 log_table[] =
 /* Private function prototypes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 static FuncResult Audio_Init(u32 AudioFreq);
 static u32 ConvertVolume(u32 NewVolume);
-static FuncResult FeedDMA(void);
+static FuncResult FeedDMA(AudioBuffer_Typedef *buffer);
 static FuncResult Audio_DoCommand(AudioCommand_Typedef cmd);
 
 void AudioBuffer_Init(void);
@@ -263,7 +264,7 @@ FuncResult Audio_ChangeVolume(s8 delta) //todo async
 
 FuncResult Audio_PeriodicKick(void)
 {
-  FuncResult fr = FUNC_SUCCESS;
+  FuncResult fr = FUNC_NOT_SUCCESS;
 
   if (AudioState == AS_ERROR)
     return FUNC_ERROR;
@@ -272,7 +273,11 @@ FuncResult Audio_PeriodicKick(void)
 
   if (DMA_Starving_Flag && !AudioBuffer_TryGetProducer())
   {
-    fr = FeedDMA();
+    AudioBuffer_Typedef *buffer = AudioBuffer_TryGetConsumer();
+    if (buffer)
+    {
+      fr = FeedDMA(buffer);
+    }
   }
 
   vPortExitCritical();
@@ -309,60 +314,51 @@ void EVAL_AUDIO_TransferComplete_CallBack(uint32_t pBuffer, uint32_t Size)
     AudioBuffer_MoveConsumer();
   }
 
-  if (AudioState == AS_PLAYING && FeedDMA() != FUNC_SUCCESS)
+  if (AudioState == AS_PLAYING)
   {
-    NeglectedDMA_Count++;
-
-    Audio_DoCommand(AC_SUSPEND);
+    AudioBuffer_Typedef *buffer = AudioBuffer_TryGetConsumer();
+    if (!(buffer && FeedDMA(buffer) == FUNC_SUCCESS))
+    {
+      NeglectedDMA_Count++;
+      Audio_DoCommand(AC_SUSPEND);
+    }
   }
 
   vPortExitCritical();
-
-  Player_AsyncCommandFromISR(PC_NEED_MORE_DATA, 0);
 }
 
-FuncResult FeedDMA(void) //todo
+FuncResult FeedDMA(AudioBuffer_Typedef *buffer)
 {
-  AudioBuffer_Typedef *buffer;
+  configASSERT(buffer);
 
-#ifdef PROFILING
-  return FUNC_SUCCESS;
-#endif
-
-  buffer = AudioBuffer_TryGetConsumer();
-  if (buffer)
+  if (buffer->sampling_freq != SampleRate)
   {
-    if (buffer->sampling_freq != SampleRate)
-    {
-      trace("New sampling freq: %u (was %u)\n",
-              (unsigned int) buffer->sampling_freq,
-              (unsigned int) SampleRate);
+    trace("New sampling freq: %u (was %u)\n",
+	(unsigned int) buffer->sampling_freq,
+	(unsigned int) SampleRate);
 
-      FuncResult fr = Audio_Init(buffer->sampling_freq);
+    FuncResult fr = Audio_Init(buffer->sampling_freq);
 
-      if (fr != FUNC_SUCCESS)
-        return fr;
-    }
-
-    if (AudioState == AS_PAUSED)
-    {
-      if (EVAL_AUDIO_PauseResume(AUDIO_RESUME/*, (uint32_t) buffer->data, buffer->size * 2*/) != 0)
-      {
-        Audio_Error();
-        return FUNC_ERROR;
-      }
-    }
-//    else
-    {
-      Audio_MAL_Play((uint32_t) buffer->data, buffer->size * 2);
-//      ();
-    }
-
-    DMA_Starving_Flag = false;
-    SetVariable(VAR_AudioStatus, AudioState, AS_PLAYING);
-
-    return FUNC_SUCCESS;
+    if (fr != FUNC_SUCCESS)
+      return fr;
   }
 
-  return FUNC_NOT_SUCCESS;
+  if (AudioState == AS_PAUSED)
+  {
+    if (EVAL_AUDIO_PauseResume(AUDIO_RESUME/*, (uint32_t) buffer->data, buffer->size * 2*/) != 0)
+    {
+      Audio_Error();
+      return FUNC_ERROR;
+    }
+  }
+  //    else
+  {
+    Audio_MAL_Play((uint32_t) buffer->data, buffer->size * 2);
+    //      ();
+  }
+
+  DMA_Starving_Flag = false;
+  SetVariable(VAR_AudioStatus, AudioState, AS_PLAYING);
+
+  return FUNC_SUCCESS;
 }

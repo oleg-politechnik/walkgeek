@@ -48,26 +48,8 @@ typedef struct
 {
   MediaFileState_Typedef state;
 
-  /* global indexes */
-  int total_media_files;
-  int current_media_file_index;
-
-  /* current dir */
-  DIR dir;
-  //  u32 path_indexes[PLAYER_MAX_DIR_DEPTH];
-  u32 path_depth;
-
-  int total_media_files_dir;
-  int current_media_file_index_dir;
-
   /* current file */
   FIL file;
-  int file_index;
-
-  /* decoding */
-  u32 data_start;
-  u32 framesize;//todo VBR??
-  u32 maxframe;
 
   /* file buffer */
   u32 buf_offset;

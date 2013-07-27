@@ -241,7 +241,7 @@ void BSP_InitPowerManager(void)
 
   ADC_DMA_Config();
 
-  xADCTimer = xTimerCreate("ADC Timer", 10 / portTICK_RATE_MS, pdTRUE,
+  xADCTimer = xTimerCreate((signed char *) "ADC Timer", 10 / portTICK_RATE_MS, pdTRUE,
     (void *) BSP_StartADC, BSP_StartADC);
   xTimerStart(xADCTimer, configTIMER_API_TIMEOUT_TICKS);
 #endif

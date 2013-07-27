@@ -39,6 +39,6 @@
 FuncResult WAV_FastFileCheck(const char *fname);
 FuncResult WAV_TryFile(MediaFile_Typedef *mfile);
 FuncResult WAV_Decode(MediaFile_Typedef *mfile, AudioBuffer_Typedef *audio_buf);
-FuncResult WAV_Seek(MediaFile_Typedef *mfile, s32 msec);
+FuncResult WAV_Seek(MediaFile_Typedef *mfile, signed portBASE_TYPE msec);
 
 #endif /* WAV_DECODER_H_ */

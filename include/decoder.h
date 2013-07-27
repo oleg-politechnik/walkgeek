@@ -1,7 +1,7 @@
 /*
- * scheduler.h
+ * decoder.h
  *
- * Copyright (c) 2012, Oleg Tsaregorodtsev
+ * Copyright (c) 2013, Oleg Tsaregorodtsev
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,29 +25,35 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef SCHEDULER_H_
-#define SCHEDULER_H_
+#ifndef DECODER_H_
+#define DECODER_H_
 
-/* Includes ------------------------------------------------------------------*/
-#include "common.h"
+/* Includes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+#include "types.h"
 
-/* Exported constants --------------------------------------------------------*/
-#define SCHEDULER_MS_GRANULARITY 10
-
-/* Exported types ------------------------------------------------------------*/
+/* Public defines ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+/* Public types ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 typedef enum
 {
-  REPEAT,
-  NO_REPEAT
-} RepeatPolicy;
+  DC_SEEK,
+  DC_END_SEEKING,
+  DC_MAX
+} eDecoderCommand;
 
-/* Exported macro ------------------------------------------------------------*/
-/* Exported functions ------------------------------------------------------- */
-void Scheduler_Reset(void);
-FuncResult Scheduler_PutTask(u32 timeout_ms, void(*callback)(void),
-        RepeatPolicy repeat);
-void Scheduler_RemoveTask(void(*callback)(void));
-void RAM_FUNC Scheduler_1msCycle(void);
+typedef struct
+{
+  eDecoderCommand cmd;
+  u32 ms_absolute_offset;
+} sDecoderCommand;
 
-#endif /* SCHEDULER_H_ */
+/* Public constants ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+/* Public variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+/* Public macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+/* Public functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+void prvDecoderTask(void *pDecoderContext);
+
+void Decoder_AsyncCommand(eDecoderCommand cmd, u32 ms_absolute_offset);
+
+/* Public static inline functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+#endif /* DECODER_H_ */

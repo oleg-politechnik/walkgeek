@@ -1,7 +1,7 @@
 /*
  * mp3_decoder.h
  *
- * Copyright (c) 2012, Oleg Tsaregorodtsev
+ * Copyright (c) 2012, 2013, Oleg Tsaregorodtsev
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,9 +37,13 @@
 /* Exported types ------------------------------------------------------------*/
 /* Exported macro ------------------------------------------------------------*/
 /* Exported functions ------------------------------------------------------- */
-void MP3_LoadFile(char *filepath);
-void MP3_MainThread(void);
-void MP3_Seek(u32 msec);
-void MP3_Stop(void);
+FuncResult MP3_LoadFile(sDecoderContext *psDecoderContext);
+FuncResult MP3_LoadMetadata(sDecoderContext *psDecoderContext);
+
+FuncResult MP3_InitDecoder(sDecoderContext *psDecoderContext);
+FuncResult MP3_MainThread(sDecoderContext *psDecoderContext);
+FuncResult MP3_Seek(sDecoderContext *psDecoderContext, u32 ms_absolute_offset);
+
+void MP3_Destroy(sDecoderContext *psDecoderContext);
 
 #endif /* MP3_DECODER_H_ */

@@ -30,8 +30,8 @@
 #include "player.h"
 
 extern USBH_Usr_cb_TypeDef USR_Callbacks;
-extern PlayerStatus_Typedef PlayerStatus;
-extern PlayerState_Typedef PlayerState;
+extern ePlayerStatus PlayerStatus;
+extern sPlayerState PlayerState;
 
 /** @addtogroup STM32F4-Discovery_Audio_Player_Recorder
   * @{

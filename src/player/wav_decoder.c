@@ -290,7 +290,7 @@ FuncResult WAV_Decode(MediaFile_Typedef *mfile, AudioBuffer_Typedef *audio_buf)
   return FUNC_SUCCESS;
 }
 
-FuncResult WAV_Seek(MediaFile_Typedef *mfile, s32 msec)
+FuncResult WAV_Seek(MediaFile_Typedef *mfile, signed portBASE_TYPE msec)
 {
 //  //  if (audio_buf->size != 0)
 //  //    return FR_SUCCESS;

@@ -1,7 +1,7 @@
 /*
- * nestedfilter.c
+ * decoder.c
  *
- * Copyright (c) 2012, Oleg Tsaregorodtsev
+ * Copyright (c) 2013, Oleg Tsaregorodtsev
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,72 +27,87 @@
 
 /* Includes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 #include "FreeRTOS.h"
+#include "queue.h"
+#include "task.h"
 
-#include "nestedfilter.h"
+#include "decoder.h"
+#include "player.h"
+#include "audio_if.h"
 
 /* Imported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private define ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private typedef ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-/* Private variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private function prototypes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+/* Private variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+static sDecoderContext *ctx;
+
 /* Private functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-NestedFilterSet_Typedef *NestedFilter_Init(u8 filter_count,
-        u8 filter_buffer_size)
-{
-  int i;
-  NestedFilterSet_Typedef *nfs = pvPortMalloc(sizeof(NestedFilterSet_Typedef));
-  nfs->count = filter_count;
-  nfs->filters = pvPortMalloc(sizeof(NestedFilter_Typedef) * filter_count);
 
-  for (i = 0; i < filter_count; i++)
+void prvDecoderTask(void *pDecoderContext)
+{
+  u32 last_mstime_curr = 0;
+  int mstime_delta;
+  bool enter_seeking;
+
+  ctx = (sDecoderContext *) pDecoderContext;
+  sDecoderCommand command;
+  sPlayerState *state;
+
+  CPU_InitUserHeap();
+
+  Decoder(ctx)->InitDecoder(ctx);
+
+  while (1)
   {
-    nfs->filters[i].size = filter_buffer_size;
-    nfs->filters[i].pos = 0;
-    nfs->filters[i].buf = pvPortMalloc(sizeof(nfpoint_t) * filter_buffer_size);
-    memset(nfs->filters[i].buf, 0, sizeof(nfpoint_t) * filter_buffer_size);
+    Decoder(ctx)->MainThread(ctx);
+
+//    Audio_CommandSync(AC_PLAY);
+
+    if (xQueueReceive(ctx->xCommandQueue, &(command), 0))
+    {
+      while (1)
+      {
+        if (command.cmd == DC_END_SEEKING)
+        {
+          Audio_CommandSync(AC_RESET_BUFFERS);
+          Decoder(ctx)->Seek(ctx, ctx->psMetadata->mstime_curr);
+          break;
+        }
+        else if (command.cmd == DC_SEEK)
+        {
+          Audio_CommandSync(AC_PAUSE);
+          configASSERT(command.cmd <= ctx->psMetadata->mstime_max);
+          ctx->psMetadata->mstime_curr = command.cmd;
+        }
+
+        command.cmd = DC_MAX;
+        xQueueReceive(ctx->xCommandQueue, &(command), portMAX_DELAY);
+      }
+    }
+
+    vTaskDelay(10); //todo rework async buffer
+/*
+    state = Player_GetState();
+
+    if (state->status == PS_PLAYING || state->status == PS_SEEKING)
+    {
+      if (state->metadata.time_curr != state->metadata.mstime_curr / 1000)
+      {
+        SetVariable(VAR_AudioPosition, state->metadata.time_curr,
+                state->metadata.mstime_curr / 1000);
+      }
+    }
+
+    Audio_PeriodicKick();*/
   }
-
-  return nfs;
 }
 
-void NestedFilter_AddMeasure(NestedFilterSet_Typedef *nfs, nfpoint_t p, VAR_Index var_ix)
+void Decoder_AsyncCommand(eDecoderCommand cmd, u32 ms_absolute_offset)
 {
-  int filter_ix = 0;
-  u8 i;
-  nfpoint_aggregate_t temp_avg_value;
-  NestedFilter_Typedef *nf;
+  sDecoderCommand command;
+  command.cmd = cmd;
+  command.ms_absolute_offset = ms_absolute_offset;
 
-  do
-  {
-    nf = &nfs->filters[filter_ix];
-
-    nf->buf[nf->pos] = p;
-
-    nf->pos++;
-    if (nf->pos < nf->size)
-    {
-      return;
-    }
-
-    nf->pos = 0;
-    temp_avg_value = 0;
-    for (i = 0; i < nf->size; i++)
-    {
-      temp_avg_value += nf->buf[i];
-    }
-
-    temp_avg_value /= nf->size;
-
-    p = temp_avg_value;
-
-    filter_ix++;
-  } while (filter_ix < nfs->count);
-
-  SetVariable(var_ix, nfs->value, temp_avg_value);
-}
-
-nfpoint_t NestedFilter_GetValue(NestedFilterSet_Typedef *nfs)
-{
-  return nfs->value;
+  xQueueSend( ctx->xCommandQueue, ( void * ) &command, taskDECODER_COMMAND_QUEUE_TIMEOUT );
 }

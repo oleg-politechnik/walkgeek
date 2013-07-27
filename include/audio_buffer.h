@@ -37,10 +37,10 @@
 /* Exported types ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 typedef struct
 {
-  s16 data[AUDIO_BUFFER_MAX_SIZE];
-  u16 size;
-  u8 channel_count;
-  uint32_t sampling_freq;
+  u16 data[AUDIO_BUFFER_MAX_SIZE];
+  u32 size;
+  u32 channel_count;
+  u32 sampling_freq;
 } AudioBuffer_Typedef;
 
 /* Exported functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/

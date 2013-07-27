@@ -52,4 +52,6 @@
 # define ENABLE_TRACE                        1
 #endif
 
+#define MAX_FILE_PATH				256
+
 #endif /* SOFTWARE_CONF_H_ */
