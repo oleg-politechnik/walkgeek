@@ -187,10 +187,8 @@ static FuncResult Audio_DoCommand(AudioCommand_Typedef cmd)
 
       /* Process the PAUSE command ---------------------------*/
     case AC_RESET_BUFFERS:
-      fr = Audio_DoCommand(AC_PAUSE);
-
       AudioBuffer_Init();
-      return fr;
+      return FUNC_SUCCESS;
 
       /* Unsupported command ---------------------------------*/
     default:
@@ -270,14 +268,11 @@ FuncResult Audio_PeriodicKick(void)
     return FUNC_ERROR;
 
   vPortEnterCritical();
+  AudioBuffer_Typedef *buffer;
 
-  if (DMA_Starving_Flag && !AudioBuffer_TryGetProducer())
+  if (DMA_Starving_Flag && (buffer = AudioBuffer_TryGetConsumer())/*!AudioBuffer_TryGetProducer()*/)
   {
-    AudioBuffer_Typedef *buffer = AudioBuffer_TryGetConsumer();
-    if (buffer)
-    {
-      fr = FeedDMA(buffer);
-    }
+    fr = FeedDMA(buffer);
   }
 
   vPortExitCritical();

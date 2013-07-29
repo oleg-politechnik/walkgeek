@@ -134,17 +134,6 @@ void prvPlayerTask(void *pvParameters)
     {
       Player_SyncCommand(command.cmd, command.arg);
     }
-
-    if (PlayerState.status == PS_PLAYING || PlayerState.status == PS_SEEKING)
-    {
-      if (PlayerState.metadata.time_curr != PlayerState.metadata.mstime_curr
-              / 1000)
-      {
-
-        SetVariable(VAR_AudioPosition, PlayerState.metadata.time_curr,
-                PlayerState.metadata.mstime_curr / 1000);
-      }
-    }
   }
 }
 
@@ -230,7 +219,7 @@ void Player_DeInit(void)
 
 void Player_Play(void)
 {
-  assert_param(PlayerState.status == PS_STOPPED);
+  assert_param(PlayerState.status >= PS_STOPPED);
 
   bzero(&PlayerState.metadata, sizeof(PlayerState.metadata));
 
@@ -245,8 +234,8 @@ void Player_Play(void)
 
     if (pMainDecoderContext->pDecoderData)
     {
-      configASSERT(pNextDecoderContext->pDecoder);
-      Decoder(pNextDecoderContext)->Destroy(pNextDecoderContext);
+      configASSERT(pMainDecoderContext->pDecoder);
+      Decoder(pMainDecoderContext)->Destroy(pMainDecoderContext);
     }
 
     if (pxDecoderTask)
@@ -268,6 +257,12 @@ void Player_Play(void)
     }
     else
     {
+      if (pNextDecoderContext->pDecoderData)
+      {
+        configASSERT(pNextDecoderContext->pDecoder);
+        Decoder(pNextDecoderContext)->Destroy(pNextDecoderContext);
+      }
+
       trace("player: loading %s\n", pMainDecoderContext->pcFilePath);
 
       pMainDecoderContext->pDecoder = &decoders[PlayerContext.suffix_ix];
@@ -288,6 +283,8 @@ void Player_Play(void)
 
       xReturn = xTaskCreate(prvDecoderTask, (signed portCHAR *) "Decoder", taskDECODER_STACK_SIZE, pMainDecoderContext, taskDECODER_PRIORITY, &pxDecoderTask);
       configASSERT(xReturn == pdPASS);
+
+      Audio_CommandSync(AC_PLAY);
     }
 
     /* Load metadata for the current track */
@@ -336,9 +333,18 @@ void Player_Stop(void)
   if (PlayerState.status >= PS_PLAYING)
   {
     Audio_CommandSync(AC_STOP);
+
+    if (pxDecoderTask)
+    {
+      vTaskDelete(pxDecoderTask);
+      pxDecoderTask = NULL;
+    }
+
     SetVariable(VAR_PlayerState, PlayerState.status, PS_STOPPED);
     trace("player: stopped\n");
   }
+
+  configASSERT(!pxDecoderTask);
 }
 
 void Player_AsyncCommand(ePlayerCommand cmd, int arg)
