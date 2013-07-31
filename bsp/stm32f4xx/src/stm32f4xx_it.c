@@ -82,9 +82,9 @@ void HardFault_TopHandler(unsigned int * hardfault_args)
           (*((volatile unsigned long *)(0xE000ED2C))),
           (*((volatile unsigned long *)(0xE000ED30))),
           (*((volatile unsigned long *)(0xE000ED3C))),
-          SCB->SHCSR);
+          (unsigned int) SCB->SHCSR);
 
-  assert_failed(NULL, NULL, str_buf);
+  assert_failed(NULL, 0, str_buf);
 }
 
 void HardFault_Handler(void) __attribute__ ((naked));

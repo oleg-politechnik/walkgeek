@@ -296,9 +296,7 @@ void Player_Play(void)
 
     Decoder(pNextDecoderContext)->LoadMetadata(pNextDecoderContext);
 
-    strncpy(pNextDecoderContext->psMetadata->title,
-	pNextDecoderContext->pcFilePath,
-	sizeof(pNextDecoderContext->psMetadata->title));
+    pNextDecoderContext->psMetadata->file_path = pNextDecoderContext->pcFilePath;
 
     SyncVariable(VAR_Metadata);
 

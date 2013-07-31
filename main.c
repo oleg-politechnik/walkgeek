@@ -78,7 +78,8 @@ static void System_EnterLowPowerModeCallback(xTimerHandle xTimer)
 
 static void prvInitTask(void *pvParameters)
 {
-  xSystemStateQueue = xQueueCreate( mainSYSTEM_STATE_QUEUE_SIZE, sizeof( SystemState_Typedef ) );
+  xSystemStateQueue = xQueueCreate( mainSYSTEM_STATE_QUEUE_SIZE,
+          sizeof( SystemState_Typedef ) );
 
   BSP_Keypad_Init();
 
@@ -109,9 +110,11 @@ static void prvInitTask(void *pvParameters)
     System_SetState(debug_mode ? SS_PLAYER : SS_USB_MSC);
   }
 
-  xTaskCreate(prvUiTask, (signed portCHAR *) "UI", mainUI_TASK_STACK_SIZE, NULL, mainUI_TASK_PRIORITY, NULL);
+  xTaskCreate(prvUiTask, (signed portCHAR *) "UI",
+          mainUI_TASK_STACK_SIZE, NULL, mainUI_TASK_PRIORITY, NULL);
 
-  xTaskCreate(prvPlayerTask, (signed portCHAR *) "Player", mainPLAYER_TASK_STACK_SIZE, NULL, mainPLAYER_TASK_PRIORITY, NULL);
+  xTaskCreate(prvPlayerTask, (signed portCHAR *) "Player",
+          mainPLAYER_TASK_STACK_SIZE, NULL, mainPLAYER_TASK_PRIORITY, NULL);
 
   {
     xEnterLowPowerModeTimer = xTimerCreate(
@@ -218,7 +221,8 @@ int main(void)
 {
   CPU_PreInit();
 
-  xTaskCreate(prvInitTask, (signed portCHAR *) "Init", mainINIT_TASK_STACK_SIZE, NULL, mainINIT_TASK_PRIORITY, NULL);
+  xTaskCreate(prvInitTask, (signed portCHAR *) "Init", mainINIT_TASK_STACK_SIZE,
+          NULL, mainINIT_TASK_PRIORITY, NULL);
 
   /* Start the scheduler. */
   vTaskStartScheduler();

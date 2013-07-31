@@ -231,6 +231,7 @@ static uint32_t Codec_Mute(uint32_t Cmd);
 /* Low layer codec functions */
 static void Codec_CtrlInterface_Init(void);
 static void Codec_CtrlInterface_DeInit(void);
+static void Codec_AudioInterface_Init(uint32_t AudioFreq);
 static void Codec_AudioInterface_DeInit(void);
 static void Codec_Reset(void);
 static uint32_t Codec_WriteRegister(uint8_t RegisterAddr, uint8_t RegisterValue);
@@ -246,7 +247,6 @@ static void Delay(__IO uint32_t nCount);
  MAL (Media Access Layer) functions
  ------------------------------------------*/
 /* Peripherals configuration functions */
-static void Audio_MAL_Init(void);
 static void Audio_MAL_DeInit(void);
 static void Audio_MAL_PauseResume(uint32_t Cmd, uint32_t Addr);
 static void Audio_MAL_Stop(void);
@@ -269,10 +269,6 @@ uint32_t EVAL_AUDIO_Init(uint16_t OutputDevice, uint8_t Volume)
   }
   else
   {
-    /* I2S data transfer preparation:
-     Prepare the Media to be used for the audio transfer from memory to I2S peripheral */
-    Audio_MAL_Init();
-
     /* Return 0 when all operations are OK */
     return 0;
   }
@@ -1211,7 +1207,7 @@ uint32_t Codec_TIMEOUT_UserCallback(void)
  * @param  None
  * @retval None
  */
-static void Audio_MAL_Init(void)
+void Audio_MAL_Init(uint32_t AudioFreq)
 {
 #if defined(AUDIO_MAL_DMA_IT_TC_EN) || defined(AUDIO_MAL_DMA_IT_HT_EN) || defined(AUDIO_MAL_DMA_IT_TE_EN)
   NVIC_InitTypeDef NVIC_InitStructure;
@@ -1264,6 +1260,8 @@ static void Audio_MAL_Init(void)
 
     /* Enable the I2S DMA request */
     SPI_I2S_DMACmd(CODEC_I2S, SPI_I2S_DMAReq_Tx, ENABLE);
+
+    Codec_AudioInterface_Init(AudioFreq);
 }
 
 /**
@@ -1318,10 +1316,10 @@ void Audio_MAL_Play(uint32_t Addr0, uint32_t Addr1, uint32_t Size)
   /* Configure the DMA Stream with the new parameters */
   DMA_Init(AUDIO_MAL_DMA_STREAM, &DMA_InitStructure);
 
-  DMA_DoubleBufferModeConfig(AUDIO_MAL_DMA_STREAM, (uint32_t) Addr1, DMA_Memory_0);
-
-  /* Enable DMA double mode. This function can be called only when the DMA Stream is disabled.*/
-  DMA_DoubleBufferModeCmd(AUDIO_MAL_DMA_STREAM, ENABLE);
+//  DMA_DoubleBufferModeConfig(AUDIO_MAL_DMA_STREAM, (uint32_t) Addr1, DMA_Memory_0);
+//
+//  /* Enable DMA double mode. This function can be called only when the DMA Stream is disabled.*/
+//  DMA_DoubleBufferModeCmd(AUDIO_MAL_DMA_STREAM, ENABLE);
 
   /* Enable the I2S DMA Stream*/
   DMA_Cmd(AUDIO_MAL_DMA_STREAM, ENABLE);

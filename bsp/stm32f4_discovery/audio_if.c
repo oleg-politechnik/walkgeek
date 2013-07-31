@@ -207,15 +207,15 @@ void EVAL_AUDIO_TransferComplete_CallBack(void)
                 (unsigned int) CurrentBuffer->sampling_freq,
                 (unsigned int) SampleRate);
 
-        Codec_AudioInterface_Init(CurrentBuffer->sampling_freq);
+//        Audio_MAL_Init(CurrentBuffer->sampling_freq);
         SetVariable(VAR_AudioPosition, SampleRate, CurrentBuffer->sampling_freq);
         SampleRate = CurrentBuffer->sampling_freq;
       }
 
       if (CurrentBuffer->size != NextBuffer->size)
       {
-        Audio_MAL_Play((uint32_t) CurrentBuffer->data,
-                (uint32_t) NextBuffer->data, CurrentBuffer->size * sizeof(u16));
+//        Audio_MAL_Play((uint32_t) CurrentBuffer->data,
+//                (uint32_t) NextBuffer->data, CurrentBuffer->size * sizeof(u16));
       }
     }
 
@@ -273,8 +273,8 @@ Buffer_Typedef *Audio_GetBuffer(u16 size, u32 sampling_freq)
       vPortFree(ReturnBuffer->data);
     }
     ReturnBuffer->data = pvPortMalloc(size * sizeof(u16));
-    DMA_MemoryTargetConfig(AUDIO_MAL_DMA_STREAM,
-            (uint32_t) ReturnBuffer->data, ReturnBuffer == &Buffers[1] ? DMA_Memory_1 : DMA_Memory_0);
+//    DMA_MemoryTargetConfig(AUDIO_MAL_DMA_STREAM,
+//            (uint32_t) ReturnBuffer->data, ReturnBuffer == &Buffers[1] ? DMA_Memory_1 : DMA_Memory_0);
 
     /*TODO */
     /*
@@ -302,29 +302,32 @@ FuncResult Audio_AppendBuffer(Buffer_Typedef *AppendableBuffer)
 
   AppendableBuffer->full = true;
 
-  if (AudioState == AS_PAUSED)
-  {
-    if (EVAL_AUDIO_PauseResume(AUDIO_RESUME) != 0)
-    {
-      Audio_Error();
-      return FUNC_ERROR;
-    }
-  }
+//  if (AudioState == AS_PAUSED)
+//  {
+//    if (EVAL_AUDIO_PauseResume(AUDIO_RESUME) != 0)
+//    {
+//      Audio_Error();
+//      return FUNC_ERROR;
+//    }
+//  }
 
   if (AudioState == AS_STOPPED)
   {
     configASSERT(AppendableBuffer == CurrentBuffer);
 
-    FuncResult fr = Audio_Init();
-    if (fr != FUNC_SUCCESS)
-    {
-      return fr;
-    }
+//    FuncResult fr = Audio_Init();
+//    if (fr != FUNC_SUCCESS)
+//    {
+//      return fr;
+//    }
 
-    Codec_AudioInterface_Init(AppendableBuffer->sampling_freq);
+    /* I2S data transfer preparation:
+     Prepare the Media to be used for the audio transfer from memory to I2S peripheral */
+//    Audio_MAL_Init(AppendableBuffer->sampling_freq);
+
     SetVariable(VAR_AudioPosition, SampleRate, AppendableBuffer->sampling_freq);
-    Audio_MAL_Play((uint32_t) CurrentBuffer->data, (uint32_t) NextBuffer->data,
-            CurrentBuffer->size * sizeof(u16));
+//    Audio_MAL_Play((uint32_t) CurrentBuffer->data, (uint32_t) NextBuffer->data,
+//            CurrentBuffer->size * sizeof(u16));
   }
 
   SetVariable(VAR_AudioStatus, AudioState, AS_PLAYING);

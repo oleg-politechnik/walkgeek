@@ -94,7 +94,6 @@
 /** @defgroup STM32F4_DISCOVERY_AUDIO_CODEC_Exported_Functions
   * @{
   */
-void Codec_AudioInterface_Init(uint32_t AudioFreq);
 uint32_t EVAL_AUDIO_Init(uint16_t OutputDevice, uint8_t Volume);
 uint32_t EVAL_AUDIO_DeInit(void);
 uint32_t EVAL_AUDIO_PauseResume(uint32_t Cmd);
@@ -102,6 +101,7 @@ uint32_t EVAL_AUDIO_Stop(uint32_t CodecPowerDown_Mode);
 uint32_t EVAL_AUDIO_VolumeCtl(uint8_t Volume);
 uint32_t EVAL_AUDIO_Mute(uint32_t Command);
 void Audio_MAL_Play(uint32_t Addr0, uint32_t Addr1, uint32_t Size);
+void Audio_MAL_Init(uint32_t AudioFreq);
 
 /* User Callbacks: user has to implement these functions in his code if
   they are needed. -----------------------------------------------------------*/

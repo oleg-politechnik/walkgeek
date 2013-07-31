@@ -49,6 +49,8 @@ typedef struct
   char year[5];
   //
   char error_string[128];
+  //
+  char *file_path;
 } sMetadata;
 
 /* Exported functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/

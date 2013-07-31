@@ -655,7 +655,7 @@ void Vibrator_Enable(void)
 
 
 #ifdef  USE_FULL_ASSERT
-void assert_failed(uint8_t* file, uint32_t line, uint8_t* expr)
+void assert_failed(uint8_t* file, uint32_t line, char* expr)
 {
   /* User can add his own implementation to report the file name and line number,
    ex: printf("Wrong parameters value: file %s on line %d\n", file, line) */
@@ -689,16 +689,16 @@ void assert_failed(uint8_t* file, uint32_t line, uint8_t* expr)
     if (BSP_Keypad_GetKeyStatus(KEY_PPP))
     {
       //Delay(10); //todo const
-      delay += 10;
+//      delay += 10;
 
-      if (delay < 1000) //todo const
-      {
+//      if (delay < 1000) //todo const
+//      {
 	BSP_PowerDisable();
-      }
+//      }
     }
     else
     {
-      delay = 0;
+//      delay = 0;
     }
   }
 }
