@@ -48,6 +48,7 @@ typedef enum
   PS_ERROR_FILE,
 
   PS_PLAYING,
+  PS_PAUSED,
   PS_SEEKING,
 
   PS_MAX
@@ -60,6 +61,7 @@ typedef enum
 
   PC_NEXT,
   PC_PREV,
+  PC_PLAY_PAUSE,
 
   PC_DIR_START,
   PC_DIR_END,

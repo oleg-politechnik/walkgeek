@@ -94,21 +94,23 @@
 /** @defgroup STM32F4_DISCOVERY_AUDIO_CODEC_Exported_Functions
   * @{
   */
-void DAC_Config(void);
-
 void Codec_AudioInterface_Init(uint32_t AudioFreq);
+uint32_t EVAL_AUDIO_Init(uint16_t OutputDevice, uint8_t Volume);
+uint32_t EVAL_AUDIO_DeInit(void);
+uint32_t EVAL_AUDIO_PauseResume(uint32_t Cmd);
+uint32_t EVAL_AUDIO_Stop(uint32_t CodecPowerDown_Mode);
+uint32_t EVAL_AUDIO_VolumeCtl(uint8_t Volume);
+uint32_t EVAL_AUDIO_Mute(uint32_t Command);
+void Audio_MAL_Play(uint32_t Addr0, uint32_t Addr1, uint32_t Size);
 
 /* User Callbacks: user has to implement these functions in his code if
   they are needed. -----------------------------------------------------------*/
 
 uint16_t EVAL_AUDIO_GetSampleCallBack(void);
 
-/* This function is called when the requested data has been completely transferred.
-   In Normal mode (when  the define AUDIO_MAL_MODE_NORMAL is enabled) this function
-   is called at the end of the whole audio file.
-   In circular mode (when  the define AUDIO_MAL_MODE_CIRCULAR is enabled) this
+/* In circular mode (when  the define AUDIO_MAL_MODE_CIRCULAR is enabled) this
    function is called at the end of the current buffer transmission. */
-void EVAL_AUDIO_TransferComplete_CallBack(uint32_t pBuffer, uint32_t Size) RAM_FUNC;
+void EVAL_AUDIO_TransferComplete_CallBack(void);
 
 /* This function is called when half of the requested buffer has been transferred
    This callback is useful in Circular mode only (when AUDIO_MAL_MODE_CIRCULAR
@@ -117,7 +119,7 @@ void EVAL_AUDIO_HalfTransfer_CallBack(uint32_t pBuffer, uint32_t Size);
 
 /* This function is called when an Interrupt due to transfer error on or peripheral
    error occurs. */
-void EVAL_AUDIO_Error_CallBack(void* pData);
+void EVAL_AUDIO_Error_CallBack();
 
 /* Codec_TIMEOUT_UserCallback() function is called whenever a timeout condition
    occurs during communication (waiting on an event that doesn't occur, bus

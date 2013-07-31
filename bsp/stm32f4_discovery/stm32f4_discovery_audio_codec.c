@@ -128,7 +128,6 @@
 
 #include "stm32f4_discovery_audio_codec.h"
 #include "stm32f4xx_i2c.h"
-#include "stm32f4xx_dac.h"
 #include "stm32f4xx_spi.h"
 #include "stm32f4xx_rcc.h"
 #include "stm32f4xx_dma.h"
@@ -201,14 +200,9 @@
 DMA_InitTypeDef DMA_InitStructure;
 DMA_InitTypeDef AUDIO_MAL_DMA_InitStructure;
 
-uint32_t AudioTotalSize = 0xFFFF; /* This variable holds the total size of the audio file */
-uint32_t AudioRemSize = 0; /* This variable holds the remaining data in audio file */
-uint16_t *CurrentPos; /* This variable holds the current position of audio pointer */
 __IO uint32_t CODECTimeout = CODEC_LONG_TIMEOUT;
 __IO uint8_t OutputDev = 0;
-//__IO uint32_t CurrAudioInterface = AUDIO_INTERFACE_I2S; //AUDIO_INTERFACE_DAC
 
-//__IO uint8_t CodecIsInPause = 1;
 /**
  * @}
  */
@@ -227,8 +221,7 @@ __IO uint8_t OutputDev = 0;
  Audio Codec functions
  ------------------------------------------*/
 /* High Layer codec functions */
-static uint32_t Codec_Init(uint16_t OutputDevice, uint8_t Volume,
-        uint32_t AudioFreq);
+static uint32_t Codec_Init(uint16_t OutputDevice, uint8_t Volume);
 static uint32_t Codec_DeInit(void);
 static uint32_t Codec_Play(void);
 static uint32_t Codec_PauseResume(uint32_t Cmd);
@@ -267,11 +260,10 @@ static void Audio_MAL_Stop(void);
  * @param  AudioFreq: Audio frequency used to play the audio stream.
  * @retval 0 if correct communication, else wrong communication
  */
-uint32_t EVAL_AUDIO_Init(uint16_t OutputDevice, uint8_t Volume,
-        uint32_t AudioFreq)
+uint32_t EVAL_AUDIO_Init(uint16_t OutputDevice, uint8_t Volume)
 {
   /* Perform low layer Codec initialization */
-  if (Codec_Init(OutputDevice, VOLUME_CONVERT(Volume), AudioFreq) != 0)
+  if (Codec_Init(OutputDevice, VOLUME_CONVERT(Volume)) != 0)
   {
     return 1;
   }
@@ -299,32 +291,6 @@ uint32_t EVAL_AUDIO_DeInit(void)
 
   /* DeInitialize Codec */
   Codec_DeInit();
-
-  return 0;
-}
-
-/**
- * @brief  Starts playing audio stream from a data buffer for a determined size.
- * @param  pBuffer: Pointer to the buffer
- * @param  Size: Number of audio data BYTES.
- * @retval 0 if correct communication, else wrong communication
- */
-uint32_t EVAL_AUDIO_Play(uint16_t* pBuffer, uint32_t Size)
-{
-  /* Set the total number of data to be played (count in half-word) */
-  AudioTotalSize = Size;
-
-  /* Call the audio Codec Play function */
-  Codec_Play();
-
-  /* Update the Media layer and enable it for play */
-  Audio_MAL_Play((uint32_t) pBuffer, (uint32_t)(DMA_MAX(Size/4)));
-
-  /* Update the remaining number of data to be played */
-  AudioRemSize = (Size / 2) - DMA_MAX(AudioTotalSize);
-
-  /* Update the current audio pointer position */
-  CurrentPos = pBuffer + DMA_MAX(AudioTotalSize);
 
   return 0;
 }
@@ -416,66 +382,16 @@ uint32_t EVAL_AUDIO_Mute(uint32_t Cmd)
  */
 void Audio_MAL_IRQHandler(void)
 {
-#ifndef AUDIO_MAL_MODE_NORMAL
-  uint16_t *pAddr = (uint16_t *)CurrentPos;
-  uint32_t Size = AudioRemSize;
-#endif /* AUDIO_MAL_MODE_NORMAL */
-
 #ifdef AUDIO_MAL_DMA_IT_TC_EN
   /* Transfer complete interrupt */
   if (DMA_GetFlagStatus(AUDIO_MAL_DMA_STREAM, AUDIO_MAL_DMA_FLAG_TC) != RESET)
   {
-#ifdef AUDIO_MAL_MODE_NORMAL
-    /* Check if the end of file has been reached */
-    if (AudioRemSize > 0)
-    {
-      /* Wait the DMA Stream to be effectively disabled */
-      while (DMA_GetCmdStatus(AUDIO_MAL_DMA_STREAM) != DISABLE)
-      {
-      }
-
-      /* Clear the Interrupt flag */
-      DMA_ClearFlag(AUDIO_MAL_DMA_STREAM, AUDIO_MAL_DMA_FLAG_TC);
-
-      /* Re-Configure the buffer address and size */
-      DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t) CurrentPos;
-      DMA_InitStructure.DMA_BufferSize = (uint32_t)(DMA_MAX(AudioRemSize));
-
-      /* Configure the DMA Stream with the new parameters */
-      DMA_Init(AUDIO_MAL_DMA_STREAM, &DMA_InitStructure);
-
-      /* Enable the I2S DMA Stream*/
-      DMA_Cmd(AUDIO_MAL_DMA_STREAM, ENABLE);
-
-      /* Update the current pointer position */
-      CurrentPos += DMA_MAX(AudioRemSize);
-
-      /* Update the remaining number of data to be played */
-      AudioRemSize -= DMA_MAX(AudioRemSize);
-      /* Enable the I2S DMA Stream*/
-      DMA_Cmd(AUDIO_MAL_DMA_STREAM, ENABLE);
-    }
-    else
-    {
-      /* Disable the I2S DMA Stream*/
-      DMA_Cmd(AUDIO_MAL_DMA_STREAM, DISABLE);
-
-      /* Clear the Interrupt flag */
-      DMA_ClearFlag(AUDIO_MAL_DMA_STREAM, AUDIO_MAL_DMA_FLAG_TC);
-
-      /* Manage the remaining file size and new address offset: This function
-       should be coded by user (its prototype is already declared in stm32f4_discovery_audio_codec.h) */
-      EVAL_AUDIO_TransferComplete_CallBack((uint32_t) CurrentPos, 0);
-    }
-
-#elif defined(AUDIO_MAL_MODE_CIRCULAR)
     /* Manage the remaining file size and new address offset: This function
      should be coded by user (its prototype is already declared in stm32f4_discovery_audio_codec.h) */
-    EVAL_AUDIO_TransferComplete_CallBack(pAddr, Size);
+    EVAL_AUDIO_TransferComplete_CallBack();
 
     /* Clear the Interrupt flag */
     DMA_ClearFlag(AUDIO_MAL_DMA_STREAM, AUDIO_MAL_DMA_FLAG_TC);
-#endif /* AUDIO_MAL_MODE_NORMAL */
   }
 #endif /* AUDIO_MAL_DMA_IT_TC_EN */
 
@@ -501,7 +417,7 @@ void Audio_MAL_IRQHandler(void)
   {
     /* Manage the error generated on DMA FIFO: This function
      should be coded by user (its prototype is already declared in stm32f4_discovery_audio_codec.h) */
-    EVAL_AUDIO_Error_CallBack((uint32_t*)&pAddr);
+    EVAL_AUDIO_Error_CallBack();
 
     /* Clear the Interrupt flag */
     DMA_ClearFlag(AUDIO_MAL_DMA_STREAM, AUDIO_MAL_DMA_FLAG_TE | AUDIO_MAL_DMA_FLAG_FE |
@@ -515,10 +431,10 @@ void Audio_MAL_IRQHandler(void)
  * @param  None
  * @retval 0 if correct communication, else wrong communication
  */
-//void Audio_MAL_I2S_IRQHandler(void)
-//{
-//  Audio_MAL_IRQHandler();
-//}
+void Audio_MAL_I2S_IRQHandler(void)
+{
+  Audio_MAL_IRQHandler();
+}
 
 /**
  * @brief  I2S interrupt management
@@ -530,12 +446,6 @@ void Audio_I2S_IRQHandler(void)
   /* Check on the I2S TXE flag */
   if (SPI_I2S_GetFlagStatus(SPI3, SPI_I2S_FLAG_TXE) != RESET)
   {
-    if (0)
-    {
-      /* Wirte data to the DAC interface */
-      DAC_SetChannel1Data(DAC_Align_12b_L, EVAL_AUDIO_GetSampleCallBack());
-    }
-
     /* Send dummy data on I2S to avoid the underrun condition */
     SPI_I2S_SendData(CODEC_I2S, EVAL_AUDIO_GetSampleCallBack());
   }
@@ -553,8 +463,7 @@ void Audio_I2S_IRQHandler(void)
  * @param  AudioFreq: Audio frequency used to play the audio stream.
  * @retval 0 if correct communication, else wrong communication
  */
-static uint32_t Codec_Init(uint16_t OutputDevice, uint8_t Volume,
-        uint32_t AudioFreq)
+static uint32_t Codec_Init(uint16_t OutputDevice, uint8_t Volume)
 {
   uint32_t counter = 0;
 
@@ -622,9 +531,6 @@ static uint32_t Codec_Init(uint16_t OutputDevice, uint8_t Volume,
   counter += Codec_WriteRegister(0x1B, 0x0A);
 
   Codec_Mute(AUDIO_MUTE_OFF);
-
-  /* Configure the I2S peripheral */
-  Codec_AudioInterface_Init(AudioFreq);
 
   /* Return communication control value */
   return counter;
@@ -1072,30 +978,19 @@ uint32_t Codec_TIMEOUT_UserCallback(void)
 void Codec_AudioInterface_Init(uint32_t AudioFreq)
 {
   I2S_InitTypeDef I2S_InitStructure;
-  DAC_InitTypeDef DAC_InitStructure;
 
   /* Enable the CODEC_I2S peripheral clock */
   RCC_APB1PeriphClockCmd(CODEC_I2S_CLK, ENABLE);
 
   /* CODEC_I2S peripheral configuration */
+  /* In all modes, disable the I2S peripheral */
+  I2S_Cmd(CODEC_I2S, DISABLE);
   SPI_I2S_DeInit(CODEC_I2S);
   I2S_InitStructure.I2S_AudioFreq = AudioFreq;
   I2S_InitStructure.I2S_Standard = I2S_STANDARD;
   I2S_InitStructure.I2S_DataFormat = I2S_DataFormat_16b;
   I2S_InitStructure.I2S_CPOL = I2S_CPOL_Low;
-#ifdef DAC_USE_I2S_DMA
-  if (0)
-  {
-    I2S_InitStructure.I2S_Mode = I2S_Mode_MasterRx;
-  }
-  else
-  {
-#else
   I2S_InitStructure.I2S_Mode = I2S_Mode_MasterTx;
-#endif
-#ifdef DAC_USE_I2S_DMA
-}
-#endif /* DAC_USE_I2S_DMA */
 #ifdef CODEC_MCLK_ENABLED
   I2S_InitStructure.I2S_MCLKOutput = I2S_MCLKOutput_Enable;
 #elif defined(CODEC_MCLK_DISABLED)
@@ -1107,7 +1002,6 @@ void Codec_AudioInterface_Init(uint32_t AudioFreq)
   /****************************************************************************/
 
   uint32_t PLLI2SN, PLLI2SR;
-  /*uint16_t I2SDIV, I2SODD;*/
 
 #ifdef CODEC_MCLK_DISABLED
 # error "Fix the following values to add support for external MCLK"
@@ -1115,61 +1009,44 @@ void Codec_AudioInterface_Init(uint32_t AudioFreq)
 
   switch (AudioFreq)
   {
-    //    case I2S_AudioFreq_96k:
-    //      PLLI2SN = 344;
-    //      PLLI2SR = 2;
-    //      I2SDIV = 3;
-    //      I2SODD = 1;
-    //      break;
+  case I2S_AudioFreq_96k:
+    PLLI2SN = 344;
+    PLLI2SR = 2;
+    break;
 
     case I2S_AudioFreq_48k:
       PLLI2SN = 258;
       PLLI2SR = 3;
-//      I2SDIV = 3;
-//      I2SODD = 1;
       break;
 
     case I2S_AudioFreq_44k:
       PLLI2SN = 271;
       PLLI2SR = 2;
-//      I2SDIV = 6;
-//      I2SODD = 0;
       break;
 
     case I2S_AudioFreq_32k:
       PLLI2SN = 213;
       PLLI2SR = 2;
-//      I2SDIV = 6;
-//      I2SODD = 1;
       break;
 
     case I2S_AudioFreq_22k:
       PLLI2SN = 429;
       PLLI2SR = 4;
-//      I2SDIV = 9;
-//      I2SODD = 1;
       break;
 
     case I2S_AudioFreq_16k:
       PLLI2SN = 213;
       PLLI2SR = 2;
-//      I2SDIV = 13;
-//      I2SODD = 0;
       break;
 
     case I2S_AudioFreq_8k:
       PLLI2SN = 256;
       PLLI2SR = 5;
-//      I2SDIV = 12;
-//      I2SODD = 1;
       break;
 
     default:
       PLLI2SN = PLLI2S_N;
       PLLI2SR = PLLI2S_R;
-
-      //      I2SDIV = 13;
-      //      I2SODD = 0;
       break;
   }
 
@@ -1180,25 +1057,7 @@ void Codec_AudioInterface_Init(uint32_t AudioFreq)
   /* Initialize the I2S peripheral with the structure above */
   I2S_Init(CODEC_I2S, &I2S_InitStructure);
 
-  //CODEC_I2S->I2SPR = I2SDIV | (I2SODD << 8) | I2S_InitStructure.I2S_MCLKOutput;
-
   /****************************************************************************/
-
-  /* Configure the DAC interface */
-  if (0)
-  {
-    /* DAC Periph clock enable */
-    RCC_APB1PeriphClockCmd(RCC_APB1Periph_DAC, ENABLE);
-
-    /* DAC channel1 Configuration */
-    DAC_InitStructure.DAC_Trigger = DAC_Trigger_None;
-    DAC_InitStructure.DAC_WaveGeneration = DAC_WaveGeneration_None;
-    DAC_InitStructure.DAC_OutputBuffer = DAC_OutputBuffer_Enable;
-    DAC_Init(AUDIO_DAC_CHANNEL, &DAC_InitStructure);
-
-    /* Enable DAC Channel1 */
-    DAC_Cmd(AUDIO_DAC_CHANNEL, ENABLE);
-  }
 
   /* The I2S peripheral will be enabled only in the EVAL_AUDIO_Play() function
    or by user functions if DMA mode not enabled */
@@ -1268,7 +1127,6 @@ static void Codec_GPIO_Init(void)
   GPIO_PinAFConfig(CODEC_I2S_GPIO, CODEC_I2S_SD_PINSRC, CODEC_I2S_GPIO_AF);
   GPIO_PinAFConfig(CODEC_I2S_GPIO, CODEC_I2S_SCK_PINSRC, CODEC_I2S_GPIO_AF);
 
-  //	if (1) {
   GPIO_InitStructure.GPIO_Pin = CODEC_I2S_WS_PIN;
   GPIO_Init(CODEC_I2S_WS_GPIO, &GPIO_InitStructure);
   GPIO_PinAFConfig(CODEC_I2S_WS_GPIO, CODEC_I2S_WS_PINSRC, CODEC_I2S_GPIO_AF);
@@ -1355,26 +1213,10 @@ uint32_t Codec_TIMEOUT_UserCallback(void)
  */
 static void Audio_MAL_Init(void)
 {
-
-#ifdef I2S_INTERRUPT
-  NVIC_InitTypeDef NVIC_InitStructure;
-
-  NVIC_InitStructure.NVIC_IRQChannel = SPI3_IRQn;
-  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = configIRQ_PRIORITY_AUDIO;
-  NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
-  NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-  NVIC_Init(&NVIC_InitStructure);
-
-  SPI_I2S_ITConfig(SPI3, SPI_I2S_IT_TXE, ENABLE);
-
-  I2S_Cmd(SPI3, ENABLE);
-#else
 #if defined(AUDIO_MAL_DMA_IT_TC_EN) || defined(AUDIO_MAL_DMA_IT_HT_EN) || defined(AUDIO_MAL_DMA_IT_TE_EN)
   NVIC_InitTypeDef NVIC_InitStructure;
 #endif
 
-  if (1)
-  {
     /* Enable the DMA clock */
     RCC_AHB1PeriphClockCmd(AUDIO_MAL_DMA_CLOCK, ENABLE);
 
@@ -1391,13 +1233,7 @@ static void Audio_MAL_Init(void)
     DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;
     DMA_InitStructure.DMA_PeripheralDataSize = AUDIO_MAL_DMA_PERIPH_DATA_SIZE;
     DMA_InitStructure.DMA_MemoryDataSize = AUDIO_MAL_DMA_MEM_DATA_SIZE;
-#ifdef AUDIO_MAL_MODE_NORMAL
-    DMA_InitStructure.DMA_Mode = DMA_Mode_Normal;
-#elif defined(AUDIO_MAL_MODE_CIRCULAR)
     DMA_InitStructure.DMA_Mode = DMA_Mode_Circular;
-#else
-#error "AUDIO_MAL_MODE_NORMAL or AUDIO_MAL_MODE_CIRCULAR should be selected !!"
-#endif /* AUDIO_MAL_MODE_NORMAL */
     DMA_InitStructure.DMA_Priority = DMA_Priority_High;
     DMA_InitStructure.DMA_FIFOMode = DMA_FIFOMode_Disable;
     DMA_InitStructure.DMA_FIFOThreshold = DMA_FIFOThreshold_1QuarterFull;
@@ -1425,90 +1261,9 @@ static void Audio_MAL_Init(void)
     NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
     NVIC_Init(&NVIC_InitStructure);
 #endif
-  }
 
-#ifdef DAC_USE_I2S_DMA
-  else
-  {
-    /* Enable the DMA clock */
-    RCC_AHB1PeriphClockCmd(AUDIO_MAL_DMA_CLOCK, ENABLE);
-
-    /* Configure the DMA Stream */
-    DMA_Cmd(AUDIO_MAL_DMA_STREAM, DISABLE);
-    DMA_DeInit(AUDIO_MAL_DMA_STREAM);
-    /* Set the parameters to be configured */
-    DMA_InitStructure.DMA_Channel = AUDIO_MAL_DMA_CHANNEL;
-    DMA_InitStructure.DMA_PeripheralBaseAddr = AUDIO_MAL_DMA_DREG;
-    DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t)0; /* This field will be configured in play function */
-    DMA_InitStructure.DMA_DIR = DMA_DIR_MemoryToPeripheral;
-    DMA_InitStructure.DMA_BufferSize = (uint32_t)0xFFFE; /* This field will be configured in play function */
-    DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
-    DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;
-    DMA_InitStructure.DMA_PeripheralDataSize = AUDIO_MAL_DMA_PERIPH_DATA_SIZE;
-    DMA_InitStructure.DMA_MemoryDataSize = AUDIO_MAL_DMA_MEM_DATA_SIZE;
-#ifdef AUDIO_MAL_MODE_NORMAL
-    DMA_InitStructure.DMA_Mode = DMA_Mode_Normal;
-#elif defined(AUDIO_MAL_MODE_CIRCULAR)
-    DMA_InitStructure.DMA_Mode = DMA_Mode_Circular;
-#else
-#error "AUDIO_MAL_MODE_NORMAL or AUDIO_MAL_MODE_CIRCULAR should be selected !!"
-#endif /* AUDIO_MAL_MODE_NORMAL */
-    DMA_InitStructure.DMA_Priority = DMA_Priority_High;
-    DMA_InitStructure.DMA_FIFOMode = DMA_FIFOMode_Enable;
-    DMA_InitStructure.DMA_FIFOThreshold = DMA_FIFOThreshold_Full;
-    DMA_InitStructure.DMA_MemoryBurst = DMA_MemoryBurst_Single;
-    DMA_InitStructure.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
-    DMA_Init(AUDIO_MAL_DMA_STREAM, &DMA_InitStructure);
-
-    /* Enable the selected DMA interrupts (selected in "stm32f4_discovery_eval_audio_codec.h" defines) */
-#ifdef AUDIO_MAL_DMA_IT_TC_EN
-    DMA_ITConfig(AUDIO_MAL_DMA_STREAM, DMA_IT_TC, ENABLE);
-#endif /* AUDIO_MAL_DMA_IT_TC_EN */
-#ifdef AUDIO_MAL_DMA_IT_HT_EN
-    DMA_ITConfig(AUDIO_MAL_DMA_STREAM, DMA_IT_HT, ENABLE);
-#endif /* AUDIO_MAL_DMA_IT_HT_EN */
-#ifdef AUDIO_MAL_DMA_IT_TE_EN
-    DMA_ITConfig(AUDIO_MAL_DMA_STREAM, DMA_IT_TE | DMA_IT_FE | DMA_IT_DME, ENABLE);
-#endif /* AUDIO_MAL_DMA_IT_TE_EN */
-
-#if defined(AUDIO_MAL_DMA_IT_TC_EN) || defined(AUDIO_MAL_DMA_IT_HT_EN) || defined(AUDIO_MAL_DMA_IT_TE_EN)
-    /* I2S DMA IRQ Channel configuration */
-    NVIC_InitStructure.NVIC_IRQChannel = AUDIO_MAL_DMA_IRQ;
-    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = configIRQ_PRIORITY_AUDIO;
-    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
-    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-    NVIC_Init(&NVIC_InitStructure);
-#endif
-  }
-#endif /* DAC_USE_I2S_DMA */
-
-  if (1)
-  {
     /* Enable the I2S DMA request */
     SPI_I2S_DMACmd(CODEC_I2S, SPI_I2S_DMAReq_Tx, ENABLE);
-  }
-  else
-  {
-    /* Configure the STM32 DAC to geenrate audio analog signal */
-    DAC_Config();
-
-#ifndef DAC_USE_I2S_DMA
-    /* Enable the I2S interrupt used to write into the DAC register */
-    SPI_I2S_ITConfig(SPI3, SPI_I2S_IT_TXE, ENABLE);
-
-    /* I2S DMA IRQ Channel configuration */
-    NVIC_InitStructure.NVIC_IRQChannel = CODEC_I2S_IRQ;
-    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority
-            = configIRQ_PRIORITY_AUDIO;
-    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
-    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-    NVIC_Init(&NVIC_InitStructure);
-#else
-    /* Enable the I2S DMA request */
-    SPI_I2S_DMACmd(CODEC_I2S, SPI_I2S_DMAReq_Rx, ENABLE);
-#endif /* DAC_USE_I2S_DMA */
-  }
-#endif
 }
 
 /**
@@ -1516,7 +1271,7 @@ static void Audio_MAL_Init(void)
  * @param  None
  * @retval None
  */
-static void Audio_MAL_DeInit(void)
+void Audio_MAL_DeInit(void)
 {
 #if defined(AUDIO_MAL_DMA_IT_TC_EN) || defined(AUDIO_MAL_DMA_IT_HT_EN) || defined(AUDIO_MAL_DMA_IT_TE_EN)
   NVIC_InitTypeDef NVIC_InitStructure;
@@ -1545,7 +1300,7 @@ static void Audio_MAL_DeInit(void)
  * @param  None
  * @retval None
  */
-void Audio_MAL_Play(uint32_t Addr, uint32_t Size)
+void Audio_MAL_Play(uint32_t Addr0, uint32_t Addr1, uint32_t Size)
 {
   /* Wait the DMA Stream to be effectively disabled */
   while (DMA_GetCmdStatus(AUDIO_MAL_DMA_STREAM) != DISABLE)
@@ -1557,25 +1312,22 @@ void Audio_MAL_Play(uint32_t Addr, uint32_t Size)
 
 
   /* Configure the buffer address and size */
-  DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t) Addr;
+  DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t) Addr0;
   DMA_InitStructure.DMA_BufferSize = (uint32_t) Size / 2;
 
   /* Configure the DMA Stream with the new parameters */
   DMA_Init(AUDIO_MAL_DMA_STREAM, &DMA_InitStructure);
 
-  /* Enable the I2S DMA Stream*/
-  DMA_Cmd(AUDIO_MAL_DMA_STREAM, ENABLE);
+  DMA_DoubleBufferModeConfig(AUDIO_MAL_DMA_STREAM, (uint32_t) Addr1, DMA_Memory_0);
 
-  /* Update the remaining number of data to be played */
-  AudioRemSize = 0;
-
-
+  /* Enable DMA double mode. This function can be called only when the DMA Stream is disabled.*/
+  DMA_DoubleBufferModeCmd(AUDIO_MAL_DMA_STREAM, ENABLE);
 
   /* Enable the I2S DMA Stream*/
   DMA_Cmd(AUDIO_MAL_DMA_STREAM, ENABLE);
 
-  /* Update the current pointer position */
-  CurrentPos = (uint16_t *) Addr + Size / 2;
+  /* Enable the I2S DMA Stream*/
+  DMA_Cmd(AUDIO_MAL_DMA_STREAM, ENABLE);
 
   /* Enable the I2S DMA Stream*/
   DMA_Cmd(AUDIO_MAL_DMA_STREAM, ENABLE);
@@ -1585,9 +1337,6 @@ void Audio_MAL_Play(uint32_t Addr, uint32_t Size)
   {
     I2S_Cmd(CODEC_I2S, ENABLE);
   }
-
-//  if (CodecIsInPause)
-//    Codec_PauseResume(AUDIO_RESUME);
 }
 
 /**
@@ -1655,41 +1404,6 @@ static void Audio_MAL_Stop(void)
   /* In all modes, disable the I2S peripheral */
   I2S_Cmd(CODEC_I2S, DISABLE);
 }
-
-/**
- * @brief  DAC  Channel1 Configuration
- * @param  None
- * @retval None
- */
-void DAC_Config(void)
-{
-  DAC_InitTypeDef DAC_InitStructure;
-  GPIO_InitTypeDef GPIO_InitStructure;
-
-  /* DMA1 clock and GPIOA clock enable (to be used with DAC) */
-  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_DMA1 | RCC_AHB1Periph_GPIOA, ENABLE);
-
-  /* DAC Periph clock enable */
-  RCC_APB1PeriphClockCmd(RCC_APB1Periph_DAC, ENABLE);
-
-  /* DAC channel 1 & 2 (DAC_OUT1 = PA.4) configuration */
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4;
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
-  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-  GPIO_Init(GPIOA, &GPIO_InitStructure);
-
-  /* DAC channel1 Configuration */
-  DAC_InitStructure.DAC_Trigger = DAC_Trigger_None;
-  DAC_InitStructure.DAC_WaveGeneration = DAC_WaveGeneration_None;
-  DAC_InitStructure.DAC_OutputBuffer = DAC_OutputBuffer_Enable;
-  DAC_Init(AUDIO_DAC_CHANNEL, &DAC_InitStructure);
-
-  /* Enable DAC Channel1 */
-  DAC_Cmd(AUDIO_DAC_CHANNEL, ENABLE);
-}
-/**
- * @}
- */
 
 /**
  * @}

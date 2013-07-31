@@ -156,7 +156,7 @@ typedef struct {
 //#define I2S_INTERRUPT                 /* Uncomment this line to enable audio transfert with I2S interrupt*/
 
 /* Audio Transfer mode (DMA, Interrupt or Polling) */
-#define AUDIO_MAL_MODE_NORMAL         /* Uncomment this line to enable the audio
+/*#define AUDIO_MAL_MODE_NORMAL*/         /* Uncomment this line to enable the audio
                                          Transfer using DMA */
 #define AUDIO_MAL_MODE_CIRCULAR  /* Uncomment this line to enable the audio
                                          Transfer using DMA */
@@ -164,7 +164,7 @@ typedef struct {
 /* For the DMA modes select the interrupt that will be used */
 #define AUDIO_MAL_DMA_IT_TC_EN        /* Uncomment this line to enable DMA Transfer Complete interrupt */
 /*#define AUDIO_MAL_DMA_IT_HT_EN*/   /* Uncomment this line to enable DMA Half Transfer Complete interrupt */
-/* #define AUDIO_MAL_DMA_IT_TE_EN */  /* Uncomment this line to enable DMA Transfer Error interrupt */
+#define AUDIO_MAL_DMA_IT_TE_EN   /* Uncomment this line to enable DMA Transfer Error interrupt */
 
 /* Select the interrupt preemption priority and subpriority for the DMA interrupt */
 //#define EVAL_AUDIO_IRQ_PREPRIO           2   /* Select the preemption priority level(0 is the highest) */
@@ -205,7 +205,7 @@ typedef struct {
 
 /* Uncomment this line to enable verifying data sent to codec after each write
   operation */
-//#define VERIFY_WRITTENDATA
+#define VERIFY_WRITTENDATA
 
 #define PLLI2S_N   258
 #define PLLI2S_R   3

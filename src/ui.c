@@ -632,7 +632,7 @@ void Keypad_KeyReleasedCallback(KEY_Typedef key)
     {
     case KEY_PPP:
     case KEY_BTN:
-      Audio_CommandSync(AC_PLAY_PAUSE);
+      Player_AsyncCommand(PC_PLAY_PAUSE, 0);
       break;
 
     case KEY_NEXT:

@@ -41,8 +41,7 @@
 
 /* Memory */
 #define FILE_BUFFER_SIZE                    2048
-#define AUDIO_BUFFER_MAX_SIZE               2500
-#define AUDIO_BUFFER_COUNT                  4
+#define AUDIO_BUFFER_SIZE_SAMPLES           2500
 
 /* CDC buf size */
 #define APP_RX_DATA_SIZE                    8192

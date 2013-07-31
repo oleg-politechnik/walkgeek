@@ -38,6 +38,7 @@
 #include <malloc.h>
 #include <unistd.h>
 #include <limits.h>
+#include "audio_if.h"
 
 /* Private define ------------------------------------------------------------*/
 #define MP3_FRAME_MSTIME            26
@@ -50,7 +51,7 @@
 
 /* Private macro -------------------------------------------------------------*/
 #define MP3_CHECK_TAG(file, tag) \
-  (strncmp(tag, (char*) &FILE_BUF(file, 0), sizeof(tag) - 1) == 0)
+        (strncmp(tag, (char*) &FILE_BUF(file, 0), sizeof(tag) - 1) == 0)
 
 /* Private typedef -----------------------------------------------------------*/
 typedef struct
@@ -66,6 +67,8 @@ typedef struct
   u32 framesize;//todo VBR??
   u32 maxframe;
 
+  bool sample_buf_full;
+
   //uint16_t MP3_FrameSize; //fixme
 } sMP3Private;
 
@@ -78,6 +81,25 @@ static int Frame_bitrates[15] =
 
 /* Private function prototypes -----------------------------------------------*/
 /* Private functions ---------------------------------------------------------*/
+static FuncResult CheckSampleRate(int samp_freq)
+{
+  for (int i = 0; i < 3; i++) {
+    if (Frame_sampfreqs[i] == samp_freq)
+      return FUNC_SUCCESS;
+  }
+
+  return FUNC_ERROR;
+}
+
+static FuncResult CheckBitrate(int bitrate)
+{
+  for (int i = 1; i < 15; i++) {
+    if (Frame_bitrates[i] == bitrate)
+      return FUNC_SUCCESS;
+  }
+
+  return FUNC_ERROR;
+}
 
 FuncResult MP3_LoadFile(sDecoderContext *psDecoderContext)
 {
@@ -106,9 +128,9 @@ FuncResult MP3_LoadFile(sDecoderContext *psDecoderContext)
 
   if (MP3_CHECK_TAG(mfile, "ID3"))
   { /* try ID3v2 */
-    p->data_start = ((DWORD) FILE_BUF(mfile, 6) << 21)
-            | ((DWORD) FILE_BUF(mfile, 7) << 14) | ((WORD) FILE_BUF(mfile, 8)
-            << 7) | FILE_BUF(mfile, 9)/*XXX??? + 10*/;
+    p->data_start = (((DWORD) FILE_BUF(mfile, 6) << 21)
+                    | ((DWORD) FILE_BUF(mfile, 7) << 14) | ((WORD) FILE_BUF(mfile, 8)
+                            << 7) | FILE_BUF(mfile, 9)) + 10;
   }
 
   MF_EXEC(MediaFile_FillFromFile(mfile, p->data_start));
@@ -129,11 +151,7 @@ FuncResult MP3_LoadMetadata(sDecoderContext *psDecoderContext)
   MF_EXEC(MediaFile_FillFromFile(mfile, 0));
 
   if (MP3_CHECK_TAG(mfile, "ID3"))
-  { /* try ID3v2 */
-    p->data_start = ((DWORD) FILE_BUF(mfile, 6) << 21)
-            | ((DWORD) FILE_BUF(mfile, 7) << 14) | ((WORD) FILE_BUF(mfile, 8)
-            << 7) | FILE_BUF(mfile, 9)/*XXX??? + 10*/;
-
+  {
     version_major = FILE_BUF(mfile, 3);
     //    version_release = FILE_BUF(mfile, 4);
     //    extended_header = FILE_BUF(mfile, 5) & (1 << 6);
@@ -148,13 +166,13 @@ FuncResult MP3_LoadMetadata(sDecoderContext *psDecoderContext)
       if (version_major >= 3)
       {
         frame_size = ((DWORD) FILE_BUF(mfile, 4) << 24)
-                | ((DWORD) FILE_BUF(mfile, 5) << 16)
-                | ((WORD) FILE_BUF(mfile, 6) << 8) | FILE_BUF(mfile, 7);
+                        | ((DWORD) FILE_BUF(mfile, 5) << 16)
+                        | ((WORD) FILE_BUF(mfile, 6) << 8) | FILE_BUF(mfile, 7);
       }
       else
       {
         frame_size = ((DWORD) FILE_BUF(mfile, 3) << 14)
-                | ((WORD) FILE_BUF(mfile, 4) << 7) | FILE_BUF(mfile, 5);
+                        | ((WORD) FILE_BUF(mfile, 4) << 7) | FILE_BUF(mfile, 5);
       }
 
       if (frame_size == 0)
@@ -282,7 +300,7 @@ FuncResult MP3_LoadMetadata(sDecoderContext *psDecoderContext)
     assert_param(mfile->file.fsize > p->data_start);
 
     p->maxframe = (mfile->file.fsize - p->data_start)
-            / p->framesize; // the total frames
+                    / p->framesize; // the total frames
   }
   else //VBR
   {
@@ -296,8 +314,8 @@ FuncResult MP3_LoadMetadata(sDecoderContext *psDecoderContext)
 
     offset = offset + 40;
     p->maxframe = FILE_BUF(mfile, offset + 3) + FILE_BUF(mfile, offset + 2)
-            * 256 + FILE_BUF(mfile, offset + 1) * 256 * 256
-            + FILE_BUF(mfile, offset) * 256 * 256 * 256;
+                    * 256 + FILE_BUF(mfile, offset + 1) * 256 * 256
+                    + FILE_BUF(mfile, offset) * 256 * 256 * 256;
 
     offset += 4;
 
@@ -356,15 +374,12 @@ FuncResult MP3_MainThread(sDecoderContext *psDecoderContext)
     Player_AsyncCommand(PC_NEXT, 0);
   }
 
-  AudioBuffer_Typedef *audio_buf;
-  if (!(audio_buf = AudioBuffer_TryGetProducer()))
-  {
-    return FUNC_NOT_SUCCESS;
-  }
+  //  if (!(audio_buf = AudioBuffer_TryGetProducer()))
+  //  {
+  //    return FUNC_NOT_SUCCESS;
+  //  }
 
   sMetadata *meta = psDecoderContext->psMetadata;
-
-  assert_param(audio_buf->size == 0);
 
   MF_EXEC(MediaFile_ReFill(mfile));
 
@@ -386,19 +401,29 @@ FuncResult MP3_MainThread(sDecoderContext *psDecoderContext)
   bzero(&mp3FrameInfo, sizeof(MP3FrameInfo));
 
   err = MP3GetNextFrameInfo(p->pMP3Decoder, &mp3FrameInfo, &FILE_BUF(mfile, 0));
-  if (!(err == ERR_MP3_NONE && mp3FrameInfo.bitrate && mp3FrameInfo.nChans
-          && mp3FrameInfo.outputSamps && mp3FrameInfo.samprate
-          && mp3FrameInfo.bitsPerSample))
+  if (!(err == ERR_MP3_NONE && CheckBitrate(mp3FrameInfo.bitrate) && mp3FrameInfo.nChans
+          && mp3FrameInfo.outputSamps && CheckSampleRate(mp3FrameInfo.samprate)
+  && mp3FrameInfo.bitsPerSample))
   {
     // advance data pointer
     MF_EXEC(MediaFile_Seek(mfile, 1));
     return FUNC_NOT_SUCCESS;
   }
 
+  u16 samps = mp3FrameInfo.outputSamps;
+
+  if (mp3FrameInfo.nChans == 1)
+  {
+    samps *= 2;
+  }
+
+  Buffer_Typedef *sample_buf = Audio_GetBuffer(samps, mp3FrameInfo.samprate);
+  assert_param(sample_buf);
+
   bytesLeft = mfile->bytes_in_buf;
   f_buffer = &FILE_BUF(mfile, 0);
 
-  err = MP3Decode(p->pMP3Decoder, &f_buffer, &bytesLeft, (s16*) audio_buf->data, 0);
+  err = MP3Decode(p->pMP3Decoder, &f_buffer, &bytesLeft, (s16*) sample_buf->data, 0);
 
   if (err != ERR_MP3_NONE)
   {
@@ -418,7 +443,7 @@ FuncResult MP3_MainThread(sDecoderContext *psDecoderContext)
         break;
 
       default:
-	MF_EXEC(MediaFile_Seek(mfile, MAX(1, mfile->bytes_in_buf - bytesLeft)));
+        MF_EXEC(MediaFile_Seek(mfile, MAX(1, mfile->bytes_in_buf - bytesLeft)));
         break;
     }
 
@@ -430,37 +455,35 @@ FuncResult MP3_MainThread(sDecoderContext *psDecoderContext)
   /* no error */
   bzero(&mp3FrameInfo, sizeof(MP3FrameInfo));
   MP3GetLastFrameInfo(p->pMP3Decoder, &mp3FrameInfo);
-  if (!(mp3FrameInfo.bitrate && mp3FrameInfo.nChans && mp3FrameInfo.outputSamps
-          && mp3FrameInfo.samprate && mp3FrameInfo.bitsPerSample))
+  if (!(CheckBitrate(mp3FrameInfo.bitrate) && mp3FrameInfo.nChans && mp3FrameInfo.outputSamps
+          && CheckSampleRate(mp3FrameInfo.samprate) && mp3FrameInfo.bitsPerSample))
   {
     // advance data pointer
     MF_EXEC(MediaFile_Seek(mfile, 1));
     return FUNC_NOT_SUCCESS;
   }
 
-  assert_param(mp3FrameInfo.outputSamps <= AUDIO_BUFFER_MAX_SIZE);
   assert_param(mp3FrameInfo.nChans <= 2);
+  assert_param(samps == mp3FrameInfo.outputSamps * (mp3FrameInfo.nChans == 1 ? 2 : 1));
 
-  audio_buf->size = mp3FrameInfo.outputSamps;
-  audio_buf->sampling_freq = mp3FrameInfo.samprate;
-
-  SetVariable(VAR_AudioStatus, meta->channel_count, mp3FrameInfo.nChans);
-  SetVariable(VAR_AudioStatus, meta->bitrate, mp3FrameInfo.bitrate);
+  //  SetVariable(VAR_AudioStatus, meta->channel_count, mp3FrameInfo.nChans);
+  //  SetVariable(VAR_AudioStatus, meta->bitrate, mp3FrameInfo.bitrate);
 
   if (mp3FrameInfo.nChans == 1)
   {
-    assert_param(audio_buf->size * 2 <= AUDIO_BUFFER_MAX_SIZE);
-    for (portBASE_TYPE i = audio_buf->size - 1; i >= 0; i--)
+    for (int i = mp3FrameInfo.outputSamps - 1; i >= 0; i--)
     {
-      audio_buf->data[2 * i] = audio_buf->data[i];
-      audio_buf->data[2 * i + 1] = audio_buf->data[i];
+      sample_buf[2 * i] = sample_buf[i];
+      sample_buf[2 * i + 1] = sample_buf[i];
     }
-    audio_buf->size *= 2;
   }
 
-  AudioBuffer_MoveProducer();
+  p->sample_buf_full = true;
 
-  meta->mstime_curr += MP3_FRAME_MSTIME;
+  if (Audio_AppendBuffer(sample_buf) == FUNC_SUCCESS)
+  {
+    meta->mstime_curr += MP3_FRAME_MSTIME;
+  }
 
   return FUNC_SUCCESS;
 }

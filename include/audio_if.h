@@ -1,7 +1,7 @@
 /*
  * audio_if.h
  *
- * Copyright (c) 2012, Oleg Tsaregorodtsev
+ * Copyright (c) 2012, 2013, Oleg Tsaregorodtsev
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -44,28 +44,28 @@ typedef enum {
   AS_ERROR
 } AudioState_Typedef;
 
-typedef enum
+typedef struct
 {
-  AC_RESET_BUFFERS,
-  AC_PLAY,
-  AC_PAUSE,
-  AC_PLAY_PAUSE,
-  AC_SUSPEND,
-  AC_STOP
-} AudioCommand_Typedef;
+  u16 *data;
+  u16 size;
+  u32 sampling_freq;
+  bool full;
+} Buffer_Typedef;
 
 /* Exported functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-void Audio_DeInit(void);
-
-FuncResult Audio_CommandSync(AudioCommand_Typedef cmd);
+FuncResult Audio_Pause(void);
 FuncResult Audio_SetVolume(u8 NewVolume);
 FuncResult Audio_ChangeVolume(s8 delta);
-
-FuncResult Audio_PeriodicKick(void);
+void Audio_Stop(void);
 
 AudioState_Typedef Audio_GetState(void);
-int Audio_GetSampleRate(void);
-int Audio_GetVolume(void);
+u32 Audio_GetSampleRate(void);
+u8 Audio_GetVolume(void);
+
+/* Buffer */
+Buffer_Typedef *Audio_GetBuffer(u16 size, u32 sampling_freq);
+FuncResult Audio_AppendBuffer(Buffer_Typedef *AppendableBuffer);
+
 /* Exported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Exported static inline functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 

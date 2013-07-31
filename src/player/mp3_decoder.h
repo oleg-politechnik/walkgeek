@@ -34,6 +34,8 @@
 #include "mediafile.h"
 
 /* Exported constants --------------------------------------------------------*/
+#define MP3_BUFFER_SAMPLE_SIZE	(AUDIO_BUFFER_SAMPLE_SIZE / 2)
+
 /* Exported types ------------------------------------------------------------*/
 /* Exported macro ------------------------------------------------------------*/
 /* Exported functions ------------------------------------------------------- */

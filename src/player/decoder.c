@@ -68,13 +68,13 @@ void prvDecoderTask(void *pDecoderContext)
       {
         if (command.cmd == DC_END_SEEKING)
         {
-//          Audio_CommandSync(AC_RESET_BUFFERS);
+          Audio_Stop();
           Decoder(ctx)->Seek(ctx, ctx->psMetadata->mstime_curr);
           break;
         }
         else if (command.cmd == DC_SEEK)
         {
-          Audio_CommandSync(AC_SUSPEND);
+          Audio_Pause();
           configASSERT(command.cmd <= ctx->psMetadata->mstime_max);
           ctx->psMetadata->mstime_curr = command.ms_absolute_offset;
 
@@ -87,8 +87,6 @@ void prvDecoderTask(void *pDecoderContext)
       }
     }
 
-    vTaskDelay(1); //todo rework async buffer
-
     state = Player_GetState();
 
     if (state->status == PS_PLAYING || state->status == PS_SEEKING)
@@ -99,8 +97,6 @@ void prvDecoderTask(void *pDecoderContext)
                 state->metadata.mstime_curr / 1000);
       }
     }
-
-    Audio_PeriodicKick();
   }
 }
 

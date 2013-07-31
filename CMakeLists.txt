@@ -38,7 +38,6 @@ include(bsp/bsp.cmake)
 add_subdirectory(lib)
 
 set (SOURCES
-    src/audio_buffer.c
 #    src/player/wav_decoder.c
     src/player/opus_decoder.c
     src/player/player.c

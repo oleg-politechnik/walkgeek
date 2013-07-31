@@ -37,7 +37,6 @@
 
 #include "opus_decoder.h"
 #include "mediafile.h"
-#include "audio_buffer.h"
 #include <ogg/ogg.h>
 #include "opus_types.h"
 #include <opus_multistream.h>
@@ -56,7 +55,6 @@
 
 #include <string.h>
 #include "opus_header.h"
-#include "audio_buffer.h"
 #include "player.h"
 #include "audio_if.h"
 
@@ -352,8 +350,8 @@ int OPUS_MainThread(sDecoderContext *psDecoderContext)
 
   if (p->frame_size) /* already have decoded frame */
   {
-    if (AudioBuffer_TryGetProducer())
-    {
+//    if (AudioBuffer_TryGetProducer())
+//    {
 //      opus_int64 outsamp;
 //
 //      outsamp = audio_write(output, channels, frame_size, &preskip,
@@ -384,7 +382,7 @@ int OPUS_MainThread(sDecoderContext *psDecoderContext)
 //
 ////        vTaskDelete(NULL);
 //      }
-    }
+//    }
   }
 
   return 0;//fixme

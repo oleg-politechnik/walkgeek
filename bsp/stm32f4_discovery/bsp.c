@@ -386,6 +386,7 @@ void Disp_SetRST(FunctionalState enabled)
 /* sdio ----------------------------------------------------------------------*/
 #ifdef HAS_SDIO
 #include "stm324xg_eval_sdio_sd.h"
+#include "stm32f4_discovery_audio_codec.h"
 
 /**
  * @brief  DeInitializes the SDIO interface.
@@ -659,10 +660,9 @@ void assert_failed(uint8_t* file, uint32_t line, uint8_t* expr)
   /* User can add his own implementation to report the file name and line number,
    ex: printf("Wrong parameters value: file %s on line %d\n", file, line) */
 
-  vTaskSuspendAll();
+  vPortEnterCritical();
 
   char buf[256];
-  int row = 0;
 
   //TODO: add application state
 
@@ -670,15 +670,15 @@ void assert_failed(uint8_t* file, uint32_t line, uint8_t* expr)
 
   Disp_Clear();
 
-  Disp_String(0, row++, "ASSERT FAILED", true);
-  Disp_String(0, row, expr, true);
-  row += 2;
-
-  sprintf(buf, "line %i in %s", (int) line, strrchr(file, '/') ? strrchr(file, '/') + 1 : file);
-  /*todo: test on windows*/
-  Disp_String(0, row, buf, true);
-
-  portBASE_TYPE delay = 0;
+  if (file)
+  {
+    snprintf(buf, sizeof(buf), "ASSERT %i at %s: %s", (int) line, strrchr(file, '/') ? strrchr(file, '/') + 1 : file, expr);
+    Disp_String(0, 0, buf, true);
+  }
+  else
+  {
+    Disp_String(0, 0, expr, true);
+  }
 
   /* Infinite loop */
   while (1)
@@ -688,10 +688,10 @@ void assert_failed(uint8_t* file, uint32_t line, uint8_t* expr)
 
     if (BSP_Keypad_GetKeyStatus(KEY_PPP))
     {
-      vTaskDelay(10 / portTICK_RATE_MS); //todo const
+      //Delay(10); //todo const
       delay += 10;
 
-      if (delay < 1000)
+      if (delay < 1000) //todo const
       {
 	BSP_PowerDisable();
       }
