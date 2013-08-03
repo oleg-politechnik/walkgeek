@@ -36,18 +36,17 @@ typedef enum
 {
   VAR_SystemState,
   VAR_ScreenMode,
-
-  VAR_ApplicationState,
-
-  VAR_AudioStatus,
-  VAR_PlayerState,
-  VAR_AudioVolume,
-  VAR_AudioPosition,
-  VAR_Audio_NeglectedDMA_Count,
-
   VAR_BatteryState,
 
+  VAR_PlayerTrack,
+  VAR_PlayerPosition,
+  VAR_PlayerScreenMode,
+
+  VAR_AudioStatus,
+  VAR_AudioVolume,
+
   VAR_MSC_Speed,
+
   MAX_DISPLAY_VARIABLES
 } VAR_Index;
 

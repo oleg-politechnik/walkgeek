@@ -29,10 +29,16 @@
 #define PLAYER_H_
 
 /* Includes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+#include "FreeRTOS.h"
+#include "queue.h"
+
 #include "metadata.h"
+#include "portmacro.h"
 
 /* Exported defines ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Exported macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+#define Decoder(ctx) ((sDecoder *) (ctx->pDecoder))
+
 /* Exported types ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 typedef enum
 {
@@ -45,7 +51,7 @@ typedef enum
   PS_SEEKING,
 
   PS_MAX
-} PlayerStatus_Typedef;
+} ePlayerStatus;
 
 typedef enum
 {
@@ -69,33 +75,36 @@ typedef enum
 
 typedef struct
 {
-  ePlayerCommand cmd;
-  s32 arg;
-} sPlayerCommand;
+  void *pDecoder;
+  sMetadata *psMetadata;
+//  xQueueHandle xCommandQueue;
+  void *pDecoderData;
+  char pcFilePath[MAX_FILE_PATH];
+} sDecoderContext;
 
 typedef struct
 {
-  void (*LoadFile)(char *filepath);
-  void (*MainThread)(void);
-  void (*Seek)(u32 msec);
-  void (*Stop)(void);
-} Decoder_Typedef;
+  FuncResult (*LoadFile)(sDecoderContext *psDecoderContext);
+  FuncResult (*MainThread)(sDecoderContext *psDecoderContext);
+  FuncResult (*Seek)(sDecoderContext *psDecoderContext, u32 ms_absolute_offset);
+  void (*Destroy)(sDecoderContext *psDecoderContext);
+} sDecoder;
 
 typedef struct
 {
-  Metadata_TypeDef metadata;
-} PlayerState_Typedef;
+  sMetadata metadata;
+  ePlayerStatus status;
+} sPlayerState;
 
 /* Exported functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-void Player_AsyncCommand(ePlayerCommand cmd, s32 arg);
-void Player_AsyncCommandFromISR(ePlayerCommand cmd, s32 arg);
+void Player_AsyncCommand(ePlayerCommand cmd, int arg);
+void Player_AsyncCommandFromISR(ePlayerCommand cmd, int arg);
 
-PlayerState_Typedef *Player_GetState(void);
-PlayerStatus_Typedef Player_GetStatus(void);
+bool Player_IsSeekable(void);
 
-char *Player_GetErrorString(void);
+sPlayerState *Player_GetState(void);
 
-void Player_AudioFileError(char *error); //fixme
+#define Player_AudioFileError(c) /* fixme */
 
 /* Exported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Exported static inline functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/

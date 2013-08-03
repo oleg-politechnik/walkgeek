@@ -44,7 +44,8 @@ typedef struct
 } AudioBuffer_Typedef;
 
 /* Exported functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-AudioBuffer_Typedef *AudioBuffer_TryGetProducer(void) RAM_FUNC;
+void AudioBuffer_Init(void);
+AudioBuffer_Typedef *AudioBuffer_TryGetProducer() RAM_FUNC;
 void AudioBuffer_MoveProducer(void) RAM_FUNC;
 
 /* Exported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/

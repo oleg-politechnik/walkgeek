@@ -1107,7 +1107,6 @@ void Codec_AudioInterface_Init(uint32_t AudioFreq)
   /****************************************************************************/
 
   uint32_t PLLI2SN, PLLI2SR;
-  /*uint16_t I2SDIV, I2SODD;*/
 
 #ifdef CODEC_MCLK_DISABLED
 # error "Fix the following values to add support for external MCLK"
@@ -1115,61 +1114,44 @@ void Codec_AudioInterface_Init(uint32_t AudioFreq)
 
   switch (AudioFreq)
   {
-    //    case I2S_AudioFreq_96k:
-    //      PLLI2SN = 344;
-    //      PLLI2SR = 2;
-    //      I2SDIV = 3;
-    //      I2SODD = 1;
-    //      break;
+    case I2S_AudioFreq_96k:
+      PLLI2SN = 344;
+      PLLI2SR = 2;
+      break;
 
     case I2S_AudioFreq_48k:
       PLLI2SN = 258;
       PLLI2SR = 3;
-//      I2SDIV = 3;
-//      I2SODD = 1;
       break;
 
     case I2S_AudioFreq_44k:
       PLLI2SN = 271;
       PLLI2SR = 2;
-//      I2SDIV = 6;
-//      I2SODD = 0;
       break;
 
     case I2S_AudioFreq_32k:
       PLLI2SN = 213;
       PLLI2SR = 2;
-//      I2SDIV = 6;
-//      I2SODD = 1;
       break;
 
     case I2S_AudioFreq_22k:
       PLLI2SN = 429;
       PLLI2SR = 4;
-//      I2SDIV = 9;
-//      I2SODD = 1;
       break;
 
     case I2S_AudioFreq_16k:
       PLLI2SN = 213;
       PLLI2SR = 2;
-//      I2SDIV = 13;
-//      I2SODD = 0;
       break;
 
     case I2S_AudioFreq_8k:
       PLLI2SN = 256;
       PLLI2SR = 5;
-//      I2SDIV = 12;
-//      I2SODD = 1;
       break;
 
     default:
       PLLI2SN = PLLI2S_N;
       PLLI2SR = PLLI2S_R;
-
-      //      I2SDIV = 13;
-      //      I2SODD = 0;
       break;
   }
 

@@ -1,7 +1,7 @@
 /*
  * mp3_decoder.c
  *
- * Copyright (c) 2012, 2013 Oleg Tsaregorodtsev
+ * Copyright (c) 2012, 2013, Oleg Tsaregorodtsev
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,6 +26,9 @@
  */
 
 /* Includes ------------------------------------------------------------------*/
+#include "FreeRTOS.h"
+#include "task.h"
+
 #include <mp3dec.h>
 #include <string.h>
 #include "player.h"
@@ -35,29 +38,40 @@
 #include <malloc.h>
 #include <unistd.h>
 #include <limits.h>
+#include "audio_if.h"
+#include "audio_buffer.h"
 
-extern PlayerStatus_Typedef PlayerStatus;
-
-/* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
 #define MP3_FRAME_MSTIME            26
 #define MP3_TABLE_OF_CONTENTS_SIZE  100
 
+#define ID3V2_BUF_SIZE 900
+#define ID3V2_MAX_ITEM_SIZE 240
+
 /* Private macro -------------------------------------------------------------*/
 #define MP3_CHECK_TAG(file, tag) \
-  (strncmp(tag, (char*) &FILE_BUF(file, 0), sizeof(tag) - 1) == 0)
+        (strncmp(tag, (char*) &FILE_BUF(file, 0), sizeof(tag) - 1) == 0)
+
+/* Private typedef -----------------------------------------------------------*/
+typedef struct
+{
+  MediaFile_Typedef mfile;
+  HMP3Decoder pMP3Decoder;
+
+  bool vbr;
+  u8 toc[MP3_TABLE_OF_CONTENTS_SIZE];
+
+  /* decoding */
+  u32 data_start;
+  u32 framesize;//todo VBR??
+  u32 maxframe;
+
+//  bool sample_buf_full;
+
+  //uint16_t MP3_FrameSize; //fixme
+} sMP3Private;
 
 /* Private variables ---------------------------------------------------------*/
-HMP3Decoder pMP3Decoder;
-MP3FrameInfo mp3FrameInfo;
-
-static bool vbr;
-static u8 toc[MP3_TABLE_OF_CONTENTS_SIZE];
-
-static MediaFile_Typedef *mfile;
-
-//uint16_t MP3_FrameSize; //fixme
-
 static int Frame_sampfreqs[4] =
 { 44100, 48000, 32000, 0 }; // sample rate MPEG1 LAYER3
 static int Frame_bitrates[15] =
@@ -65,216 +79,53 @@ static int Frame_bitrates[15] =
         192000, 224000, 256000, 320000 }; // bitrate MPEG1 LAYER3
 
 /* Private function prototypes -----------------------------------------------*/
+static FuncResult MP3_LoadMetadata(sDecoderContext *psDecoderContext);
+
 /* Private functions ---------------------------------------------------------*/
-static void MediaFile_Clear(MediaFile_Typedef *mfile)
+FuncResult MP3_LoadFile(sDecoderContext *psDecoderContext)
 {
-  mfile->buf_offset = mfile->bytes_in_buf = 0;
+  configASSERT(!psDecoderContext->pDecoderData);
+
+  trace("MP3 started");
+  print_user_heap_mallinfo();
+
+  psDecoderContext->pDecoderData = pvPortMalloc(sizeof(sMP3Private));
+  bzero(psDecoderContext->pDecoderData, sizeof(sMP3Private));
+
+  trace("MP3 file buffers allocated");
+  print_user_heap_mallinfo();
+
+  sMP3Private *p = (sMP3Private *) psDecoderContext->pDecoderData;
+
+  configASSERT(!p->pMP3Decoder);
+  p->pMP3Decoder = MP3InitDecoder();
+  assert_param(p->pMP3Decoder);
+
+  trace("MP3 decoder allocated");
+  print_user_heap_mallinfo();
+
+  MF_EXEC(MediaFile_Open(&p->mfile, psDecoderContext->pcFilePath));
+
+  return MP3_LoadMetadata(psDecoderContext);
 }
 
-FuncResult MediaFile_Open(MediaFile_Typedef *mfile, const TCHAR *path)
-{
-  assert_param(mfile->state == MFS_EMPTY);
-
-  if (f_open(&mfile->file, path, FA_READ) != FR_OK)
-  {
-    mfile->state = MFS_ERROR;
-    return FUNC_ERROR;
-  }
-
-  MediaFile_Clear(mfile);
-
-  mfile->state = MFS_OPENED;
-  return FUNC_SUCCESS;
-}
-
-void MediaFile_Close(MediaFile_Typedef *mfile)
-{
-  if (mfile->state != MFS_EMPTY)
-  {
-    f_close(&mfile->file);
-
-    mfile->state = MFS_EMPTY;
-  }
-}
-
-FuncResult MediaFile_Seek(MediaFile_Typedef *mfile, u32 delta)
-{
-  assert_param(mfile->state >= MFS_OPENED);
-
-  assert_param(mfile->buf_offset < FILE_BUFFER_SIZE);
-  assert_param(mfile->bytes_in_buf + mfile->buf_offset <= FILE_BUFFER_SIZE);
-
-  u32 offset_to_load = mfile->file.fptr - mfile->bytes_in_buf + delta;
-
-  assert_param(offset_to_load/* + size_min*/ < mfile->file.fsize);
-
-  if (delta >= mfile->bytes_in_buf)
-  {
-    return MediaFile_FillFromFile(mfile, offset_to_load);
-  }
-
-  mfile->bytes_in_buf -= delta;
-  mfile->buf_offset += delta;
-
-  assert_param(mfile->buf_offset < FILE_BUFFER_SIZE);
-  assert_param(mfile->bytes_in_buf + mfile->buf_offset <= FILE_BUFFER_SIZE);
-
-//  if (size_min > mfile->bytes_in_buf)
-//  {
-    return MediaFile_ReFill(mfile);
-//  }
-//
-//  return FUNC_SUCCESS;
-}
-
-FuncResult MediaFile_FillFromFile(MediaFile_Typedef *mfile, u32 abs_offset)
-{
-  assert_param(mfile->state >= MFS_OPENED);
-
-  assert_param(abs_offset <= mfile->file.fsize);
-
-  if (f_lseek(&mfile->file, abs_offset) != FR_OK)
-  {
-    mfile->state = MFS_ERROR;
-    return FUNC_ERROR;
-  }
-
-  MediaFile_Clear(mfile);
-  return MediaFile_ReFill(mfile);
-}
-
-FuncResult MediaFile_ReFill(MediaFile_Typedef *mfile)
-{
-  assert_param(mfile->state >= MFS_OPENED);
-
-  FRESULT res;
-  u32 bytes_returned, bytes_to_read, bytes_avail;
-
-//  if (size_min <= mfile->bytes_in_buf)
-//    /* nothing to do here */
-//    return FUNC_SUCCESS;
-
-  assert_param(mfile->buf_offset < FILE_BUFFER_SIZE);
-  assert_param(mfile->bytes_in_buf + mfile->buf_offset <= FILE_BUFFER_SIZE);
-
-  bytes_avail = mfile->file.fsize - mfile->file.fptr;
-
-  if (bytes_avail == 0)
-  {
-    mfile->state = MFS_EOF;
-    return FUNC_SUCCESS;
-  }
-
-//  if (bytes_avail >= FILE_BUFFER_SIZE)
-//  {
-    bytes_to_read = MIN(FILE_BUFFER_SIZE - mfile->bytes_in_buf, bytes_avail);
-//  }
-//  else
-//  {
-//    bytes_to_read = size_min - mfile->bytes_in_buf;
-//  }
-
-
-
-//  if (bytes_to_read > bytes_avail)
-//  {
-//    mfile->state = MFS_EOF;
-//    return FUNC_NOT_SUCCESS;
-//  }
-
-  /*
-   * x = free space
-   * B = old buffer data
-   *
-   * file->file_buf
-   * |
-   * |          file->buf_offset
-   * |          |
-   * |          <----> - file->bytes_in_buf
-   * |          |    |
-   * xxxxxxxxxxxBBBBBB
-   *                 ^
-   *                 file->fptr
-   */
-
-  memmove(mfile->file_buf, &mfile->file_buf[mfile->buf_offset], mfile->bytes_in_buf);
-
-  /*
-   * x = free space
-   * B = old buffer data
-   *
-   * file->file_buf
-   * |
-   * file->buf_offset
-   * |
-   * <----> - file->bytes_in_buf
-   * |    |
-   * BBBBBBxxxxxxxxxxx
-   *      ^
-   *      file->fptr
-   */
-
-  res = f_read(&mfile->file, &mfile->file_buf[mfile->bytes_in_buf], bytes_to_read,
-          (UINT*) &bytes_returned);
-
-  if (res != FR_OK || bytes_to_read != bytes_returned)
-  {
-    mfile->state = MFS_ERROR;
-    return FUNC_ERROR;
-  }
-
-  /*
-   * B = old buffer data
-   * F = new data
-   *
-   * file->buf_offset
-   * |
-   * <---------------> - file->bytes_in_buf
-   * |               |
-   * BBBBBBFFFFFFFFFFF
-   *                 ^
-   *                 file->fptr
-   */
-
-  mfile->buf_offset = 0;
-  mfile->bytes_in_buf += bytes_returned;
-
-  assert_param(mfile->buf_offset < FILE_BUFFER_SIZE);
-  assert_param(mfile->bytes_in_buf + mfile->buf_offset <= FILE_BUFFER_SIZE);
-
-  return FUNC_SUCCESS;
-}
-
-FuncResult MP3_ReadMetadata(MediaFile_Typedef *mfile)
+FuncResult MP3_LoadMetadata(sDecoderContext *psDecoderContext)
 {
   uint32_t offset, frame_size, frame_header_size;
   u16 val; // record the start frame
   u8 version_major/*, extended_header*/;
 
-  Metadata_TypeDef *meta = &(Player_GetState()->metadata);
-
-  vbr = true;
-
-
-
-
-
-
-
-
-
-
-
-
-
+  sMP3Private *p = (sMP3Private *) psDecoderContext->pDecoderData;
+  MediaFile_Typedef *mfile = &p->mfile;
+  sMetadata *meta = psDecoderContext->psMetadata;
 
   MF_EXEC(MediaFile_FillFromFile(mfile, 0));
 
   if (MP3_CHECK_TAG(mfile, "ID3"))
-  { /* try ID3v2 */
-    mfile->data_start = ((DWORD) FILE_BUF(mfile, 6) << 21)
-            | ((DWORD) FILE_BUF(mfile, 7) << 14) | ((WORD) FILE_BUF(mfile, 8)
-            << 7) | FILE_BUF(mfile, 9)/*XXX??? + 10*/;
+  {
+    p->data_start = (((DWORD) FILE_BUF(mfile, 6) << 21)
+                    | ((DWORD) FILE_BUF(mfile, 7) << 14) | ((WORD) FILE_BUF(mfile, 8)
+                            << 7) | FILE_BUF(mfile, 9)) + 10;
 
     version_major = FILE_BUF(mfile, 3);
     //    version_release = FILE_BUF(mfile, 4);
@@ -285,18 +136,18 @@ FuncResult MP3_ReadMetadata(MediaFile_Typedef *mfile)
     MF_EXEC(MediaFile_Seek(mfile, 10));
 
     // iterate through frames
-    while (mfile->file.fptr - mfile->bytes_in_buf < mfile->data_start)
+    while (mfile->file.fptr - mfile->bytes_in_buf < p->data_start)
     {
       if (version_major >= 3)
       {
         frame_size = ((DWORD) FILE_BUF(mfile, 4) << 24)
-                | ((DWORD) FILE_BUF(mfile, 5) << 16)
-                | ((WORD) FILE_BUF(mfile, 6) << 8) | FILE_BUF(mfile, 7);
+                        | ((DWORD) FILE_BUF(mfile, 5) << 16)
+                        | ((WORD) FILE_BUF(mfile, 6) << 8) | FILE_BUF(mfile, 7);
       }
       else
       {
         frame_size = ((DWORD) FILE_BUF(mfile, 3) << 14)
-                | ((WORD) FILE_BUF(mfile, 4) << 7) | FILE_BUF(mfile, 5);
+                        | ((WORD) FILE_BUF(mfile, 4) << 7) | FILE_BUF(mfile, 5);
       }
 
       if (frame_size == 0)
@@ -362,13 +213,20 @@ FuncResult MP3_ReadMetadata(MediaFile_Typedef *mfile)
     }
     else
     {
-      return FUNC_ERROR;
+      /*
+       *   if (MP3_ReadMetadata(mfile) == FUNC_ERROR)
+  {*
+    return Player_AudioFileError("Invalid MP3 metadata format");
+  }
+       *
+       * */
+      return false; //todo estimate?
     }
 
-    mfile->data_start = 0;
+    p->data_start = 0;
   }
 
-  MF_EXEC(MediaFile_FillFromFile(mfile, mfile->data_start));
+  MF_EXEC(MediaFile_FillFromFile(mfile, p->data_start));
 
   //(c) SAM3U_COOS
 
@@ -400,24 +258,24 @@ FuncResult MP3_ReadMetadata(MediaFile_Typedef *mfile)
   MF_EXEC(MediaFile_Seek(mfile, offset));
   offset = 0;
 
-  vbr = false; // this MP3 is CBR
+  p->vbr = false; // this MP3 is CBR
   for (i = 0; i < 36; i++)// read the following 36 bytes, find if it has VBR flag
   {
     if (strncmp("Xing", (char *) &FILE_BUF(mfile, i), 4) == 0)
     {
-      vbr = true; // this MP3 is VBR
+      p->vbr = true; // this MP3 is VBR
     }
   }
 
-  if (vbr == false) //CBR
+  if (p->vbr == false) //CBR
   {
-    mfile->framesize = (u32) (((144 * Frame_bitrates[bitrate_index])
+    p->framesize = (u32) (((144 * Frame_bitrates[bitrate_index])
             / Frame_sampfreqs[sample_index])) + padding_bit; // count the bytes of every frame
 
-    assert_param(mfile->file.fsize > mfile->data_start);
+    assert_param(mfile->file.fsize > p->data_start);
 
-    mfile->maxframe = (mfile->file.fsize - mfile->data_start)
-            / mfile->framesize; // the total frames
+    p->maxframe = (mfile->file.fsize - p->data_start)
+                    / p->framesize; // the total frames
   }
   else //VBR
   {
@@ -430,9 +288,9 @@ FuncResult MP3_ReadMetadata(MediaFile_Typedef *mfile)
      * */
 
     offset = offset + 40;
-    mfile->maxframe = FILE_BUF(mfile, offset + 3) + FILE_BUF(mfile, offset + 2)
-            * 256 + FILE_BUF(mfile, offset + 1) * 256 * 256
-            + FILE_BUF(mfile, offset) * 256 * 256 * 256;
+    p->maxframe = FILE_BUF(mfile, offset + 3) + FILE_BUF(mfile, offset + 2)
+                    * 256 + FILE_BUF(mfile, offset + 1) * 256 * 256
+                    + FILE_BUF(mfile, offset) * 256 * 256 * 256;
 
     offset += 4;
 
@@ -444,7 +302,7 @@ FuncResult MP3_ReadMetadata(MediaFile_Typedef *mfile)
     MF_EXEC(MediaFile_Seek(mfile, offset));
     offset = 0;
 
-    memcpy(toc, &FILE_BUF(mfile, offset), sizeof(toc));
+    memcpy(p->toc, &FILE_BUF(mfile, offset), sizeof(p->toc));
 
     //    52-151    TOC (Table of Contents)
     //    Contains of 100 indexes (one Byte length) for easier lookup in file-> Approximately solves problem with moving inside file->
@@ -455,94 +313,77 @@ FuncResult MP3_ReadMetadata(MediaFile_Typedef *mfile)
     //    and corresponding Byte in file is then approximately at:
     //    (TOC[25]/256) * 5000000
   }
-  meta->mstime_curr = 0;
-  meta->mstime_max = mfile->maxframe * MP3_FRAME_MSTIME;
 
-  SyncVariable(VAR_PlayerState);
+  meta->mstime_max = p->maxframe * MP3_FRAME_MSTIME;
+
+  MF_EXEC(MediaFile_FillFromFile(mfile, p->data_start));
 
   return FUNC_SUCCESS;
 }
 
-void MP3_LoadFile(char *filepath)
+FuncResult MP3_MainThread(sDecoderContext *psDecoderContext)
 {
-  trace("MP3 started");
-  print_user_heap_mallinfo();
+  configASSERT(psDecoderContext->pDecoderData);
+  sMP3Private *p = (sMP3Private *) psDecoderContext->pDecoderData;
+  MediaFile_Typedef *mfile = &p->mfile;
 
-  mfile = (MediaFile_Typedef *) malloc(sizeof(MediaFile_Typedef));
-  memset(mfile, 0, sizeof(MediaFile_Typedef));
+  AudioBuffer_Typedef *audio_buf;
 
-  trace("MP3 file buffers allocated");
-  print_user_heap_mallinfo();
-
-  MediaFile_Open(mfile, filepath);
-
-  if (MP3_ReadMetadata(mfile) == FUNC_ERROR)
-  {
-    return Player_AudioFileError("Invalid MP3 metadata format");
-  }
-
-  pMP3Decoder = MP3InitDecoder();
-  assert_param(pMP3Decoder);
-
-  trace("MP3 decoder allocated");
-  print_user_heap_mallinfo();
-}
-
-void MP3_MainThread(void)
-{
   int offset, bytesLeft, err;
   u8 *f_buffer;
 
   if (mfile->state == MFS_EOF) /*XXX ???*/
   {
     Player_AsyncCommand(PC_NEXT, 0);
-    return;
   }
 
-  AudioBuffer_Typedef *audio_buf;
-  if (!(audio_buf = AudioBuffer_TryGetProducer()))
-  {
-    return;
+  audio_buf = AudioBuffer_TryGetProducer();
+  if (!audio_buf) {
+    return FUNC_NOT_SUCCESS;
   }
 
-  Metadata_TypeDef *meta = &(Player_GetState()->metadata);
+  sMetadata *meta = psDecoderContext->psMetadata;
 
-  assert_param(audio_buf->size == 0);
-
-  if (MediaFile_ReFill(mfile) != FUNC_SUCCESS)
-    return;
+  MF_EXEC(MediaFile_ReFill(mfile));
 
   offset = MP3FindSyncWord(&FILE_BUF(mfile, 0), mfile->bytes_in_buf);
   if (offset < 0)
   {
     /* 2-byte sync word */
 
-    MediaFile_Seek(mfile, mfile->bytes_in_buf - 2);
-    return;
+    MF_EXEC(MediaFile_Seek(mfile, mfile->bytes_in_buf - 2));
+    return FUNC_NOT_SUCCESS;
   }
 
   if (offset > 0)
   {
-    if (MediaFile_Seek(mfile, offset) != FUNC_SUCCESS)
-	    return;
+    MF_EXEC(MediaFile_Seek(mfile, offset));
   }
 
-  memset(&mp3FrameInfo, 0, sizeof(mp3FrameInfo));
-  err = MP3GetNextFrameInfo(pMP3Decoder, &mp3FrameInfo, &FILE_BUF(mfile, 0));
+  MP3FrameInfo mp3FrameInfo;
+  bzero(&mp3FrameInfo, sizeof(MP3FrameInfo));
+
+  err = MP3GetNextFrameInfo(p->pMP3Decoder, &mp3FrameInfo, &FILE_BUF(mfile, 0));
   if (!(err == ERR_MP3_NONE && mp3FrameInfo.bitrate && mp3FrameInfo.nChans
           && mp3FrameInfo.outputSamps && mp3FrameInfo.samprate
-          && mp3FrameInfo.bitsPerSample))
+  && mp3FrameInfo.bitsPerSample))
   {
     // advance data pointer
-    MediaFile_Seek(mfile, 1);
-    return;
+    MF_EXEC(MediaFile_Seek(mfile, 1));
+    return FUNC_NOT_SUCCESS;
+  }
+
+  u16 samps = mp3FrameInfo.outputSamps;
+
+  if (mp3FrameInfo.nChans == 1)
+  {
+    samps *= 2;
   }
 
   bytesLeft = mfile->bytes_in_buf;
   f_buffer = &FILE_BUF(mfile, 0);
 
-  err = MP3Decode(pMP3Decoder, &f_buffer, &bytesLeft, (s16*) audio_buf->data,
-      0);
+  err = MP3Decode(p->pMP3Decoder, &f_buffer, &bytesLeft, (s16*) audio_buf->data, 0);
 
   if (err != ERR_MP3_NONE)
   {
@@ -550,95 +391,94 @@ void MP3_MainThread(void)
     {
       case ERR_MP3_INDATA_UNDERFLOW:
       case ERR_MP3_MAINDATA_UNDERFLOW:
-        if (mfile->state == MFS_EOF) /*XXX ???*/
+        if (mfile->state == MFS_EOF) /*XXX todo determine how big of a buffers are req for 320kbps ???*/
         {
-          return;
+          return FUNC_NOT_SUCCESS;
         }
         else
         {
           /*XXX ???*/
-
-          MediaFile_Seek(mfile, MAX(1, mfile->bytes_in_buf - bytesLeft));
+          MF_EXEC(MediaFile_Seek(mfile, MAX(1, mfile->bytes_in_buf - bytesLeft)));
         }
         break;
 
       default:
-        MediaFile_Seek(mfile, MAX(1, mfile->bytes_in_buf - bytesLeft));
+        MF_EXEC(MediaFile_Seek(mfile, MAX(1, mfile->bytes_in_buf - bytesLeft)));
         break;
     }
 
-    return;
+    return FUNC_NOT_SUCCESS;
   }
 
-  MediaFile_Seek(mfile, mfile->bytes_in_buf - bytesLeft);
+  MF_EXEC(MediaFile_Seek(mfile, mfile->bytes_in_buf - bytesLeft));
 
   /* no error */
-
-  memset(&mp3FrameInfo, 0, sizeof(mp3FrameInfo));
-  MP3GetLastFrameInfo(pMP3Decoder, &mp3FrameInfo);
+  bzero(&mp3FrameInfo, sizeof(MP3FrameInfo));
+  MP3GetLastFrameInfo(p->pMP3Decoder, &mp3FrameInfo);
   if (!(mp3FrameInfo.bitrate && mp3FrameInfo.nChans && mp3FrameInfo.outputSamps
           && mp3FrameInfo.samprate && mp3FrameInfo.bitsPerSample))
   {
     // advance data pointer
-    MediaFile_Seek(mfile, 1);
-    return;
+    MF_EXEC(MediaFile_Seek(mfile, 1));
+    return FUNC_NOT_SUCCESS;
   }
 
-  assert_param(mp3FrameInfo.outputSamps <= AUDIO_BUFFER_MAX_SIZE);
   assert_param(mp3FrameInfo.nChans <= 2);
-
-  audio_buf->size = mp3FrameInfo.outputSamps;
-  audio_buf->sampling_freq = mp3FrameInfo.samprate;
-
-  SetVariable(VAR_AudioStatus, meta->channel_count, mp3FrameInfo.nChans);
-  SetVariable(VAR_AudioStatus, meta->bitrate, mp3FrameInfo.bitrate);
+  assert_param(samps == mp3FrameInfo.outputSamps * (mp3FrameInfo.nChans == 1 ? 2 : 1));
+  assert_param(samps <= AUDIO_BUFFER_MAX_SIZE);
 
   if (mp3FrameInfo.nChans == 1)
   {
-    assert_param(audio_buf->size * 2 <= AUDIO_BUFFER_MAX_SIZE);
-    for (s32 i = audio_buf->size - 1; i >= 0; i--)
+    for (int i = mp3FrameInfo.outputSamps - 1; i >= 0; i--)
     {
       audio_buf->data[2 * i] = audio_buf->data[i];
       audio_buf->data[2 * i + 1] = audio_buf->data[i];
     }
-    audio_buf->size *= 2;
   }
 
-  meta->mstime_curr += MP3_FRAME_MSTIME;
+  audio_buf->channel_count = mp3FrameInfo.nChans;
+  audio_buf->sampling_freq = mp3FrameInfo.samprate;
+  audio_buf->size = samps;
 
   AudioBuffer_MoveProducer();
 
-  return;
+  psDecoderContext->psMetadata->mstime_curr += MP3_FRAME_MSTIME;
+
+  return FUNC_SUCCESS;
 }
 
-void MP3_Seek(u32 msec)
+//todo assertion of a decoder only
+
+FuncResult MP3_Seek(sDecoderContext *psDecoderContext, u32 ms_absolute_offset)
 {
-  Metadata_TypeDef *meta = &(Player_GetState()->metadata);
+  sMP3Private *p = (sMP3Private *) psDecoderContext->pDecoderData;
 
-  if (msec > meta->mstime_max)
-    return;
+  configASSERT(ms_absolute_offset <= psDecoderContext->psMetadata->mstime_max);
 
-  if (vbr) //todo
-    return;
+  if (p->vbr) //todo
+    return FUNC_NOT_SUCCESS;
 
-  u32 delta_data = msec / MP3_FRAME_MSTIME;
+  u32 delta_data = ms_absolute_offset / MP3_FRAME_MSTIME;
   u32 delta_time = delta_data * MP3_FRAME_MSTIME;
 
-  meta->mstime_curr = delta_time;
+  psDecoderContext->psMetadata->mstime_curr = delta_time;
 
-  delta_data *= mfile->framesize;
-  MediaFile_FillFromFile(mfile, delta_data);
+  delta_data *= p->framesize;
+  MediaFile_FillFromFile(&p->mfile, delta_data);
 
-  return;
+  return FUNC_SUCCESS;
 }
 
-void MP3_Stop(void)
+void MP3_Destroy(sDecoderContext *psDecoderContext)
 {
+  sMP3Private *p = (sMP3Private *) psDecoderContext->pDecoderData;
+
   trace("MP3 deallocated");
   print_user_heap_mallinfo();
 
-  MediaFile_Close(mfile);
+  MediaFile_Close(&p->mfile);
+  MP3FreeDecoder(p->pMP3Decoder);
 
-  free(mfile);
+  vPortFree(psDecoderContext->pDecoderData);
+  psDecoderContext->pDecoderData = NULL;
 }
-

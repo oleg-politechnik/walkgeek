@@ -56,6 +56,7 @@ static __IO uint32_t dirty_row_flags;
 static __IO uint32_t busy;
 static u16 ram_x;
 static u8 ram_row;
+static bool irq;
 
 static const uint8_t FontLookup[][5] =
 {
@@ -156,6 +157,11 @@ static const uint8_t FontLookup[][5] =
 //static inline FuncResult Disp_NextColRow(u16 *x, u8 *row);
 
 /* Private functions ---------------------------------------------------------*/
+static inline void Disp_SendData(u8 byte);
+static inline void Disp_SendCommand(u8 byte);
+static inline void FeedDisp();
+static inline void Disp_SendByte(u16 byte);
+
 /* Private low-level functions -----------------------------------------------*/
 
 static void Disp_Interface_Init()
@@ -179,10 +185,34 @@ static void Disp_Interface_Init()
   SPI_Cmd(DISP_SPI, ENABLE);
 }
 
+static inline void Disp_SendData(u8 byte)
+{
+  Disp_SendByte((byte | 0x100) << 7);
+}
+
+static inline void Disp_SendCommand(u8 byte)
+{
+  Disp_SendByte((byte & ~0x100) << 7);
+}
+
+static inline void FeedDisp()
+{
+  if (DISP_IS_VALID_X(ram_x))
+  {
+    assert_param(DISP_IS_VALID_ROW(ram_row));
+
+    Disp_SendData(dispRAM[ram_row][ram_x]);
+    ram_x++;
+  }
+}
+
 static inline void Disp_SendByte(u16 byte)
 {
-  while (busy)
-    ;
+  if (irq)
+  {
+    while (busy)
+      ;
+  }
 
   busy = true;
   Disp_SetCS(true);
@@ -191,16 +221,16 @@ static inline void Disp_SendByte(u16 byte)
 
   /* XXX clear? */
   SPI_I2S_ITConfig(DISP_SPI, SPI_I2S_IT_RXNE, ENABLE);
-}
 
-static inline void Disp_SendData(u8 byte)
-{
-  Disp_SendByte((byte | 0x100) << 7);
-}
+  if (!irq)
+  {
+    while (!SPI_GetITStatus(DISP_SPI, SPI_IT_RXNE))
+      ;
 
-static void Disp_SendCommand(u8 byte)
-{
-  Disp_SendByte((byte & ~0x100) << 7);
+    SPI_I2S_ReceiveData(DISP_SPI);
+
+    Disp_SetCS(DISABLE);
+  }
 }
 
 static void Disp_SetXRow(u8 x, u8 row)
@@ -225,17 +255,6 @@ static inline void Disp_SetRowDirty(uint8_t row, bool dirty)
   vPortExitCritical();
 }
 
-static inline void FeedDisp()
-{
-  if (DISP_IS_VALID_X(ram_x))
-  {
-    assert_param(DISP_IS_VALID_ROW(ram_row));
-
-    Disp_SendData(dispRAM[ram_row][ram_x]);
-    ram_x++;
-  }
-}
-
 void Disp_MainThread()
 {
   u32 temp;
@@ -243,6 +262,10 @@ void Disp_MainThread()
 
   if (busy)
   {
+    if (!irq)
+    {
+      FeedDisp();
+    }
     return;
   }
 
@@ -282,59 +305,22 @@ void Disp_MainThread()
 
 void Disp_IRQHandler()
 {
-  volatile u16 temp;
-
   if (SPI_GetITStatus(DISP_SPI, SPI_IT_RXNE))
   {
-    temp = SPI_I2S_ReceiveData(DISP_SPI);
+    SPI_I2S_ReceiveData(DISP_SPI);
 
     Disp_SetCS(DISABLE);
+
     busy = false;
 
     FeedDisp();
   }
 }
 
-//static inline FuncResult Disp_NextXY(u16 *x, u16 *y, u8 row_size)
-//{
-//  row_size = 8;
-//
-//  (*x)++;
-//
-//  if (!DISP_IS_VALID_X(*x)) {
-//    (*x) = 0;
-//    (*y) += row_size;
-//  }
-//
-//  if (!DISP_IS_VALID_Y(*y)) {
-//    return FR_ERROR;
-//  }
-//
-//  return FR_SUCCESS;
-//}
-
-
 void Disp_SetData(u8 x, u8 row, u8 byte)
 {
-  //  u8 row = y / 8;
-  //  u8 byte0 = CTRL_ROW(offset_code);
-  //  u8 bit0, mask;
   assert_param(DISP_IS_VALID_X(x));
   assert_param(DISP_IS_VALID_ROW(row));
-
-  //#if (col_count != 8)
-  //  row &= _BV(col_count) - 1;
-  //#endif
-
-  //  bit0 = CTRL_COL(offset_code);
-  //
-  //  mask = _BV(bit0) - 1;
-  //
-  //  disp_RAM[DISP_INDEX(col, row)] &= mask;
-  //  disp_RAM[DISP_INDEX(col, row)] |= row << bit0;
-  //
-  //  disp_RAM[DISP_INDEX(col, row + 1)] &= ~mask;
-  //  disp_RAM[DISP_INDEX(col, row + 1)] |= row >> (8 - bit0);
 
   if (dispRAM[row][x] != byte)
   {
@@ -349,10 +335,7 @@ void Disp_Clear(void)
 
   for (row = 0; row < DISP_ROW_COUNT; ++row)
   {
-    for (x = 0; x < DISP_X_COUNT; ++x)
-    {
-      Disp_SetData(x, row, 0/*(x + row * DISP_X_COUNT) % 0xFF*/);
-    }
+    Disp_ClearRow(row);
   }
 }
 
@@ -407,17 +390,29 @@ void Disp_String(uint8_t col, uint8_t row, const char *ptr, bool new_line)
   }
 }
 
+void Disp_ClearRow(uint8_t row)
+{
+  assert_param(DISP_IS_VALID_ROW(row));
+
+  bzero(dispRAM[row], sizeof(dispRAM[row]));
+
+  Disp_SetRowDirty(row, true);
+}
+
 /* Private functions ---------------------------------------------------------*/
 static void Disp_InitFinally()
 {
   Disp_SetRST(DISABLE);
 
-  NVIC_InitTypeDef NVIC_InitStructure;
-  NVIC_InitStructure.NVIC_IRQChannel = DISP_SPI_IRQ;
-  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = configIRQ_PRIORITY_DISP;
-  NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
-  NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-  NVIC_Init(&NVIC_InitStructure);
+  if (irq)
+  {
+    NVIC_InitTypeDef NVIC_InitStructure;
+    NVIC_InitStructure.NVIC_IRQChannel = DISP_SPI_IRQ;
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = configIRQ_PRIORITY_DISP;
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_Init(&NVIC_InitStructure);
+  }
 
   Disp_SendCommand(0x20); // write VOP register
   Disp_SendCommand(0x90);
@@ -445,6 +440,7 @@ void Disp_Init()
   Disp_SetRST(ENABLE);
   Disp_SetCS(DISABLE);
   busy = false;
+  irq = true;
 
   Disp_Interface_Init();
 
@@ -453,103 +449,43 @@ void Disp_Init()
   Disp_InitFinally();
 }
 
-//
-///*******************************************************************************
-// * Function Name  : LCD_DrawRect
-// * Description    : Displays a rectangle.
-// * Input          : - Xpos: specifies the X position.
-// *                  - Ypos: specifies the Y position.
-// *                  - Height: display rectangle height.
-// *                  - Width: display rectangle width.
-// * Output         : None
-// * Return         : None
-// *******************************************************************************/
-//void LCD_DrawRect(uint8_t Xpos, uint16_t Ypos, uint8_t Height, uint16_t Width)
-//{
-//    //  LCD_DrawLine(Xpos, Ypos, Width, Horizontal);
-//    //  LCD_DrawLine((Xpos + Height), Ypos, Width, Horizontal);
-//    //
-//    //  LCD_DrawLine(Xpos, Ypos, Height, Vertical);
-//    //  LCD_DrawLine(Xpos, (Ypos - Width + 1), Height, Vertical);
-//}
-//
-///*******************************************************************************
-// * Function Name  : LCD_DrawMonoPict
-// * Description    : Displays a monocolor picture.
-// * Input          : - Pict: pointer to the picture array.
-// * Output         : None
-// * Return         : None
-// *******************************************************************************/
-//void LCD_DrawMonoPict(const uint32_t *Pict)
-//{
-//    //  uint32_t index = 0, i = 0;
-//    //
-//    //  LCD_SetCursor(0, 319);
-//    //
-//    //  LCD_WriteRAM_Prepare(); /* Prepare to write GRAM */
-//    //  for(index = 0; index < 2400; index++)
-//    //  {
-//    //    for(i = 0; i < 32; i++)
-//    //    {
-//    //      if((Pict[index] & (1 << i)) == 0x00)
-//    //      {
-//    //        LCD_WriteRAM(BackColor);
-//    //      }
-//    //      else
-//    //      {
-//    //        LCD_WriteRAM(TextColor);
-//    //      }
-//    //    }
-//    //  }
-//}
 
-//#define col_count 8
-//
-//u8 ctrl_mx_get_row(const u8 *matrix, ctrl_t offset_code)
-//{
-//  u8 byte0 = CTRL_ROW(offset_code);
-//  u8 bit0, row;
-//  if (byte0 > SYS_MATRIX_SIZE - 1) {
-//    return 0;
-//  }
-//
-//  bit0 = CTRL_COL(offset_code);
-//  row = 0;
-//
-//  row |= matrix[byte0] >> bit0;
-//  row |= (matrix[byte0 + 1] << (8 - bit0));
-//
-//#if (col_count != 8)
-//  row &= _BV(col_count) - 1;
-//#endif
-//
-//  return row;
-//}
+void uDelay (const uint32_t usec)
+{
+  uint32_t count = 0;
+  const uint32_t utime = (120 * usec / 7);
+  do
+  {
+    if ( ++count > utime )
+    {
+      return ;
+    }
+  }
+  while (1);
+}
 
 
-//u8 ctrl_mx_get_row(const u8 *matrix, ctrl_t offset_code);
-//void ctrl_mx_set_row(u8 *matrix, ctrl_t offset_code, u8 row/*, u8 mask*/);
-//
-//static __inline void Disp_SetPixel(u16 x, u16 y, boolbool)
-//{
-//    assert_param()
-//
-//    if (value) {
-//        matrix[CTRL_ROW(code)] |= _BV(CTRL_COL(code));
-//    } else {
-//        matrix[CTRL_ROW(code)] &= ~_BV(CTRL_COL(code));
-//    }
-//
-//    return;
-//}
-//
-//static __inline void Disp_TogglePixel(u16 x, u16 y)
-//{
-//    if (code > CTRL_MAX) {
-//        return;
-//    }
-//
-//    matrix[CTRL_ROW(code)] ^= _BV(CTRL_COL(code));
-//
-//    return;
-//}
+void mDelay (const uint32_t msec)
+{
+    uDelay(msec * 1000);
+}
+
+void Disp_InitIRQ_Less(void)
+{
+  ram_x = DISP_X_COUNT;
+  dirty_row_flags = 0;
+
+  Disp_Clear();
+
+  Disp_GPIO_Init();
+  Disp_SetRST(ENABLE);
+  Disp_SetCS(DISABLE);
+  busy = false;
+  irq = false;
+
+  Disp_Interface_Init();
+
+  mDelay(100);
+
+  Disp_InitFinally();
+}

@@ -42,9 +42,12 @@ set (SOURCES
 #    src/player/wav_decoder.c
     src/player/opus_decoder.c
     src/player/player.c
+    src/player/mediafile.c
     src/navigator.c
     src/nestedfilter.c
-    src/ui.c
+    src/ui/ui.c
+    src/ui/player_ui.c
+    src/ui/usb_ui.c
     src/usbd.c
     
     main.c

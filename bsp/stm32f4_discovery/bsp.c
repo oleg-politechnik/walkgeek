@@ -241,9 +241,9 @@ void BSP_InitPowerManager(void)
 
   ADC_DMA_Config();
 
-  xADCTimer = xTimerCreate("ADC Timer", 10 / portTICK_RATE_MS, pdTRUE,
+  xADCTimer = xTimerCreate((signed char *) "ADC Timer", 10 / portTICK_RATE_MS, pdTRUE,
     (void *) BSP_StartADC, BSP_StartADC);
-  xTimerStart(xADCTimer, configTIMER_API_TIMEOUT_TICKS);
+  xTimerStart(xADCTimer, configTIMER_API_TIMEOUT_MS);
 #endif
 
 #ifdef HAS_HEADSET
@@ -386,6 +386,7 @@ void Disp_SetRST(FunctionalState enabled)
 /* sdio ----------------------------------------------------------------------*/
 #ifdef HAS_SDIO
 #include "stm324xg_eval_sdio_sd.h"
+#include "stm32f4_discovery_audio_codec.h"
 
 /**
  * @brief  DeInitializes the SDIO interface.
@@ -654,31 +655,32 @@ void Vibrator_Enable(void)
 
 
 #ifdef  USE_FULL_ASSERT
-void assert_failed(uint8_t* file, uint32_t line, uint8_t* expr)
+void assert_failed(char* file, uint32_t line, char* expr)
 {
   /* User can add his own implementation to report the file name and line number,
    ex: printf("Wrong parameters value: file %s on line %d\n", file, line) */
 
-  vTaskSuspendAll();
+  vPortEnterCritical();
 
   char buf[256];
-  int row = 0;
 
   //TODO: add application state
 
   EVAL_AUDIO_DeInit();
 
-  Disp_Clear();
+  Disp_InitIRQ_Less();
 
-  Disp_String(0, row++, "ASSERT FAILED", true);
-  Disp_String(0, row, expr, true);
-  row += 2;
-
-  sprintf(buf, "line %i in %s", (int) line, strrchr(file, '/') ? strrchr(file, '/') + 1 : file);
-  /*todo: test on windows*/
-  Disp_String(0, row, buf, true);
-
-  portBASE_TYPE delay = 0;
+  if (file)
+  {
+    snprintf(buf, sizeof(buf), "ASSERT %i at %s: %s", (int) line,
+	(char *) ((int) strrchr(file, '/') ? strrchr(file, '/') + 1 : file),
+	expr);
+    Disp_String(0, 0, buf, true);
+  }
+  else
+  {
+    Disp_String(0, 0, expr, true);
+  }
 
   /* Infinite loop */
   while (1)
@@ -688,17 +690,17 @@ void assert_failed(uint8_t* file, uint32_t line, uint8_t* expr)
 
     if (BSP_Keypad_GetKeyStatus(KEY_PPP))
     {
-      vTaskDelay(10 / portTICK_RATE_MS); //todo const
-      delay += 10;
+      //Delay(10); //todo const
+//      delay += 10;
 
-      if (delay < 1000)
-      {
+//      if (delay < 1000) //todo const
+//      {
 	BSP_PowerDisable();
-      }
+//      }
     }
     else
     {
-      delay = 0;
+//      delay = 0;
     }
   }
 }

@@ -47,7 +47,6 @@ static char root[] = "0:";
 /* Private functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void Navigator_Init(void)
 {
-  //fixme call
   f_mount(0, &fatfs);
 }
 
@@ -245,8 +244,6 @@ bool Navigator_IsOnline(void)
 void Navigator_InitRoot(NavigatorContext_Typedef *ctx,
         char *suffixes_white_list[])
 {
-  //fixme call
-
   ctx->dir_nesting_ = 0;
   ctx->dir_path[0] = 0;
 
@@ -259,10 +256,7 @@ void Navigator_InitRoot(NavigatorContext_Typedef *ctx,
 
   OpenDir(ctx, root);
 
-  if (res != FR_OK)
-  {
-    return;
-  }
+  assert_param(res == FR_OK);
 
   trace("navigator: init\n");
 }

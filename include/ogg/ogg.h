@@ -64,6 +64,8 @@ typedef struct {
 
   long nextpage_pos;
   size_t fsize;
+
+  void *file;
 } ogg_sync_state;
 
 typedef struct {

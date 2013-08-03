@@ -28,6 +28,9 @@
 #ifdef USE_DEVICE_MODE
 
 /* Includes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+#include "FreeRTOS.h"
+#include "timers.h"
+
 #include "system.h"
 
 /* Imported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -42,19 +45,13 @@ extern void BSP_USBD_MSC_Init(void);
 extern void BSP_USBD_CDC_Init(void);
 extern void BSP_USBD_DeInit(void);
 
-u32 MSC_DataIn;
-u32 MSC_DataOut;
-
+u32 MSC_DataIn, MSC_DataOut;
 u32 MSC_RxSpeed, MSC_TxSpeed;
 
-void USB_MSC_DisplaySpeed_Int(void)
-{
-  if (SystemState != SS_USB_MSC)
-  {
-    //Scheduler_RemoveTask(&USB_MSC_DisplaySpeed_Int);
-    return;
-  }
+static xTimerHandle xShowUsbSpeedTimer;
 
+void USB_MSC_DisplaySpeed(xTimerHandle xTimer)
+{
   SetVariable(VAR_MSC_Speed, MSC_RxSpeed, MSC_DataIn * USBD_MSC_SPEED_MPS);
   SetVariable(VAR_MSC_Speed, MSC_TxSpeed, MSC_DataOut * USBD_MSC_SPEED_MPS);
 
@@ -66,7 +63,13 @@ void USB_MSC_Init(void)
 {
   trace("usb: MSC mode activated\n");
 
-  //Scheduler_PutTask(1000 / USBD_MSC_SPEED_MPS, USB_MSC_DisplaySpeed_Int, REPEAT);
+  xShowUsbSpeedTimer = xTimerCreate((signed portCHAR *) "USB Speed Timer",
+      (1000 / USBD_MSC_SPEED_MPS) / portTICK_RATE_MS, pdTRUE,
+      (void *) USB_MSC_DisplaySpeed, USB_MSC_DisplaySpeed);
+  configASSERT(xShowUsbSpeedTimer);
+
+  int result = xTimerStart(xShowUsbSpeedTimer, configTIMER_API_TIMEOUT_MS);
+  configASSERT(result);
 
   BSP_USBD_MSC_Init();
 }
@@ -84,6 +87,8 @@ void USB_DeInit(void)
   trace("usb: deinit\n");
 
   BSP_USBD_DeInit();
+
+  xTimerDelete(xShowUsbSpeedTimer, configTIMER_API_TIMEOUT_MS);
 }
 
 #endif

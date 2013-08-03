@@ -63,47 +63,28 @@ void NMI_Handler(void)
 
 void HardFault_TopHandler(unsigned int * hardfault_args)
 {
+  char str_buf[256];
+
   // From Joseph Yiu, minor edits by FVH
   // hard fault handler in C,
   // with stack frame location as input parameter
   // called from HardFault_Handler in file xxx.s
 
-  unsigned int stacked_r0;
-  unsigned int stacked_r1;
-  unsigned int stacked_r2;
-  unsigned int stacked_r3;
-  unsigned int stacked_r12;
-  unsigned int stacked_lr;
-  unsigned int stacked_pc;
-  unsigned int stacked_psr;
+  snprintf(str_buf, sizeof(str_buf),
+          "HARD FAULT! PC=0x%08x,LR=0x%08x,R0=0x%08x,R1=0x%08x,R2=0x%08x,"
+          "R3=0x%08x,R12=0x%08x,PSR=0x%08x,BFAR=0x%08x,CFSR=0x%08x,"
+          "HFSR=0x%08x,DFSR=0x%08x,AFSR=0x%08x,SCB_SHCSR=0x%08x",
+          hardfault_args[6], hardfault_args[5], hardfault_args[0],
+          hardfault_args[1], hardfault_args[2], hardfault_args[3],
+          hardfault_args[4], hardfault_args[7],
+          (*((volatile unsigned int *)(0xE000ED38))),
+          (*((volatile unsigned int *)(0xE000ED28))),
+          (*((volatile unsigned int *)(0xE000ED2C))),
+          (*((volatile unsigned int *)(0xE000ED30))),
+          (*((volatile unsigned int *)(0xE000ED3C))),
+          (unsigned int) SCB->SHCSR);
 
-  stacked_r0 = ((unsigned long) hardfault_args[0]);
-  stacked_r1 = ((unsigned long) hardfault_args[1]);
-  stacked_r2 = ((unsigned long) hardfault_args[2]);
-  stacked_r3 = ((unsigned long) hardfault_args[3]);
-
-  stacked_r12 = ((unsigned long) hardfault_args[4]);
-  stacked_lr = ((unsigned long) hardfault_args[5]);
-  stacked_pc = ((unsigned long) hardfault_args[6]);
-  stacked_psr = ((unsigned long) hardfault_args[7]);
-
-//  printf ("\n\n[Hard fault handler - all numbers in hex]\n");
-//  printf ("R0 = %x\n", stacked_r0);
-//  printf ("R1 = %x\n", stacked_r1);
-//  printf ("R2 = %x\n", stacked_r2);
-//  printf ("R3 = %x\n", stacked_r3);
-//  printf ("R12 = %x\n", stacked_r12);
-//  printf ("LR [R14] = %x  subroutine call return address\n", stacked_lr);
-//  printf ("PC [R15] = %x  program counter\n", stacked_pc);
-//  printf ("PSR = %x\n", stacked_psr);
-//  printf ("BFAR = %x\n", (*((volatile unsigned long *)(0xE000ED38))));
-//  printf ("CFSR = %x\n", (*((volatile unsigned long *)(0xE000ED28))));
-//  printf ("HFSR = %x\n", (*((volatile unsigned long *)(0xE000ED2C))));
-//  printf ("DFSR = %x\n", (*((volatile unsigned long *)(0xE000ED30))));
-//  printf ("AFSR = %x\n", (*((volatile unsigned long *)(0xE000ED3C))));
-//  printf ("SCB_SHCSR = %x\n", SCB->SHCSR);
-
-  while (1);
+  assert_failed(NULL, 0, str_buf);
 }
 
 void HardFault_Handler(void) __attribute__ ((naked));

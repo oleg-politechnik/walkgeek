@@ -36,10 +36,10 @@
 /* Exported macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Exported types ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Exported functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-void OPUS_LoadFile(char *filepath);
-void OPUS_MainThread(void);
-void OPUS_Seek(u32 msec);
-void OPUS_Stop(void);
+FuncResult OPUS_LoadFile(sDecoderContext *psDecoderContext);
+FuncResult OPUS_MainThread(sDecoderContext *psDecoderContext);
+FuncResult OPUS_Seek(sDecoderContext *psDecoderContext, u32 ms_absolute_offset);
+void OPUS_Destroy(sDecoderContext *psDecoderContext);
 
 /* Exported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Exported static inline functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/

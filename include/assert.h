@@ -46,9 +46,9 @@
  *   If expr is true, it returns no value.
  * @retval None fixme move to the uspace
  */
-#define assert_param(expr) ((expr) ? (void)0 : assert_failed((uint8_t *)__FILE__, __LINE__, (uint8_t *)#expr))
+#define assert_param(expr) ((expr) ? (void)0 : assert_failed(__FILE__, __LINE__, #expr))
 /* Exported functions ------------------------------------------------------- */
-void assert_failed(uint8_t* file, uint32_t line, uint8_t* expr);
+void assert_failed(char* file, uint32_t line, char *expr);
 #else
 #define assert_param(expr) ((void)(expr))
 #endif /* USE_FULL_ASSERT */

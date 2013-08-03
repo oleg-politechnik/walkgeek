@@ -788,7 +788,9 @@ int minogg_sync_init(ogg_sync_state *oy, size_t buffer_size, unsigned char *buff
       return MINOGG_E_NO_MEM;
   }
 
+  void *file = oy->file;
   memset(oy, 0, sizeof(*oy));
+  oy->file = file;
 
   oy->data = buffer;
   oy->storage = buffer_size;

@@ -51,7 +51,7 @@ typedef struct
 
   /* file-related */
   FILINFO file_info_;
-  char lfn_buf_[256];
+  char lfn_buf_[MAX_FILE_PATH];
 
   char **suffixes_white_list_;
 
@@ -63,7 +63,7 @@ typedef struct
   //u32 total_media_files_dir;
   //u32 current_media_file_index_dir;
 
-  char dir_path[256];
+  char dir_path[MAX_FILE_PATH];
   char *fname;
   int suffix_ix;
 

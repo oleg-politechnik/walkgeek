@@ -1,7 +1,7 @@
 /*
- * nestedfilter.c
+ * usb_ui.c
  *
- * Copyright (c) 2012, Oleg Tsaregorodtsev
+ * Copyright (c) 2013, Oleg Tsaregorodtsev
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,73 +26,78 @@
  */
 
 /* Includes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-#include "FreeRTOS.h"
-
-#include "nestedfilter.h"
+#include "ui.h"
 
 /* Imported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+extern u32 MSC_RxSpeed, MSC_TxSpeed;
+
 /* Private define ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private typedef ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-/* Private variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private function prototypes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+static void USBScreen_Init(void);
+static void USBScreen_DeInit(void);
+static void USBScreen_VariableChangedHandler(VAR_Index var);
+
+static void PrintSpeed(char *buf, u32 bytes_per_second);
+
+/* Private variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+Screen_Typedef UsbScreen = {
+        .Init = USBScreen_Init,
+        .DeInit = USBScreen_DeInit,
+        .UpdateVar = USBScreen_VariableChangedHandler,
+        .KeyPressedHandler = NULL,
+        .KeyReleasedHandler = NULL
+};
+
 /* Private functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-NestedFilterSet_Typedef *NestedFilter_Init(u8 filter_count,
-        u8 filter_buffer_size)
+static void USBScreen_Init(void)
 {
-  int i;
-  NestedFilterSet_Typedef *nfs = pvPortMalloc(sizeof(NestedFilterSet_Typedef));
-  nfs->count = filter_count;
-  nfs->filters = pvPortMalloc(sizeof(NestedFilter_Typedef) * filter_count);
+  DISP_ALIGN_CENTER(2, "USB Disk");
 
-  for (i = 0; i < filter_count; i++)
+  SyncVariable(VAR_MSC_Speed);
+}
+
+static void USBScreen_DeInit(void)
+{
+}
+
+static void USBScreen_VariableChangedHandler(VAR_Index var)
+{
+  char str_buf[32];
+
+  switch (var)
   {
-    nfs->filters[i].size = filter_buffer_size;
-    nfs->filters[i].pos = 0;
-    nfs->filters[i].buf = pvPortMalloc(sizeof(nfpoint_t) * filter_buffer_size);
-    memset(nfs->filters[i].buf, 0, sizeof(nfpoint_t) * filter_buffer_size);
+    case VAR_MSC_Speed:
+      sprintf(str_buf, "Rx: ");
+      PrintSpeed(str_buf + sizeof("Rx"), MSC_TxSpeed);
+      Disp_ClearRow(3);
+      DISP_ALIGN_LEFT(3, str_buf);
+
+      sprintf(str_buf, "Wx: ");
+      PrintSpeed(str_buf + sizeof("Wx"), MSC_RxSpeed);
+      Disp_ClearRow(4);
+      DISP_ALIGN_LEFT(4, str_buf);
+      break;
+
+    default:
+      break;
   }
-
-  return nfs;
 }
 
-void NestedFilter_AddMeasure(NestedFilterSet_Typedef *nfs, nfpoint_t p, VAR_Index var_ix)
+void PrintSpeed(char *buf, u32 bytes_per_second)
 {
-  int filter_ix = 0;
-  u8 i;
-  nfpoint_aggregate_t temp_avg_value;
-  NestedFilter_Typedef *nf;
-
-  do
+  if (bytes_per_second < 1024)
   {
-    nf = &nfs->filters[filter_ix];
-
-    nf->buf[nf->pos] = p;
-
-    nf->pos++;
-    if (nf->pos < nf->size)
-    {
-      return;
-    }
-
-    nf->pos = 0;
-    temp_avg_value = 0;
-    for (i = 0; i < nf->size; i++)
-    {
-      temp_avg_value += nf->buf[i];
-    }
-
-    temp_avg_value /= nf->size;
-
-    p = temp_avg_value;
-
-    filter_ix++;
-  } while (filter_ix < nfs->count);
-
-  SetVariable(var_ix, nfs->value, temp_avg_value);
+    sprintf(buf, "%uB/s", (unsigned int) bytes_per_second);
+  }
+  else if (bytes_per_second < 1024 * 1024)
+  {
+    sprintf(buf, "%uKB/s", (unsigned int) bytes_per_second / (1024));
+  }
+  else
+  {
+    sprintf(buf, "%uMB/s", (unsigned int) bytes_per_second / (1024 * 1024));
+  }
 }
 
-nfpoint_t NestedFilter_GetValue(NestedFilterSet_Typedef *nfs)
-{
-  return nfs->value;
-}

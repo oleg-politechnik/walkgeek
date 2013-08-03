@@ -40,6 +40,7 @@
 /* Exported types ------------------------------------------------------------*/
 /* Exported macro ------------------------------------------------------------*/
 #define DISP_ROW_COUNT              ((DISP_Y_COUNT+DISP_Y_PER_ROW)/DISP_Y_PER_ROW)
+#define DISP_COL_COUNT              ((DISP_X_COUNT)/(5+1))
 
 #define CTRL_COL(code) (code % 8)
 #define CTRL_ROW(code) (code / 8)
@@ -48,6 +49,7 @@
 
 /* Exported functions ------------------------------------------------------- */
 void Disp_Init();
+void Disp_InitIRQ_Less(void);
 void Disp_GPIO_Init();
 
 void Disp_MainThread(void);
@@ -63,5 +65,6 @@ void Disp_SetRST(FunctionalState enabled);
 void Disp_Clear();
 void Disp_SetData(u8 x, u8 row, u8 byte);
 void Disp_String(uint8_t col, uint8_t row, const char *ptr, bool new_line);
+void Disp_ClearRow(uint8_t row);
 
 #endif /* DISP_1100_H_ */

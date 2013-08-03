@@ -1,7 +1,7 @@
 /*
  * system.h
  *
- * Copyright (c) 2012, Oleg Tsaregorodtsev
+ * Copyright (c) 2012, 2013, Oleg Tsaregorodtsev
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without

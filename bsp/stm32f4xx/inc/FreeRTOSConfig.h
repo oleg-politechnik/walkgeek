@@ -89,7 +89,7 @@
 #define configUSE_TICK_HOOK				1
 #define configCPU_CLOCK_HZ				( SystemCoreClock )
 #define configTICK_RATE_HZ				( ( portTickType ) 1000 )
-#define configMAX_PRIORITIES			( ( unsigned portBASE_TYPE ) 5 )
+#define configMAX_PRIORITIES			( 16 )
 #define configMINIMAL_STACK_SIZE		( ( unsigned short ) 130 )
 #define configTOTAL_HEAP_SIZE			( ( size_t ) ( 75 * 1024 ) )
 #define configMAX_TASK_NAME_LEN			( 64 )
@@ -104,7 +104,7 @@
 #define configUSE_APPLICATION_TASK_TAG	0
 #define configUSE_COUNTING_SEMAPHORES	1
 #define configGENERATE_RUN_TIME_STATS	0
-/*#define configUSE_PORT_OPTIMISED_TASK_SELECTION	1*/
+#define configUSE_PORT_OPTIMISED_TASK_SELECTION	1
 
 /* Co-routine definitions. */
 #define configUSE_CO_ROUTINES 		0
@@ -112,7 +112,6 @@
 
 /* Software timer definitions. */
 #define configUSE_TIMERS				1
-#define configTIMER_TASK_PRIORITY		( 2 )
 #define configTIMER_QUEUE_LENGTH		10
 #define configTIMER_TASK_STACK_DEPTH	( configMINIMAL_STACK_SIZE * 2 )
 
@@ -164,14 +163,31 @@ standard names. */
 
 /* Applications */
 
-#define configTIMER_API_TIMEOUT_TICKS			( 100 / portTICK_RATE_MS )
+#define configTIMER_API_TIMEOUT_MS			( 100 / portTICK_RATE_MS )
 
-#define configIRQ_PRIORITY_USB_TIMER			1
+#define configAUDIO_IF_TIMEOUT_MS			( 1000 / portTICK_RATE_MS )
+
+#define configIRQ_PRIORITY_USB_TIMER			(configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY + 4)
 
 #define configIRQ_PRIORITY_AUDIO			(configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY + 1)
 #define configIRQ_PRIORITY_SD_CARD			(configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY + 2)
 #define configIRQ_PRIORITY_USB				(configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY + 3)
-#define configIRQ_PRIORITY_DISP			(configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY + 4)
+#define configIRQ_PRIORITY_DISP			(1)
 #define configIRQ_PRIORITY_ADC				(configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY + 5)
+
+#define mainINIT_TASK_PRIORITY			( tskIDLE_PRIORITY + 1 )
+#define mainINIT_TASK_STACK_SIZE		( configMINIMAL_STACK_SIZE * 30 )
+
+#define mainUI_TASK_STACK_SIZE			( configMINIMAL_STACK_SIZE * 30 )
+#define mainUI_TASK_PRIORITY			( tskIDLE_PRIORITY + 2 )
+
+#define mainPLAYER_TASK_STACK_SIZE		( configMINIMAL_STACK_SIZE * 50 )
+#define mainPLAYER_TASK_PRIORITY		( tskIDLE_PRIORITY + 3 )
+
+#define mainSYSTEM_STATE_QUEUE_SIZE		( 20 )
+
+#define configTIMER_TASK_PRIORITY   ( tskIDLE_PRIORITY )
+
+#define configFS_TIMEOUT_MS         ( 1000 / portTICK_RATE_MS )
 
 #endif /* FREERTOS_CONFIG_H */

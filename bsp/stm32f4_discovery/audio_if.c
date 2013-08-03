@@ -89,7 +89,7 @@ FuncResult Audio_Init(u32 AudioFreq)
 
   /* Codec supports this value AudioFreq */
 
-  SetVariable(VAR_AudioPosition, SampleRate, AudioFreq);
+  SampleRate = AudioFreq;
   SetVariable(VAR_AudioStatus, AudioState, AS_STOPPED);
 
   return FUNC_SUCCESS;
@@ -143,7 +143,7 @@ static FuncResult Audio_DoCommand(AudioCommand_Typedef cmd)
 
       /* Process the STOP command ----------------------------*/
     case AC_STOP:
-      SetVariable(VAR_AudioPosition, SampleRate, 0);
+      SampleRate = 0;
 
       EVAL_AUDIO_Stop(CODEC_PDWN_SW); //XXX CODEC_PDWN_HW
 

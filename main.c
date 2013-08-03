@@ -44,17 +44,6 @@ extern void prvPlayerTask(void *);
 extern void prvUiTask(void *);
 
 /* Private define ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-#define mainINIT_TASK_PRIORITY			( tskIDLE_PRIORITY + 1 )
-#define mainINIT_TASK_STACK_SIZE		( configMINIMAL_STACK_SIZE * 30 )
-
-#define mainPLAYER_TASK_STACK_SIZE		( configMINIMAL_STACK_SIZE * 50 )
-#define mainPLAYER_TASK_PRIORITY		( tskIDLE_PRIORITY + 2 )
-
-#define mainUI_TASK_STACK_SIZE			( configMINIMAL_STACK_SIZE * 30 )
-#define mainUI_TASK_PRIORITY			( tskIDLE_PRIORITY + 3 )
-
-#define mainSYSTEM_STATE_QUEUE_SIZE		( 2 )
-
 /* Private typedef ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -89,7 +78,8 @@ static void System_EnterLowPowerModeCallback(xTimerHandle xTimer)
 
 static void prvInitTask(void *pvParameters)
 {
-  xSystemStateQueue = xQueueCreate( mainSYSTEM_STATE_QUEUE_SIZE, sizeof( SystemState_Typedef ) );
+  xSystemStateQueue = xQueueCreate( mainSYSTEM_STATE_QUEUE_SIZE,
+          sizeof( SystemState_Typedef ) );
 
   BSP_Keypad_Init();
 
@@ -120,9 +110,11 @@ static void prvInitTask(void *pvParameters)
     System_SetState(debug_mode ? SS_PLAYER : SS_USB_MSC);
   }
 
-  xTaskCreate(prvUiTask, (signed portCHAR *) "UI", mainUI_TASK_STACK_SIZE, NULL, mainUI_TASK_PRIORITY, NULL);
+  xTaskCreate(prvUiTask, (signed portCHAR *) "UI",
+          mainUI_TASK_STACK_SIZE, NULL, mainUI_TASK_PRIORITY, NULL);
 
-  xTaskCreate(prvPlayerTask, (signed portCHAR *) "Player", mainPLAYER_TASK_STACK_SIZE, NULL, mainPLAYER_TASK_PRIORITY, NULL);
+  xTaskCreate(prvPlayerTask, (signed portCHAR *) "Player",
+          mainPLAYER_TASK_STACK_SIZE, NULL, mainPLAYER_TASK_PRIORITY, NULL);
 
   {
     xEnterLowPowerModeTimer = xTimerCreate(
@@ -130,7 +122,7 @@ static void prvInitTask(void *pvParameters)
             10000 / portTICK_RATE_MS, pdFALSE,
             (void *) System_EnterLowPowerModeCallback,
             System_EnterLowPowerModeCallback);
-    xTimerStart(xEnterLowPowerModeTimer, configTIMER_API_TIMEOUT_TICKS);
+    xTimerStart(xEnterLowPowerModeTimer, configTIMER_API_TIMEOUT_MS);
   }
 
   while (1)
@@ -201,6 +193,8 @@ void SetState(SystemState_Typedef NewState)
 
   trace("system: entering state %s\n", stateNames[NewState]);
 
+  SetVariable(VAR_SystemState, SystemState, NewState);
+
   switch (NewState)
   {
     case SS_SHUTDOWN:
@@ -219,8 +213,6 @@ void SetState(SystemState_Typedef NewState)
     default:
       break;
   }
-
-  SetVariable(VAR_SystemState, SystemState, NewState);
 }
 
 extern void Player_Init(void);
@@ -229,7 +221,8 @@ int main(void)
 {
   CPU_PreInit();
 
-  xTaskCreate(prvInitTask, (signed portCHAR *) "Init", mainINIT_TASK_STACK_SIZE, NULL, mainINIT_TASK_PRIORITY, NULL);
+  xTaskCreate(prvInitTask, (signed portCHAR *) "Init", mainINIT_TASK_STACK_SIZE,
+          NULL, mainINIT_TASK_PRIORITY, NULL);
 
   /* Start the scheduler. */
   vTaskStartScheduler();

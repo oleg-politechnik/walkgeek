@@ -30,6 +30,10 @@
 #define UI_H_
 
 /* Includes ------------------------------------------------------------------*/
+#include "common.h"
+#include "var.h"
+#include "disp_1100.h"
+
 /* Exported constants --------------------------------------------------------*/
 #define KEY_PREV        KEY_1
 #define KEY_NEXT        KEY_3
@@ -43,27 +47,55 @@
 #define KEY_RESET_PLAYER 	KEY_C
 #define KEY_SAVE_PLAYER_STATE	KEY_5
 
+#define DISP_LAST_ROW         (DISP_ROW_COUNT - 2)
+
+#define configUI_BACKLIGHT_TIMEOUT_MS   (10000 / portTICK_RATE_MS)
+
+#define configUI_PRESS_TICK_MS          (100 / portTICK_RATE_MS)
+#define configUI_PRESS_TIMEOUT_MS       (800 / portTICK_RATE_MS)
+
+#define configUI_LOCK_UNLOCK_TIMEOUT_MS (1000 / portTICK_RATE_MS)
+
 /* Exported types ------------------------------------------------------------*/
 typedef enum
 {
-  UIM_Init,
-
+  UIM_Uninitialized,
   UIM_Player,
-  UIM_Player_Seeking,
-
-  UIM_Player_HalfLocked,
-  UIM_Player_Locked,
-  UIM_Player_HalfUnlocked,
-
-  UIM_MSC
+//  UIM_FileBrowser,
+  UIM_USB,
+  UIM_MAX
 } UserInterfaceMode_Typedef;
 
+/*
+ * Screen is like a layer plus a set of event handling functions.
+ */
+typedef struct
+{
+    void (*Init)(void);
+    void (*DeInit)(void);
+    void (*UpdateVar)(VAR_Index);
+    u16 (*KeyPressedHandler)(KEY_Typedef key);
+    u16 (*KeyHoldHandler)(KEY_Typedef key);
+    void (*KeyReleasedHandler)(KEY_Typedef key);
+} Screen_Typedef;
+
 /* Exported macro ------------------------------------------------------------*/
+#define DISP_ALIGN_CENTER(row, str) \
+  Disp_String(MAX((int)(DISP_X_COUNT / 2) - ((int) strlen(str) - 1) * 6 / 2, (int)0), row, str, false)
+
+#define DISP_ALIGN_RIGHT(row, str) \
+  Disp_String(DISP_X_COUNT - strlen(str) * 6, row, str, false)
+
+#define DISP_ALIGN_LEFT(row, str) \
+  Disp_String(0, row, str, false)
+
 /* Exported functions ------------------------------------------------------- */
-void UI_Init(void);
-void UI_MainCycle(void);
-void UI_DeInit(void);
+void UI_EnableBacklight(void);
+void UI_StartHoldTimer(u16 timeout);
 
 void Vibrator_SendSignal(u16 ms);
+
+/* */
+//extern char str_buf[DISP_COL_COUNT];
 
 #endif /* UI_H_ */
