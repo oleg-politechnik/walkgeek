@@ -417,7 +417,7 @@ void OPUS_LoadFile(char *filepath)
 
     /* All we need here is to read last page's header granulepos */
     /* Ogg max page size is 65K, so... */
-    os->oy.nextpage_pos = MIN(minogg_impl_fsize(&os->oy), 65536); //todo
+    os->oy.nextpage_pos = MAX(minogg_impl_fsize(&os->oy) - 65536, 0); //todo
 
     while (minogg_sync_pageout(&os->oy, og) == MINOGG_OK)
     {
