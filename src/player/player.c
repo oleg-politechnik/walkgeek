@@ -151,7 +151,7 @@ static void FinalizeCurrentTrack(void)
     configASSERT(!pDecoderContext->pDecoderData);
   }
 
-  Player_Stop(); //todo remove
+//  Player_Stop(); //todo remove
 
   CPU_InitUserHeap();
 }
@@ -191,7 +191,8 @@ void Player_Init(void)
     }
   }
 
-  SetVariable(VAR_PlayerTrack, PlayerState.status, PS_STOPPED);
+  PlayerState.status = PS_STOPPED;
+  SyncVariable(VAR_PlayerTrack);
 
   if (PlayerContext.fname)
   {
@@ -233,7 +234,8 @@ void Player_DeInit(void)
 
   Navigator_DeInit();
 
-  SetVariable(VAR_PlayerTrack, PlayerState.status, PS_DEINITED);
+  PlayerState.status = PS_DEINITED;
+  SyncVariable(VAR_PlayerTrack);
 
   vTaskDelay(10); /* Let screen repaint */
 }
@@ -264,7 +266,8 @@ void Player_Play(void)
 
     pDecoderContext->psMetadata->file_path = pDecoderContext->pcFilePath;
 
-    SetVariable(VAR_PlayerTrack, PlayerState.status, PS_PLAYING);
+    PlayerState.status = PS_PLAYING;
+    SyncVariable(VAR_PlayerTrack);
     Audio_CommandSync(AC_PLAY);
   }
 }
@@ -275,7 +278,8 @@ void Player_Stop(void)
   {
     Audio_CommandSync(AC_STOP);
 
-    SetVariable(VAR_PlayerTrack, PlayerState.status, PS_STOPPED);
+    PlayerState.status = PS_STOPPED;
+    SyncVariable(VAR_PlayerTrack);
     trace("player: stopped\n");
   }
 }
@@ -418,7 +422,8 @@ void Player_SyncCommand(ePlayerCommand cmd, signed portBASE_TYPE arg)
         {
           arg += (PlayerState.metadata.mstime_curr);
 
-          Player_AsyncCommand(PC_PREV, 0);
+          Player_SyncCommand(PC_PREV, 0);
+          Player_AsyncCommand(PC_SEEK, PlayerState.metadata.mstime_max - PlayerState.metadata.mstime_curr + arg);
           break;
         }
       }

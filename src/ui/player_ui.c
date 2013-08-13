@@ -136,23 +136,37 @@ static void PlayerScreen_VariableChangedHandler(VAR_Index var)
 
       DISP_ALIGN_CENTER(0, str);
 
-      switch (Audio_GetState())
+      if (PlayerScreenMode == PSM_Seeking)
       {
-        case AS_PLAYING:
-          str = "O";
-          break;
+        if (ScreenSubMode < 0)
+        {
+          str = "<<";
+        }
+        else
+        {
+          str = ">>";
+        }
+      }
+      else
+      {
+        switch (Audio_GetState())
+        {
+          case AS_PLAYING:
+            str = "O";
+            break;
 
-        case AS_STOPPED:
-          break;
+          case AS_STOPPED:
+            break;
 
-        case AS_PAUSED:
-          str = "-";
-          break;
+          case AS_PAUSED:
+            str = "-";
+            break;
 
-        case AS_ERROR:
-        default:
-          str = "~";
-          break;
+          case AS_ERROR:
+          default:
+            str = "~";
+            break;
+        }
       }
       DISP_ALIGN_CENTER(0, str);
       break;
@@ -352,55 +366,55 @@ u16 PlayerScreen_KeyPressedHandler(KEY_Typedef key)
       }
       break;
 
-        case PSM_HalfLocked:
-          switch (key)
-          {
-            case KEY_ASTERICK:
-              SetVariable(VAR_PlayerScreenMode, PlayerScreenMode, PSM_Locked);
-              KeyProcessed = SET;
-              /* fall through */
+    case PSM_HalfLocked:
+      switch (key)
+      {
+        case KEY_ASTERICK:
+          SetVariable(VAR_PlayerScreenMode, PlayerScreenMode, PSM_Locked);
+          KeyProcessed = SET;
+          /* fall through */
 
-            default:
-              LockTimeoutCallback(0);
-              break;
-          }
+        default:
+          LockTimeoutCallback(0);
+          break;
+      }
+      break;
+
+    case PSM_Locked:
+      switch (key)
+      {
+        case KEY_SEL:
+          SetVariable(VAR_PlayerScreenMode, PlayerScreenMode, PSM_HalfUnlocked);
+          xTimerStart(xKeypadLockTimer, configTIMER_API_TIMEOUT_MS);
           break;
 
-            case PSM_Locked:
-              switch (key)
-              {
-                case KEY_SEL:
-                  SetVariable(VAR_PlayerScreenMode, PlayerScreenMode, PSM_HalfUnlocked);
-                  xTimerStart(xKeypadLockTimer, configTIMER_API_TIMEOUT_MS);
-                  break;
+        default:
+          break;
+      }
+      break;
 
-                default:
-                  break;
-              }
-              break;
+    case PSM_HalfUnlocked:
+      switch (key)
+      {
+        case KEY_ASTERICK:
+          SetVariable(VAR_PlayerScreenMode, PlayerScreenMode, PSM_Normal);
+          KeyProcessed = SET;
+          UI_EnableBacklight();
 
-                case PSM_HalfUnlocked:
-                  switch (key)
-                  {
-                    case KEY_ASTERICK:
-                      SetVariable(VAR_PlayerScreenMode, PlayerScreenMode, PSM_Normal);
-                      KeyProcessed = SET;
-                      UI_EnableBacklight();
+        case KEY_PPP:
+        case KEY_UP:
+        case KEY_DOWN:
+        case KEY_SEL:
+        case KEY_C:
+          LockTimeoutCallback(0);
+          break;
 
-                    case KEY_PPP:
-                    case KEY_UP:
-                    case KEY_DOWN:
-                    case KEY_SEL:
-                    case KEY_C:
-                      LockTimeoutCallback(0);
-                      break;
+        default:
+          break;
+      }
 
-                    default:
-                      break;
-                  }
-
-                    default:
-                      break;
+    default:
+      break;
   }
 
   return 0;
@@ -419,8 +433,8 @@ u16 PlayerScreen_KeyHoldHandler(KEY_Typedef key)
           if (Player_IsSeekable())
           {
             SetVariable(VAR_PlayerScreenMode, PlayerScreenMode, PSM_Seeking);
-            return configUI_PRESS_TICK_MS;
             Player_AsyncCommand(PC_SEEK, ScreenSubMode * 1000);
+            return configUI_PRESS_TICK_MS;
           }
           break;
 
