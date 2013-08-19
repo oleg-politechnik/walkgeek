@@ -464,13 +464,18 @@ u16 PlayerScreen_KeyHoldHandler(KEY_Typedef key)
 
 void PlayerScreen_KeyReleasedHandler(KEY_Typedef key)
 {
+  if (key == KEY_BTN)
+  {
+    Audio_CommandSync(AC_PLAY_PAUSE);
+    return;
+  }
+
   switch (PlayerScreenMode)
   {
     case PSM_Normal:
       switch (key)
       {
         case KEY_PPP:
-        case KEY_BTN:
           Audio_CommandSync(AC_PLAY_PAUSE);
           break;
 
@@ -487,13 +492,13 @@ void PlayerScreen_KeyReleasedHandler(KEY_Typedef key)
       }
       break;
 
-        case PSM_Seeking:
-          UI_SetVariable(VAR_PlayerScreenMode, PlayerScreenMode, PSM_Normal);
-          Player_AsyncCommand(PC_SEEK, 0); /* restore */
-          break;
+    case PSM_Seeking:
+      UI_SetVariable(VAR_PlayerScreenMode, PlayerScreenMode, PSM_Normal);
+      Player_AsyncCommand(PC_SEEK, 0); /* restore */
+      break;
 
-        default:
-          break;
+    default:
+      break;
   }
 }
 

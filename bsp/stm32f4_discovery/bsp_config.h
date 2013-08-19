@@ -65,7 +65,7 @@
 #define Disp_IRQHandler             SPI1_IRQHandler
 
 /* keyboard ------------------------------------------------------------------*/
-#define KEY_DEBOUNCE_MS             20
+#define KEY_DEBOUNCE_CYCLES             4
 
 typedef struct {
   GPIO_TypeDef* GPIOx;

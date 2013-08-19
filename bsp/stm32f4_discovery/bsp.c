@@ -53,12 +53,11 @@ typedef enum
 static uint16_t adc_buff[128];
 extern uint16_t mV[ADCS_MAX];
 
-static ADC_Source_Typedef ADC_Source = ADCS_MAX;
-
-static xTimerHandle xADCTimer;
+static ADC_Source_Typedef ADC_Source;
 #endif
 
 #ifdef HAS_HEADSET
+static xTimerHandle xHeadsetTimer;
 static HeadsetStatus_Typedef HeadsetStatus;
 #endif
 
@@ -67,6 +66,7 @@ static bool HeadsetButtonPressed;
 /* Private function prototypes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 #ifdef HAS_HEADSET
 static void UpdateHeadsetStatus(void);
+static void CheckHeadsetInserted(xTimerHandle param);
 #endif
 
 /* Private functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -220,11 +220,10 @@ static void ADC_DMA_Config(void)
   ADC_DMACmd(ADC1, ENABLE);
 }
 
-static void BSP_StartADC(xTimerHandle xTimer)
+void BSP_StartADC(void)
 {
   if (ADC_Source < ADCS_MAX)
   {
-    trace("Warning! ADC conversion still in progress\n");
     return;
   }
 
@@ -232,23 +231,27 @@ static void BSP_StartADC(xTimerHandle xTimer)
 
   RunADC();
 }
+#else
+void BSP_StartADC(void)
+{
+}
 #endif
 
 void BSP_InitPowerManager(void)
 {
+#ifdef HAS_HEADSET
+  xHeadsetTimer = xTimerCreate((signed char *) "Headset Timer", 500 / portTICK_RATE_MS, pdFALSE,
+    (void *) CheckHeadsetInserted, CheckHeadsetInserted);
+
+  configASSERT(xHeadsetTimer);
+#endif
+
 #ifdef HAS_BATTERY
   ADC_GPIO_Config();
 
   ADC_DMA_Config();
 
-  xADCTimer = xTimerCreate((signed char *) "ADC Timer", 10 / portTICK_RATE_MS, pdTRUE,
-    (void *) BSP_StartADC, BSP_StartADC);
-  xTimerStart(xADCTimer, configTIMER_API_TIMEOUT_MS);
-#endif
-
-#ifdef HAS_HEADSET
-
-
+  ADC_Source = ADCS_MAX;
 #endif
 }
 
@@ -584,7 +587,7 @@ bool *BSP_Keypad_GetStatus(void)
 }
 
 #ifdef HAS_HEADSET
-void CheckHeadsetInserted(void)
+void CheckHeadsetInserted(xTimerHandle param)
 {
   u16 head_mV = mV[ADCS_HEADSET_STATE];
 
@@ -611,7 +614,7 @@ void UpdateHeadsetStatus(void)
   {
     /* ... and wait while pulling off / inserting */
     HeadsetStatus = HS_QUALIFYING;
-//    Scheduler_PutTask(500, CheckHeadsetInserted, NO_REPEAT);
+    xTimerStart(xHeadsetTimer, configTIMER_API_TIMEOUT_MS);
   }
   else if (HeadsetStatus == HS_PRESENT && head_mV > HANDSET_HIGH_THRESHOLD_MV)
   {

@@ -94,15 +94,15 @@ static void prvInitTask(void *pvParameters)
 #ifdef HAS_BATTERY
     int delay = 0;
 
-    while (delay < 2000)
+    while (delay < configUI_LONG_PRESS_TIMEOUT_MS)
     {
       if (!BSP_Keypad_GetKeyStatus(KEY_PPP))
       {
         BSP_PowerDisable();
       }
 
-      vTaskDelay(10 / portTICK_RATE_MS); //todo const
-      delay += 10;
+      vTaskDelay(configUI_PRESS_TICK_MS);
+      delay += configUI_PRESS_TICK_MS;
     }
 #endif
 
@@ -276,6 +276,7 @@ void vApplicationTickHook(void)
 {
   Keypad_1msScan();
   Disp_MainThread();
+  BSP_StartADC();
 }
 
 void vApplicationMallocFailedHook(void)

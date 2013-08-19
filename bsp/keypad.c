@@ -76,7 +76,7 @@ void Keypad_1msScan(void)
       else
       {
         ++*p_debounce;
-        if (*p_debounce > KEY_DEBOUNCE_MS)
+        if (*p_debounce > KEY_DEBOUNCE_CYCLES)
         {
           *p_debounce = 0;
           key_matrix[key_ix] = true;
@@ -89,7 +89,7 @@ void Keypad_1msScan(void)
       if (key_matrix[key_ix])
       {
         ++*p_debounce;
-        if (*p_debounce > KEY_DEBOUNCE_MS)
+        if (*p_debounce > KEY_DEBOUNCE_CYCLES)
         {
           *p_debounce = 0;
           key_matrix[key_ix] = false;
