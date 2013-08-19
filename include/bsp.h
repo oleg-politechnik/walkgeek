@@ -52,7 +52,8 @@ void BSP_PowerEnable(void);
 void BSP_PowerDisable(void);
 
 void BSP_Keypad_Init(void);
-bool BSP_Keypad_GetKeyStatus(KEY_Typedef key) RAM_FUNC;
+bool BSP_Keypad_GetKeyStatus(KEY_Typedef key);
+bool *BSP_Keypad_GetStatus(void);
 
 void Disp_GPIO_Init();
 

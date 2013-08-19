@@ -55,7 +55,7 @@ static void USBScreen_Init(void)
 {
   DISP_ALIGN_CENTER(2, "USB Disk");
 
-  SyncVariable(VAR_MSC_Speed);
+  UI_SyncVariable(VAR_MSC_Speed);
 }
 
 static void USBScreen_DeInit(void)

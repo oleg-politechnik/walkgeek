@@ -262,7 +262,7 @@ FuncResult OPUS_MainThread(sDecoderContext *psDecoderContext)
           trace("Output buffer allocated");
           print_user_heap_mallinfo();
 
-          SyncVariable(VAR_AudioStatus);
+          UI_SyncVariable(VAR_AudioStatus);
         }
         else if (p->packet_count == 1)
         {

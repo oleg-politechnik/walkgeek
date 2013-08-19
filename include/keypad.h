@@ -69,13 +69,7 @@ typedef enum
 
 /* Exported functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void Keypad_Init(void);
-void Keypad_1msScan(void) RAM_FUNC;
-
-bool Keypad_GetKeyState(KEY_Typedef key);
-void Keypad_KeyPressedCallback(KEY_Typedef key);
-void Keypad_KeyReleasedCallback(KEY_Typedef key);
-
-KEY_Typedef Keypad_CurrentKey(void);
+void Keypad_1msScan(void);
 
 /* Exported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Exported static inline functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/

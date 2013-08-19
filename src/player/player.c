@@ -33,6 +33,7 @@
 #include "queue.h"
 #include "task.h"
 
+#include "ui.h"
 #include "player.h"
 #include "audio_if.h"
 #include "navigator.h"
@@ -116,7 +117,7 @@ void prvPlayerTask(void *pvParameters)
   {
     sPlayerCommand command;
     if (xQueueReceive(xPlayerCommandQueue, &(command),
-            /*PlayerState.status == PS_PLAYING ? 0 : 100*/ 2))
+            /*PlayerState.status == PS_PLAYING ? 0 : 100*/ 2)) //fixme
     {
       Player_SyncCommand(command.cmd, command.arg);
     }
@@ -133,7 +134,7 @@ void prvPlayerTask(void *pvParameters)
       if (PlayerState.metadata.time_curr != PlayerState.metadata.mstime_curr
               / 1000)
       {
-        SetVariable(VAR_PlayerPosition, PlayerState.metadata.time_curr,
+        UI_SetVariable(VAR_PlayerPosition, PlayerState.metadata.time_curr,
                 PlayerState.metadata.mstime_curr / 1000);
       }
     }
@@ -150,8 +151,6 @@ static void FinalizeCurrentTrack(void)
     Decoder(pDecoderContext)->Destroy(pDecoderContext);
     configASSERT(!pDecoderContext->pDecoderData);
   }
-
-//  Player_Stop(); //todo remove
 
   CPU_InitUserHeap();
 }
@@ -192,7 +191,7 @@ void Player_Init(void)
   }
 
   PlayerState.status = PS_STOPPED;
-  SyncVariable(VAR_PlayerTrack);
+  UI_SyncVariable(VAR_PlayerTrack);
 
   if (PlayerContext.fname)
   {
@@ -235,7 +234,7 @@ void Player_DeInit(void)
   Navigator_DeInit();
 
   PlayerState.status = PS_DEINITED;
-  SyncVariable(VAR_PlayerTrack);
+  UI_SyncVariable(VAR_PlayerTrack);
 
   vTaskDelay(10); /* Let screen repaint */
 }
@@ -267,7 +266,7 @@ void Player_Play(void)
     pDecoderContext->psMetadata->file_path = pDecoderContext->pcFilePath;
 
     PlayerState.status = PS_PLAYING;
-    SyncVariable(VAR_PlayerTrack);
+    UI_SyncVariable(VAR_PlayerTrack);
     Audio_CommandSync(AC_PLAY);
   }
 }
@@ -279,7 +278,7 @@ void Player_Stop(void)
     Audio_CommandSync(AC_STOP);
 
     PlayerState.status = PS_STOPPED;
-    SyncVariable(VAR_PlayerTrack);
+    UI_SyncVariable(VAR_PlayerTrack);
     trace("player: stopped\n");
   }
 }
@@ -399,11 +398,11 @@ void Player_SyncCommand(ePlayerCommand cmd, signed portBASE_TYPE arg)
       if (arg == 0)
       {
         Audio_CommandSync(AC_PLAY);
-        SetVariable(VAR_PlayerTrack, PlayerState.status, PS_PLAYING);
+        UI_SetVariable(VAR_PlayerTrack, PlayerState.status, PS_PLAYING);
         break;
       }
 
-      SetVariable(VAR_PlayerTrack, PlayerState.status, PS_SEEKING);
+      UI_SetVariable(VAR_PlayerTrack, PlayerState.status, PS_SEEKING);
       Audio_CommandSync(AC_PAUSE);
       Audio_CommandSync(AC_RESET_BUFFERS);
 
@@ -436,7 +435,7 @@ void Player_SyncCommand(ePlayerCommand cmd, signed portBASE_TYPE arg)
       break;
 
     case PC_AUDIO_FILE_ERROR: //XXX too synchronous
-      SetVariable(VAR_PlayerTrack, PlayerState.status, PS_ERROR_FILE);
+      UI_SetVariable(VAR_PlayerTrack, PlayerState.status, PS_ERROR_FILE);
       break;
 
     default:

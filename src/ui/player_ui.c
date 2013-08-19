@@ -31,7 +31,6 @@
 
 #include "ui.h"
 #include "disp_1100.h"
-#include "var.h"
 #include "player.h"
 #include "audio_if.h"
 
@@ -99,8 +98,8 @@ static void PlayerScreen_Init(void)
 
   assert_param(xKeypadLockTimer);
 
-  SyncVariable(VAR_AudioVolume);
-  SyncVariable(VAR_AudioStatus);
+  UI_SyncVariable(VAR_AudioVolume);
+  UI_SyncVariable(VAR_AudioStatus);
 }
 
 static void PlayerScreen_DeInit(void)
@@ -179,8 +178,10 @@ static void PlayerScreen_VariableChangedHandler(VAR_Index var)
     case VAR_PlayerScreenMode:
       switch (PlayerScreenMode)
       {
-        case PSM_HalfLocked:
         case PSM_HalfUnlocked:
+          UI_EnableBacklight();
+          /* no break here */
+        case PSM_HalfLocked:
           Disp_ClearRow(DISP_LAST_ROW - 1);
           DISP_ALIGN_CENTER(DISP_LAST_ROW-1, "Press *");
           break;
@@ -188,10 +189,11 @@ static void PlayerScreen_VariableChangedHandler(VAR_Index var)
         case PSM_Locked:
           Disp_ClearRow(DISP_LAST_ROW - 1);
           DISP_ALIGN_CENTER(DISP_LAST_ROW-1, "Locked");
+          UI_DisableBacklight();
           break;
 
         default:
-          SyncVariable(VAR_PlayerTrack);
+          UI_SyncVariable(VAR_PlayerTrack);
           break;
       }
       break;
@@ -266,7 +268,7 @@ static void PlayerScreen_VariableChangedHandler(VAR_Index var)
       else
         sprintf(str_buf, "%i:%02i", time.minute, time.second);
       DISP_ALIGN_RIGHT(DISP_LAST_ROW, str_buf);
-      SyncVariable(VAR_PlayerPosition);
+      UI_SyncVariable(VAR_PlayerPosition);
       break;
 
     case VAR_PlayerPosition:
@@ -302,11 +304,11 @@ void LockTimeoutCallback(xTimerHandle xTimer)
   switch (PlayerScreenMode)
   {
     case PSM_HalfLocked: //lock failed
-      SetVariable(VAR_PlayerScreenMode, PlayerScreenMode, PSM_Normal);
+      UI_SetVariable(VAR_PlayerScreenMode, PlayerScreenMode, PSM_Normal);
       break;
 
     case PSM_HalfUnlocked: //unlock failed
-      SetVariable(VAR_PlayerScreenMode, PlayerScreenMode, PSM_Locked);
+      UI_SetVariable(VAR_PlayerScreenMode, PlayerScreenMode, PSM_Locked);
       break;
 
     default:
@@ -316,6 +318,8 @@ void LockTimeoutCallback(xTimerHandle xTimer)
 
 u16 PlayerScreen_KeyPressedHandler(KEY_Typedef key)
 {
+  int result;
+
   switch (PlayerScreenMode)
   {
     case PSM_Normal:
@@ -357,8 +361,9 @@ u16 PlayerScreen_KeyPressedHandler(KEY_Typedef key)
           return configUI_PRESS_TIMEOUT_MS;
 
         case KEY_SEL:
-          SetVariable(VAR_PlayerScreenMode, PlayerScreenMode, PSM_HalfLocked);
-          xTimerStart(xKeypadLockTimer, configTIMER_API_TIMEOUT_MS);
+          UI_SetVariable(VAR_PlayerScreenMode, PlayerScreenMode, PSM_HalfLocked);
+          result = xTimerStart(xKeypadLockTimer, configTIMER_API_TIMEOUT_MS);
+          configASSERT(result);
           break;
 
         default:
@@ -370,7 +375,7 @@ u16 PlayerScreen_KeyPressedHandler(KEY_Typedef key)
       switch (key)
       {
         case KEY_ASTERICK:
-          SetVariable(VAR_PlayerScreenMode, PlayerScreenMode, PSM_Locked);
+          UI_SetVariable(VAR_PlayerScreenMode, PlayerScreenMode, PSM_Locked);
           KeyProcessed = SET;
           /* fall through */
 
@@ -384,8 +389,9 @@ u16 PlayerScreen_KeyPressedHandler(KEY_Typedef key)
       switch (key)
       {
         case KEY_SEL:
-          SetVariable(VAR_PlayerScreenMode, PlayerScreenMode, PSM_HalfUnlocked);
-          xTimerStart(xKeypadLockTimer, configTIMER_API_TIMEOUT_MS);
+          UI_SetVariable(VAR_PlayerScreenMode, PlayerScreenMode, PSM_HalfUnlocked);
+          result = xTimerStart(xKeypadLockTimer, configTIMER_API_TIMEOUT_MS);
+          configASSERT(result);
           break;
 
         default:
@@ -397,7 +403,7 @@ u16 PlayerScreen_KeyPressedHandler(KEY_Typedef key)
       switch (key)
       {
         case KEY_ASTERICK:
-          SetVariable(VAR_PlayerScreenMode, PlayerScreenMode, PSM_Normal);
+          UI_SetVariable(VAR_PlayerScreenMode, PlayerScreenMode, PSM_Normal);
           KeyProcessed = SET;
           UI_EnableBacklight();
 
@@ -432,7 +438,7 @@ u16 PlayerScreen_KeyHoldHandler(KEY_Typedef key)
         case KEY_PREV:
           if (Player_IsSeekable())
           {
-            SetVariable(VAR_PlayerScreenMode, PlayerScreenMode, PSM_Seeking);
+            UI_SetVariable(VAR_PlayerScreenMode, PlayerScreenMode, PSM_Seeking);
             Player_AsyncCommand(PC_SEEK, ScreenSubMode * 1000);
             return configUI_PRESS_TICK_MS;
           }
@@ -482,7 +488,7 @@ void PlayerScreen_KeyReleasedHandler(KEY_Typedef key)
       break;
 
         case PSM_Seeking:
-          SetVariable(VAR_PlayerScreenMode, PlayerScreenMode, PSM_Normal);
+          UI_SetVariable(VAR_PlayerScreenMode, PlayerScreenMode, PSM_Normal);
           Player_AsyncCommand(PC_SEEK, 0); /* restore */
           break;
 

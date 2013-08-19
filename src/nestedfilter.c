@@ -89,7 +89,7 @@ void NestedFilter_AddMeasure(NestedFilterSet_Typedef *nfs, nfpoint_t p, VAR_Inde
     filter_ix++;
   } while (filter_ix < nfs->count);
 
-  SetVariable(var_ix, nfs->value, temp_avg_value);
+  UI_SetVariable(var_ix, nfs->value, temp_avg_value);
 }
 
 nfpoint_t NestedFilter_GetValue(NestedFilterSet_Typedef *nfs)

@@ -557,6 +557,32 @@ bool BSP_Keypad_GetKeyStatus(KEY_Typedef key)
   return !GPIO_ReadInputDataBit(KeyPins[key].GPIOx, (1 << KeyPins[key].GPIO_PinSourcex));
 }
 
+bool *BSP_Keypad_GetStatus(void)
+{
+  static bool keys[KEY_MAX];
+
+  keys[KEY_BTN] = HeadsetButtonPressed;
+
+  int key;
+  for (key = 0; key < KEY_MAX_GPIO; key++)
+  {
+    if (!KeyPins[key].GPIOx)
+      continue;
+
+#ifdef F4DISCOVERY
+    if (key == KEY_3)
+    {
+      keys[key] = GPIO_ReadInputDataBit(KeyPins[key].GPIOx, (1 << KeyPins[key].GPIO_PinSourcex));
+      continue;
+    }
+#endif
+
+    keys[key] = !GPIO_ReadInputDataBit(KeyPins[key].GPIOx, (1 << KeyPins[key].GPIO_PinSourcex));
+  }
+
+  return keys;
+}
+
 #ifdef HAS_HEADSET
 void CheckHeadsetInserted(void)
 {

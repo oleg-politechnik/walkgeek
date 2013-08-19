@@ -31,7 +31,6 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "common.h"
-#include "var.h"
 #include "disp_1100.h"
 
 /* Exported constants --------------------------------------------------------*/
@@ -51,8 +50,9 @@
 
 #define configUI_BACKLIGHT_TIMEOUT_MS   (10000 / portTICK_RATE_MS)
 
-#define configUI_PRESS_TICK_MS          (100 / portTICK_RATE_MS)
-#define configUI_PRESS_TIMEOUT_MS       (800 / portTICK_RATE_MS)
+#define configUI_PRESS_TICK_MS          (100)
+#define configUI_MAIN_INTERVAL_MS       (300 / portTICK_RATE_MS)
+#define configUI_PRESS_TIMEOUT_MS       (800)
 
 #define configUI_LOCK_UNLOCK_TIMEOUT_MS (1000 / portTICK_RATE_MS)
 
@@ -65,6 +65,24 @@ typedef enum
   UIM_USB,
   UIM_MAX
 } UserInterfaceMode_Typedef;
+
+typedef enum
+{
+  VAR_SystemState,
+  VAR_ScreenMode,
+  VAR_BatteryState,
+
+  VAR_PlayerTrack,
+  VAR_PlayerPosition,
+  VAR_PlayerScreenMode,
+
+  VAR_AudioStatus,
+  VAR_AudioVolume,
+
+  VAR_MSC_Speed,
+
+  VAR_MAX
+} VAR_Index;
 
 /*
  * Screen is like a layer plus a set of event handling functions.
@@ -79,6 +97,14 @@ typedef struct
     void (*KeyReleasedHandler)(KEY_Typedef key);
 } Screen_Typedef;
 
+typedef enum
+{
+  UIE_KeyReleased,
+  UIE_KeyPressed,
+  UIE_VariableChanged,
+  UIE_KeyHoldTimeout
+} eUserInterfaceEvent;
+
 /* Exported macro ------------------------------------------------------------*/
 #define DISP_ALIGN_CENTER(row, str) \
   Disp_String(MAX((int)(DISP_X_COUNT / 2) - ((int) strlen(str) - 1) * 6 / 2, (int)0), row, str, false)
@@ -89,11 +115,22 @@ typedef struct
 #define DISP_ALIGN_LEFT(row, str) \
   Disp_String(0, row, str, false)
 
+#define UI_SetVariable(var_ix, var, val) do { if (var != val) { \
+        var = val; UI_SyncVariable(var_ix); } } while(0)
+
 /* Exported functions ------------------------------------------------------- */
 void UI_EnableBacklight(void);
+void UI_DisableBacklight(void);
 void UI_StartHoldTimer(u16 timeout);
 
 void Vibrator_SendSignal(u16 ms);
+
+void UI_PreInit(void);
+
+void UI_SendEvent(eUserInterfaceEvent event, int arg);
+void UI_SendEventFromISR(eUserInterfaceEvent event, int arg);
+
+void UI_SyncVariable(VAR_Index var);
 
 /* */
 //extern char str_buf[DISP_COL_COUNT];

@@ -48,9 +48,9 @@ extern void prvUiTask(void *);
 /* Private macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 SystemState_Typedef SystemState = SS_START;
-u32 displayVariableFlags[MAX_DISPLAY_VARIABLES];
 static bool debug_mode = false;
 static bool can_sleep = false;
+static bool was_player_once_upon_a_time = false;
 
 static xQueueHandle xSystemStateQueue;
 static xTimerHandle xEnterLowPowerModeTimer;
@@ -60,6 +60,7 @@ static char *stateNames[] =
         "START",
         "PLAYER",
         "USB_MSC",
+        "",
         "SHUTDOWN"
 };
 
@@ -86,12 +87,14 @@ static void prvInitTask(void *pvParameters)
   PowerManager_Init();
   PowerManager_MainThread();
 
+  UI_PreInit();
+
   if (PowerManager_GetState() != PM_ONLINE)
   {
 #ifdef HAS_BATTERY
-    portBASE_TYPE delay = 0;
+    int delay = 0;
 
-    while (delay < 1000)
+    while (delay < 2000)
     {
       if (!BSP_Keypad_GetKeyStatus(KEY_PPP))
       {
@@ -156,12 +159,32 @@ void System_VbusDetached(void)
 
 void System_SetState(SystemState_Typedef NewState)
 {
+  if (NewState == SS_PLAYER)
+  {
+    was_player_once_upon_a_time = true;
+  }
+
   if (NewState == SS_USB_MSC && PowerManager_GetState() != PM_ONLINE)
   {
     return;
   }
 
   xQueueSend( xSystemStateQueue, ( void * ) &NewState, portMAX_DELAY );
+}
+
+void System_SetStateFomISR(SystemState_Typedef NewState)
+{
+  if (NewState == SS_PLAYER)
+  {
+    was_player_once_upon_a_time = true;
+  }
+
+  if (NewState == SS_USB_MSC && PowerManager_GetState() != PM_ONLINE)
+  {
+    return;
+  }
+
+  xQueueSendFromISR( xSystemStateQueue, ( void * ) &NewState, NULL );
 }
 
 /*
@@ -193,7 +216,7 @@ void SetState(SystemState_Typedef NewState)
 
   trace("system: entering state %s\n", stateNames[NewState]);
 
-  SetVariable(VAR_SystemState, SystemState, NewState);
+  UI_SetVariable(VAR_SystemState, SystemState, NewState);
 
   switch (NewState)
   {
@@ -210,12 +233,21 @@ void SetState(SystemState_Typedef NewState)
       USB_MSC_Init();
       break;
 
+    case SS_USB_DISCONNECT:
+      if (was_player_once_upon_a_time)
+      {
+        System_SetState(SS_PLAYER);
+      }
+      else
+      {
+        System_SetState(SS_SHUTDOWN);
+      }
+      break;
+
     default:
       break;
   }
 }
-
-extern void Player_Init(void);
 
 int main(void)
 {
@@ -242,6 +274,8 @@ void vApplicationIdleHook(void)
 
 void vApplicationTickHook(void)
 {
+  Keypad_1msScan();
+  Disp_MainThread();
 }
 
 void vApplicationMallocFailedHook(void)

@@ -28,6 +28,7 @@
 /* Includes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 #include "keypad.h"
 #include "system.h"
+#include "ui.h"
 
 /* Imported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private define ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -35,51 +36,21 @@
 /* Private macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private function prototypes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-static bool ppp_while_start;
-static KEY_Typedef key_pressed = _KEY_DUMMY;
+//static bool ppp_while_start;
+//static KEY_Typedef key_pressed = _KEY_DUMMY;
 
 static bool key_matrix[KEY_MAX];
 static u8 _debounce_matrix[KEY_MAX];
 
 /* Private functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-static inline void Key_Released(KEY_Typedef code)
-{
-  if (key_pressed == code)
-  {
-    key_pressed = _KEY_DUMMY;
-
-    if (ppp_while_start && code == KEY_PPP)
-    {
-      ppp_while_start = false;
-      return;
-    }
-
-    Keypad_KeyReleasedCallback(code);
-  }
-}
-
-static inline void Key_Pressed(KEY_Typedef code)
-{
-  if (key_pressed == _KEY_DUMMY)
-  {
-    key_pressed = code;
-
-    if (ppp_while_start && code == KEY_PPP)
-    {
-      return;
-    }
-
-    Keypad_KeyPressedCallback(code);
-  }
-}
 
 void Keypad_Init(void)
 {
   BSP_Keypad_Init();
 
-  ppp_while_start = BSP_Keypad_GetKeyStatus(KEY_PPP);
+//  ppp_while_start = BSP_Keypad_GetKeyStatus(KEY_PPP);
 
-  key_pressed = _KEY_DUMMY;
+//  key_pressed = _KEY_DUMMY;
 
   memset(key_matrix, 0, sizeof(key_matrix));
   memset(_debounce_matrix, 0, sizeof(_debounce_matrix));
@@ -90,11 +61,13 @@ void Keypad_1msScan(void)
   u8 key_ix;
   u8 *p_debounce;
 
+  bool *keys = BSP_Keypad_GetStatus();
+
   for (key_ix = 0; key_ix < KEY_MAX; key_ix++)
   {
     p_debounce = &_debounce_matrix[key_ix];
 
-    if (BSP_Keypad_GetKeyStatus(key_ix))
+    if (keys[key_ix])
     {
       if (key_matrix[key_ix])
       {
@@ -107,7 +80,7 @@ void Keypad_1msScan(void)
         {
           *p_debounce = 0;
           key_matrix[key_ix] = true;
-          Key_Pressed(key_ix);
+          UI_SendEventFromISR(UIE_KeyPressed, key_ix);
         }
       }
     }
@@ -120,7 +93,7 @@ void Keypad_1msScan(void)
         {
           *p_debounce = 0;
           key_matrix[key_ix] = false;
-          Key_Released(key_ix);
+          UI_SendEventFromISR(UIE_KeyReleased, key_ix);
         }
       }
       else
@@ -129,9 +102,4 @@ void Keypad_1msScan(void)
       }
     }
   }
-}
-
-KEY_Typedef Keypad_CurrentKey()
-{
-  return key_pressed;
 }

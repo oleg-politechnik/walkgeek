@@ -27,6 +27,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "usbd_usr.h"
+#include "system.h"
 
 typedef struct {
   uint8_t usbd_speed;
@@ -127,8 +128,7 @@ void USBD_USR_DeviceConnected(void)
  */
 void USBD_USR_DeviceDisconnected(void)
 {
-  //App_SetMode(APP_MODE_PLAYER); //fixme
-  //NVIC_SystemReset();
+  System_SetStateFomISR(SS_USB_DISCONNECT);
 }
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

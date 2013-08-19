@@ -32,7 +32,7 @@
 /* Includes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 #include "common.h"
 #include "software_conf.h"
-#include "var.h"
+#include "ui.h"
 #include "bsp.h"
 #include "assert.h"
 
@@ -42,12 +42,14 @@ typedef enum {
   SS_START,
   SS_PLAYER,
   SS_USB_MSC,
+  SS_USB_DISCONNECT,
   SS_SHUTDOWN
 } SystemState_Typedef;
 
 /* Exported macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Exported functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void System_SetState(SystemState_Typedef NewState);
+void System_SetStateFomISR(SystemState_Typedef NewState);
 void System_VbusApplied(void);
 void System_VbusDetached(void);
 

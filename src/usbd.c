@@ -32,6 +32,7 @@
 #include "timers.h"
 
 #include "system.h"
+#include "ui.h"
 
 /* Imported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private define ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -52,8 +53,8 @@ static xTimerHandle xShowUsbSpeedTimer;
 
 void USB_MSC_DisplaySpeed(xTimerHandle xTimer)
 {
-  SetVariable(VAR_MSC_Speed, MSC_RxSpeed, MSC_DataIn * USBD_MSC_SPEED_MPS);
-  SetVariable(VAR_MSC_Speed, MSC_TxSpeed, MSC_DataOut * USBD_MSC_SPEED_MPS);
+  UI_SetVariable(VAR_MSC_Speed, MSC_RxSpeed, MSC_DataIn * USBD_MSC_SPEED_MPS);
+  UI_SetVariable(VAR_MSC_Speed, MSC_TxSpeed, MSC_DataOut * USBD_MSC_SPEED_MPS);
 
   MSC_DataIn = 0;
   MSC_DataOut = 0;
