@@ -59,7 +59,9 @@ static char *stateNames[] =
 {
         "START",
         "PLAYER",
+#ifdef USE_DEVICE_MODE
         "USB_MSC",
+#endif
         "",
         "SHUTDOWN"
 };
@@ -84,17 +86,18 @@ static void prvInitTask(void *pvParameters)
 
   BSP_Keypad_Init();
 
+  UI_PreInit();
+
+#ifdef HAS_BATTERY
   PowerManager_Init();
   PowerManager_MainThread();
-
-  UI_PreInit();
 
   if (PowerManager_GetState() != PM_ONLINE)
   {
 #ifdef HAS_BATTERY
     int delay = 0;
 
-    while (delay < configUI_LONG_PRESS_TIMEOUT_MS)
+    while (delay < /*configUI_LONG_PRESS_TIMEOUT_MS*/ 2000 / portTICK_RATE_MS)
     {
       if (!BSP_Keypad_GetKeyStatus(KEY_PPP))
       {
@@ -112,6 +115,10 @@ static void prvInitTask(void *pvParameters)
   {
     System_SetState(debug_mode ? SS_PLAYER : SS_USB_MSC);
   }
+#else
+  USB_Host_Init();
+  System_SetState(SS_PLAYER);
+#endif
 
   xTaskCreate(prvUiTask, (signed portCHAR *) "UI",
           mainUI_TASK_STACK_SIZE, NULL, mainUI_TASK_PRIORITY, NULL);
@@ -132,15 +139,18 @@ static void prvInitTask(void *pvParameters)
   {
     SystemState_Typedef NewSystemState;
 
-    if (xQueueReceive(xSystemStateQueue, &(NewSystemState), (portTickType) 10))
+    if (xQueueReceive(xSystemStateQueue, &(NewSystemState), 100 / portTICK_RATE_MS))
     {
       SetState(NewSystemState);
     }
 
+#ifdef HAS_BATTERY
     PowerManager_MainThread();
+#endif
   }
 }
 
+#ifdef USE_DEVICE_MODE
 void System_VbusApplied(void)
 {
   if (SystemState != SS_USB_MSC)
@@ -156,9 +166,11 @@ void System_VbusDetached(void)
   //the need of vbus sensing (st stack may be de-initializing smth)
   USB_DeInit();
 }
+#endif
 
 void System_SetState(SystemState_Typedef NewState)
 {
+#ifdef USE_DEVICE_MODE
   if (NewState == SS_PLAYER)
   {
     was_player_once_upon_a_time = true;
@@ -168,12 +180,14 @@ void System_SetState(SystemState_Typedef NewState)
   {
     return;
   }
+#endif
 
   xQueueSend( xSystemStateQueue, ( void * ) &NewState, portMAX_DELAY );
 }
 
 void System_SetStateFomISR(SystemState_Typedef NewState)
 {
+#ifdef USE_DEVICE_MODE
   if (NewState == SS_PLAYER)
   {
     was_player_once_upon_a_time = true;
@@ -183,6 +197,7 @@ void System_SetStateFomISR(SystemState_Typedef NewState)
   {
     return;
   }
+#endif
 
   xQueueSendFromISR( xSystemStateQueue, ( void * ) &NewState, NULL );
 }
@@ -206,9 +221,11 @@ void SetState(SystemState_Typedef NewState)
       Player_AsyncCommand(PC_DEINIT, 0);
       break;
 
+#ifdef USE_DEVICE_MODE
     case SS_USB_MSC:
       USB_DeInit();
       break;
+#endif
 
     default:
       break;
@@ -226,12 +243,15 @@ void SetState(SystemState_Typedef NewState)
 
     case SS_PLAYER:
       BSP_PowerEnable();
+//      was_player_once_upon_a_time = true;
       Player_AsyncCommand(PC_INIT, 0);
       break;
 
+#ifdef USE_DEVICE_MODE
     case SS_USB_MSC:
       USB_MSC_Init();
       break;
+#endif
 
     case SS_USB_DISCONNECT:
       if (was_player_once_upon_a_time)

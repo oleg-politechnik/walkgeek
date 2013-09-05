@@ -118,7 +118,7 @@ void *_sbrk(int nbytes)
   char *_eheap_newlib = (char *) &_ssram1 + (has_256K_sram ? 64 : 0) * 1024;
 
   /* The statically held previous end of the heap, with its initialization. */
-  static void *heap_ptr = (void *) &_sheap_newlib; /* Previous end */
+  static char *heap_ptr = (char *) &_sheap_newlib; /* Previous end */
 
   if ((unsigned int) heap_ptr + nbytes <= (unsigned int) _eheap_newlib)
   {

@@ -25,6 +25,8 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifdef HAS_BATTERY
+
 /* Includes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 #include "powermanager.h"
 #include "system.h"
@@ -105,3 +107,5 @@ PowerManagerState_Typedef PowerManager_GetState(void)
 {
   return PowerManagerState;
 }
+
+#endif

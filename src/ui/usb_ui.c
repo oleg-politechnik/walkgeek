@@ -25,6 +25,8 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifdef USE_DEVICE_MODE
+
 /* Includes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 #include "ui.h"
 
@@ -101,3 +103,4 @@ void PrintSpeed(char *buf, u32 bytes_per_second)
   }
 }
 
+#endif

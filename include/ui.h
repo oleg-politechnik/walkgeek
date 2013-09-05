@@ -53,7 +53,7 @@
 #define configUI_PRESS_TICK_MS          (100 / portTICK_RATE_MS)
 #define configUI_MAIN_INTERVAL_MS       (300 / portTICK_RATE_MS)
 #define configUI_PRESS_TIMEOUT_MS       (800 / portTICK_RATE_MS)
-#define configUI_LONG_PRESS_TIMEOUT_MS       (2000 / portTICK_RATE_MS)
+#define configUI_LONG_PRESS_TIMEOUT_MS       (3000 / portTICK_RATE_MS)
 
 #define configUI_LOCK_UNLOCK_TIMEOUT_MS (1000 / portTICK_RATE_MS)
 
@@ -74,6 +74,7 @@ typedef enum
   VAR_BatteryState,
 
   VAR_PlayerTrack,
+  VAR_PlayerScreenModeFromPlayerTrack,
   VAR_PlayerPosition,
   VAR_PlayerScreenMode,
 
@@ -81,6 +82,8 @@ typedef enum
   VAR_AudioVolume,
 
   VAR_MSC_Speed,
+
+  VAR_HeadsetStatus,
 
   VAR_MAX
 } VAR_Index;

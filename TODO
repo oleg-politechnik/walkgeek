@@ -1,15 +1,15 @@
 FIXME:
+- test OGG seeking
+- USB removal handling
 - display sometimes adds some bytes after row/col is set, probably problem is
   with ISR timeouts
 - trace via CDC goes insane after some amount of data
-- slow opus files LoadFile func
-- sd card > 4Gb reported capacity value is truncated to 4 Gb
 - limit min audio file size
 
 TODO:
 - usb audio
 - handle additional cases: no sd card in
-- test OGG seeking
+
 - shutdown ADC threshold
 - assert/hard fault -> software irq-less DISP + ability to shut down the player
 - Centralized IRQ management

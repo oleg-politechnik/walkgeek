@@ -57,6 +57,8 @@ void BSP_Keypad_Init(void);
 bool BSP_Keypad_GetKeyStatus(KEY_Typedef key);
 bool *BSP_Keypad_GetStatus(void);
 
+bool BSP_IsHeadsetConnected(void);
+
 void Disp_GPIO_Init();
 
 void SD_LowLevel_DeInit(void);

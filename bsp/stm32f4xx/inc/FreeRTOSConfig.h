@@ -181,12 +181,16 @@ standard names. */
 #define mainUI_TASK_STACK_SIZE			( configMINIMAL_STACK_SIZE * 30 )
 #define mainUI_TASK_PRIORITY			( tskIDLE_PRIORITY + 2 )
 
+#define configUSBH_TASK_STACK_SIZE		( configMINIMAL_STACK_SIZE * 10 )
+#define configUSBH_TASK_PRIORITY		( tskIDLE_PRIORITY + 5 )
+
 #define mainPLAYER_TASK_STACK_SIZE		( configMINIMAL_STACK_SIZE * 50 )
-#define mainPLAYER_TASK_PRIORITY		( tskIDLE_PRIORITY + 3 )
+#define mainPLAYER_TASK_PRIORITY		( tskIDLE_PRIORITY + 4 )
+#define configPLAYER_TIMEOUT_MS         ( 30 / portTICK_RATE_MS )
 
 #define mainSYSTEM_STATE_QUEUE_SIZE		( 20 )
 
-#define configTIMER_TASK_PRIORITY   ( tskIDLE_PRIORITY )
+#define configTIMER_TASK_PRIORITY   ( tskIDLE_PRIORITY + 3 ) /* Must be less than mainUI_TASK_PRIORITY */
 
 #define configFS_TIMEOUT_MS         ( 1000 / portTICK_RATE_MS )
 

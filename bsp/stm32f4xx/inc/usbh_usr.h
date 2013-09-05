@@ -36,18 +36,13 @@
 
 /* Exported types ------------------------------------------------------------*/
 /* Exported constants --------------------------------------------------------*/
-/* State Machine for the USBH_USR_ApplicationState */
-#define USH_USR_FS_INIT    ((uint8_t)0x00)
-#define USH_USR_AUDIO      ((uint8_t)0x01)
-
-#define CMD_PLAY           ((uint8_t)0x00)
-#define CMD_RECORD         ((uint8_t)0x01)
-
 /* Exported macros -----------------------------------------------------------*/
 /* Exported variables --------------------------------------------------------*/
 extern  USBH_Usr_cb_TypeDef USR_Callbacks;
 
-/* Exported functions ------------------------------------------------------- */ 
+/* Exported functions ------------------------------------------------------- */
+void USB_Host_Init(void);
+
 void USBH_USR_Init(void);
 void USBH_USR_DeviceAttached(void);
 void USBH_USR_ResetDevice(void);

@@ -240,7 +240,7 @@ void BSP_StartADC(void)
 void BSP_InitPowerManager(void)
 {
 #ifdef HAS_HEADSET
-  xHeadsetTimer = xTimerCreate((signed char *) "Headset Timer", 500 / portTICK_RATE_MS, pdFALSE,
+  xHeadsetTimer = xTimerCreate((signed char *) "Headset Timer", 100 / portTICK_RATE_MS, pdTRUE,
     (void *) CheckHeadsetInserted, CheckHeadsetInserted);
 
   configASSERT(xHeadsetTimer);
@@ -593,12 +593,19 @@ void CheckHeadsetInserted(xTimerHandle param)
 
   if (HeadsetStatus == HS_QUALIFYING)
   {
-    HeadsetStatus = (head_mV < HANDSET_LOW_THRESHOLD_MV
-            && head_mV > BTN_PRESSED_HIGH_THRESHOLD_MV) ? HS_PRESENT : HS_NOT_PRESENT;
+    HeadsetStatus_Typedef HeadsetStatusNew = (head_mV < HANDSET_LOW_THRESHOLD_MV
+        && head_mV > BTN_PRESSED_HIGH_THRESHOLD_MV) ? HS_PRESENT : HS_NOT_PRESENT;
+
+    UI_SetVariable(VAR_HeadsetStatus, HeadsetStatus, HeadsetStatusNew);
     HeadsetButtonPressed = false;
 
     trace("Headset was inserted\n");
   }
+}
+
+bool BSP_IsHeadsetConnected(void)
+{
+  return (HeadsetStatus == HS_PRESENT);
 }
 
 void UpdateHeadsetStatus(void)
@@ -613,12 +620,12 @@ void UpdateHeadsetStatus(void)
           && head_mV > BTN_PRESSED_HIGH_THRESHOLD_MV)
   {
     /* ... and wait while pulling off / inserting */
-    HeadsetStatus = HS_QUALIFYING;
+    UI_SetVariable(VAR_HeadsetStatus, HeadsetStatus, HS_QUALIFYING);
     xTimerStart(xHeadsetTimer, configTIMER_API_TIMEOUT_MS);
   }
   else if (HeadsetStatus == HS_PRESENT && head_mV > HANDSET_HIGH_THRESHOLD_MV)
   {
-    HeadsetStatus = HS_NOT_PRESENT;
+    UI_SetVariable(VAR_HeadsetStatus, HeadsetStatus, HS_NOT_PRESENT);
     HeadsetButtonPressed = false;
     trace("Headset was removed\n");
   }

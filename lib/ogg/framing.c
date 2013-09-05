@@ -802,7 +802,7 @@ int minogg_sync_init(ogg_sync_state *oy, size_t buffer_size, unsigned char *buff
 
 int minogg_sync_pageout(ogg_sync_state *oy, ogg_page *og)
 {
-  int res = MINOGG_NEED_REFILL;
+  int res;
 
   /* all we need to do is verify a page at the head of the stream
      buffer.  If it doesn't verify, we look for the next potential

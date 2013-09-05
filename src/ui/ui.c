@@ -88,9 +88,11 @@ static void UiVariableChanged(int var)
         UiMode = UIM_Player;
         break;
 
+#ifdef USE_DEVICE_MODE
       case SS_USB_MSC:
         UiMode = UIM_USB;
         break;
+#endif
 
       default:
         UiMode = UIM_Uninitialized;
@@ -144,7 +146,7 @@ static void UiKeyPressedCallback(void)
 
   if ((CurrentKey == KEY_PPP && !PlayerScreen_IsLocked()) || CurrentKey == KEY_BTN)
   {
-    UI_StartHoldTimer(configUI_PRESS_TIMEOUT_MS);
+    UI_StartHoldTimer(configUI_LONG_PRESS_TIMEOUT_MS);
     return;
   }
 
@@ -154,11 +156,13 @@ static void UiKeyPressedCallback(void)
     return;
   }
 
+#ifdef USE_DEVICE_MODE
   if (CurrentKey == KEY_APP_MSC && SystemState != SS_USB_MSC)
   {
     System_SetState(SS_USB_MSC);
     return;
   }
+#endif
 
   if (Screens[UiMode] && Screens[UiMode]->KeyPressedHandler)
   {
@@ -218,6 +222,11 @@ void UI_PreInit(void)
 {
   xUI_EventQueue = xQueueCreate( 50 /*fixme*/, sizeof( sUserInterfaceEvent ) );
   configASSERT(xUI_EventQueue);
+
+  if (BSP_Keypad_GetKeyStatus(KEY_PPP))
+  {
+    CurrentKey = KEY_PPP;
+  }
 }
 
 void prvUiTask(void *pvParameters)
@@ -232,7 +241,9 @@ void prvUiTask(void *pvParameters)
   Vibrator_Init();
 
   Screens[UIM_Player] = &PlayerScreen;
+#ifdef USE_DEVICE_MODE
   Screens[UIM_USB] = &UsbScreen;
+#endif
 
   xBacklightTimer = xTimerCreate((signed portCHAR *) "Backlight Timer",
           configUI_BACKLIGHT_TIMEOUT_MS, pdFALSE,

@@ -254,9 +254,9 @@ int USBH_USR_MSC_Application(void)
 {
   static u32 last_ms;
 
-  System_SetState(SS_PLAYER);
-
-  System_MainThread();
+//  System_SetState(SS_PLAYER);
+//fixme
+//  System_MainThread();
 
   return(0);
 }

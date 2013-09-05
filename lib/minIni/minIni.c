@@ -192,7 +192,7 @@ static TCHAR *cleanstring(TCHAR *string, enum quote_option *quotes)
 
   /* Remove a trailing comment */
   isstring = 0;
-  for (ep = string; *ep != '\0' && ((*ep != ';' && *ep != '#') || isstring); ep++) {
+  for (ep = string; (*ep != '\0') && (((*ep != ';') && (*ep != '#')) || isstring); ep++) {
     if (*ep == '"') {
       if (*(ep + 1) == '"')
         ep++;                 /* skip "" (both quotes) */

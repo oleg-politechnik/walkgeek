@@ -122,7 +122,7 @@ static void PlayerScreen_VariableChangedHandler(VAR_Index var)
   char state;
   bool double_channel;
 
-  static char str_buf[256];
+  char str_buf[DISP_COL_COUNT * DISP_ROW_COUNT];
 
   char *str;
 
@@ -130,6 +130,22 @@ static void PlayerScreen_VariableChangedHandler(VAR_Index var)
 
   switch (var)
   {
+    case VAR_HeadsetStatus:
+#if HAS_HEADSET
+      if (Player_GetState()->status == PS_PLAYING)
+      {
+        if (Audio_GetState() == AS_PLAYING && !BSP_IsHeadsetConnected())
+        {
+          Audio_CommandSync(AC_PAUSE);
+        }
+        else if (Audio_GetState() == AS_PAUSED && BSP_IsHeadsetConnected())
+        {
+          Audio_CommandSync(AC_PLAY);
+        }
+      }
+#endif
+      break;
+
     case VAR_AudioStatus:
       str = "  ";
 
@@ -198,7 +214,27 @@ static void PlayerScreen_VariableChangedHandler(VAR_Index var)
       }
       break;
 
+    case VAR_PlayerScreenModeFromPlayerTrack:
+       switch (PlayerScreenMode)
+       {
+         case PSM_HalfUnlocked:
+         case PSM_HalfLocked:
+           Disp_ClearRow(DISP_LAST_ROW - 1);
+           DISP_ALIGN_CENTER(DISP_LAST_ROW-1, "Press *");
+           break;
+
+         case PSM_Locked:
+           Disp_ClearRow(DISP_LAST_ROW - 1);
+           DISP_ALIGN_CENTER(DISP_LAST_ROW-1, "Locked");
+           break;
+
+         default:
+           break;
+       }
+       break;
+
     case VAR_PlayerTrack:
+      UI_SyncVariable(VAR_PlayerScreenModeFromPlayerTrack);
       for (int i = 1; i <= DISP_LAST_ROW; i++)
       {
         Disp_ClearRow(i);

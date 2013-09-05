@@ -41,7 +41,9 @@
 typedef enum {
   SS_START,
   SS_PLAYER,
+#ifdef USE_DEVICE_MODE
   SS_USB_MSC,
+#endif
   SS_USB_DISCONNECT,
   SS_SHUTDOWN
 } SystemState_Typedef;

@@ -116,8 +116,7 @@ void prvPlayerTask(void *pvParameters)
   while (1)
   {
     sPlayerCommand command;
-    if (xQueueReceive(xPlayerCommandQueue, &(command),
-            /*PlayerState.status == PS_PLAYING ? 0 : 100*/ 2)) //fixme
+    if (xQueueReceive(xPlayerCommandQueue, &(command), configPLAYER_TIMEOUT_MS))
     {
       Player_SyncCommand(command.cmd, command.arg);
     }
@@ -266,8 +265,11 @@ void Player_Play(void)
     pDecoderContext->psMetadata->file_path = pDecoderContext->pcFilePath;
 
     PlayerState.status = PS_PLAYING;
-    UI_SyncVariable(VAR_PlayerTrack);
     Audio_CommandSync(AC_PLAY);
+
+    Player_AsyncCommand(PC_NEED_MORE_DATA, 0);
+
+    UI_SyncVariable(VAR_PlayerTrack);
   }
 }
 
@@ -397,12 +399,12 @@ void Player_SyncCommand(ePlayerCommand cmd, signed portBASE_TYPE arg)
 
       if (arg == 0)
       {
+        PlayerState.status = PS_PLAYING;
         Audio_CommandSync(AC_PLAY);
-        UI_SetVariable(VAR_PlayerTrack, PlayerState.status, PS_PLAYING);
         break;
       }
 
-      UI_SetVariable(VAR_PlayerTrack, PlayerState.status, PS_SEEKING);
+      PlayerState.status = PS_SEEKING;
       Audio_CommandSync(AC_PAUSE);
       Audio_CommandSync(AC_RESET_BUFFERS);
 

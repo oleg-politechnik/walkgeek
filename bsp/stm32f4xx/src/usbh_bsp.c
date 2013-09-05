@@ -20,7 +20,9 @@
   */
 
 /* Includes ------------------------------------------------------------------*/
-#include "FreeRTOSConfig.h"
+#include "FreeRTOS.h"
+#include "semphr.h"
+#include "task.h"
 
 #include "usb_bsp.h"
 #include "stm32f4_discovery.h"
@@ -59,8 +61,10 @@ extern USBH_Usr_cb_TypeDef USR_Callbacks;
 /* Private variables ---------------------------------------------------------*/
 ErrorStatus HSEStartUpStatus;
 #ifdef USE_ACCURATE_TIME
- __IO uint32_t BSP_delay = 0;
+__IO uint32_t BSP_delay = 0;
 #endif
+
+xSemaphoreHandle xUsbHostSemaphore;
 
 USB_OTG_CORE_HANDLE USB_OTG_Core;
 USBH_HOST           USB_Host;
@@ -77,15 +81,15 @@ static void DisplayPlayerStatus(void)
 {
   static u32 last_ms;
 
-  if (PlayerStatus == PS_PLAYING)
+  if (Player_GetState()->status == PS_PLAYING)
   {
     STM_EVAL_LEDOff(LED3);
 
-    if (PlayerState.metadata.mstime_curr > last_ms + 500 ||
-            PlayerState.metadata.mstime_curr < last_ms)
+    if (Player_GetState()->metadata.mstime_curr > last_ms + 500 ||
+	Player_GetState()->metadata.mstime_curr < last_ms)
     {
       STM_EVAL_LEDToggle(LED6);
-      last_ms = PlayerState.metadata.mstime_curr;
+      last_ms = Player_GetState()->metadata.mstime_curr;
     }
   }
   else
@@ -95,7 +99,22 @@ static void DisplayPlayerStatus(void)
   }
 }
 
-void PowerManager_Init(void)
+void USBH_BSP_Kick(void)
+{
+  xSemaphoreGive(xUsbHostSemaphore);
+}
+
+static void prvUsbHostTask(void *param)
+{
+  while (1)
+  {
+    xSemaphoreTake(xUsbHostSemaphore, 100 / portTICK_RATE_MS);
+    USBH_Process(&USB_OTG_Core, &USB_Host);
+    DisplayPlayerStatus();
+  }
+}
+
+void USB_Host_Init(void)
 {
   /* Initialize LEDS */
   STM_EVAL_LEDInit(LED3);
@@ -106,39 +125,15 @@ void PowerManager_Init(void)
   /* Red Led On: start of application */
   STM_EVAL_LEDOn(LED5);
 
+  vSemaphoreCreateBinary(xUsbHostSemaphore);
+  configASSERT(xUsbHostSemaphore);
+
   /* Init Host Library */
   USBH_Init(&USB_OTG_Core, USB_OTG_FS_CORE_ID, &USB_Host, &USBH_MSC_cb, &USR_Callbacks);
 
-  /*fixme Scheduler_PutTask(100, DisplayPlayerStatus, REPEAT);*/
-
-  /* Configure PA0 pin: User Key pin */
-  STM_EVAL_PBInit(BUTTON_USER, BUTTON_MODE_GPIO);
-
-  while (1)
-  {
-    USBH_Process(&USB_OTG_Core, &USB_Host);
-  }
+  xTaskCreate(prvUsbHostTask, (signed portCHAR *) "USB Host",
+      configUSBH_TASK_STACK_SIZE, NULL, configUSBH_TASK_PRIORITY, NULL);
 }
-
-void PowerManager_MainThread(void)
-{
-}
-
-PowerManagerState_Typedef PowerManager_GetState(void)
-{
-  return PM_OFFLINE;
-}
-
-/**
-  * @brief  BSP_Init
-  *         board user initializations
-  * @param  None
-  * @retval None
-  */
-void BSP_Init(void)
-{
-}
-
 
 /**
   * @brief  USB_OTG_BSP_Init
@@ -540,10 +535,6 @@ static void BSP_SetTime(uint8_t unit)
 }
 
 #endif
-
-void USB_DeInit(void) {}
-void USB_MSC_Init(void) {}
-void USB_CDC_Init(void) {}
 
 /**
 * @}

@@ -24,11 +24,9 @@ if(PLATFORM STREQUAL "N1100")
 elseif(PLATFORM STREQUAL "F4DISCOVERY")
   add_definitions(-DF4DISCOVERY)
   set (USE_HOST_MODE 1)
-elseif(PLATFORM STREQUAL "SIMULATOR")
-  add_definitions(-DSIMULATOR)
 else()
   MESSAGE(FATAL_ERROR "Invalid PLATFORM = ${PLATFORM}, use "
-                      "[N1100, F4DISCOVERY, SIMULATOR]")
+                      "[N1100, F4DISCOVERY]")
 endif()
 
 ###############################################################################
@@ -102,6 +100,7 @@ if (PLATFORM STREQUAL "N1100" OR
       bsp/stm32f4xx/src/usbd_usr.c
       bsp/stm32f4xx/src/usbd_bsp.c
     )
+    add_definitions(-DUSE_DEVICE_MODE)
   elseif(USE_HOST_MODE)
     set(CSP_SOURCES ${CSP_SOURCES}
       bsp/stm32f4xx/src/usbh_usr.c
@@ -110,25 +109,6 @@ if (PLATFORM STREQUAL "N1100" OR
     set (BSP_SOURCES ${BSP_SOURCES}
       bsp/stm32f4_discovery/fattime.c
     )
+    add_definitions(-DUSE_HOST_MODE)
   endif()
-endif()
-
-
-if(PLATFORM STREQUAL "SIMULATOR")
-  INCLUDE_DIRECTORIES(bsp/simulator)
-
-  if(NOT SD_CARD_FILE)
-    MESSAGE(FATAL_ERROR "You need to define SD_CARD_FILE")
-  endif()
-  
-  add_definitions(-DSD_CARD_FILE="${SD_CARD_FILE}")
-
-  set (BSP_SOURCES ${BSP_SOURCES}
-      bsp/simulator/bsp.c
-      bsp/simulator/diskio_sdio.c
-  )
-  
-  set (LIBRARIES ${LIBRARIES}
-      pthread
-  )
 endif()

@@ -30,6 +30,7 @@
 #include "stm32f4xx_it.h"
 
 extern uint32_t USBD_OTG_ISR_Handler(USB_OTG_CORE_HANDLE *pdev);
+extern void USBH_BSP_Kick(void);
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
@@ -248,6 +249,8 @@ void OTG_FS_IRQHandler(void)
 
 #ifdef USE_HOST_MODE
   USBH_OTG_ISR_Handler(&USB_OTG_Core);
+
+  USBH_BSP_Kick();
 #endif
 }
 #endif /* USE_USB_OTG_FS */
