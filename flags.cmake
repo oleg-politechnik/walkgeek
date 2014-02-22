@@ -10,9 +10,9 @@ SET(CMAKE_C_FLAGS_DEBUG " -ggdb -O0 -Wno-unused-variable -Wno-unused-parameter -
 SET(CMAKE_CXX_FLAGS_DEBUG " -ggdb -O0")
 SET(CMAKE_ASM_FLAGS_DEBUG " -ggdb")
 
-SET(CMAKE_C_FLAGS_RELEASE " -g0 -O3")
-SET(CMAKE_CXX_FLAGS_RELEASE " -g0 -O3")
-SET(CMAKE_ASM_FLAGS_RELEASE " -g0")
+SET(CMAKE_C_FLAGS_RELEASE " -ggdb -O3 -Wno-unused-variable -Wno-unused-parameter")
+SET(CMAKE_CXX_FLAGS_RELEASE " -ggdb -O3")
+SET(CMAKE_ASM_FLAGS_RELEASE " -ggdb")
 
 IF(CMAKE_COMPILER_IS_GNUCC)
   SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fmessage-length=0")
