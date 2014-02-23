@@ -134,7 +134,7 @@ SECTIONS
     __bss_end__ = _ebss;
     
     _sstack = .;
-    . += 10000;
+    . += 2048;
     _estack = .;
     
     _sheap_newlib = .;

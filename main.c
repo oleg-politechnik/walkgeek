@@ -1,7 +1,7 @@
 /*
  * main.c
  *
- * Copyright (c) 2012, 2013, Oleg Tsaregorodtsev
+ * Copyright (c) 2012, 2013, 2014 Oleg Tsaregorodtsev
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -47,7 +47,7 @@ extern void prvUiTask(void *);
 /* Private typedef ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-SystemState_Typedef SystemState = SS_START;
+volatile SystemState_Typedef SystemState = SS_START;
 static bool debug_mode = false;
 static bool can_sleep = false;
 static bool was_player_once_upon_a_time = false;
@@ -55,6 +55,7 @@ static bool was_player_once_upon_a_time = false;
 static xQueueHandle xSystemStateQueue;
 static xTimerHandle xEnterLowPowerModeTimer;
 
+#ifdef ENABLE_TRACE
 static char *stateNames[] =
 {
         "START",
@@ -65,6 +66,7 @@ static char *stateNames[] =
         "",
         "SHUTDOWN"
 };
+#endif
 
 /* Private function prototypes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 static void SetState(SystemState_Typedef NewState);
@@ -95,7 +97,7 @@ static void prvInitTask(void *pvParameters)
   if (PowerManager_GetState() != PM_ONLINE)
   {
 #ifdef HAS_BATTERY
-    int delay = 0;
+    u32 delay = 0;
 
     while (delay < /*configUI_LONG_PRESS_TIMEOUT_MS*/ 2000 / portTICK_RATE_MS)
     {
@@ -116,9 +118,13 @@ static void prvInitTask(void *pvParameters)
     System_SetState(debug_mode ? SS_PLAYER : SS_USB_MSC);
   }
 #else
+#ifdef USE_HOST_MODE
   USB_Host_Init();
+#endif
   System_SetState(SS_PLAYER);
 #endif
+
+  Display_Init(ENABLE);
 
   xTaskCreate(prvUiTask, (signed portCHAR *) "UI",
           mainUI_TASK_STACK_SIZE, NULL, mainUI_TASK_PRIORITY, NULL);
@@ -176,10 +182,12 @@ void System_SetState(SystemState_Typedef NewState)
     was_player_once_upon_a_time = true;
   }
 
+#ifdef HAS_BATTERY
   if (NewState == SS_USB_MSC && PowerManager_GetState() != PM_ONLINE)
   {
     return;
   }
+#endif
 #endif
 
   xQueueSend( xSystemStateQueue, ( void * ) &NewState, portMAX_DELAY );
@@ -193,10 +201,12 @@ void System_SetStateFomISR(SystemState_Typedef NewState)
     was_player_once_upon_a_time = true;
   }
 
+#ifdef HAS_BATTERY
   if (NewState == SS_USB_MSC && PowerManager_GetState() != PM_ONLINE)
   {
     return;
   }
+#endif
 #endif
 
   xQueueSendFromISR( xSystemStateQueue, ( void * ) &NewState, NULL );
@@ -279,7 +289,7 @@ int main(void)
   /* Start the scheduler. */
   vTaskStartScheduler();
 
-  assert_param(!"Fatal RTOS startup error");
+  configASSERT(!"Fatal RTOS startup error");
 
   return 42;
 }
@@ -295,18 +305,68 @@ void vApplicationIdleHook(void)
 void vApplicationTickHook(void)
 {
   Keypad_1msScan();
-  Disp_MainThread();
   BSP_StartADC();
 }
 
 void vApplicationMallocFailedHook(void)
 {
-  assert_param(!"Malloc failed");
+  configASSERT(!"Malloc failed");
 }
 
 void vApplicationStackOverflowHook(xTaskHandle *pxTask,
     signed portCHAR *pcTaskName)
 {
-  assert_param(!"Stack overflow");
+	configASSERT(!"Stack overflow");
 }
 
+#ifdef  USE_FULL_ASSERT
+void assert_failed(char* file, uint32_t line, char* expr)
+{
+	/* User can add his own implementation to report the file name and line number,
+	 ex: printf("Wrong parameters value: file %s on line %d\n", file, line) */
+
+	vPortEnterCritical();
+
+	char buf[256];
+
+	//TODO: add application state
+
+	Codec_Reset();
+
+	Vibrator_Disable();
+
+	Display_Init(DISABLE);
+
+	if (file)
+	{
+		snprintf(buf, sizeof(buf),
+				"EPIC FAIL!\nLine %i at %s:\n%s", (int) line, (char *) ((int) strrchr(file, '/') ? strrchr(file, '/') + 1 : file), expr);
+		Display_String(0, 0, buf, true);
+	}
+	else
+	{
+		Display_String(0, 0, expr, true);
+	}
+
+	/* Infinite loop */
+	while (1)
+	{
+		Display_MainCycle();
+
+		if (BSP_Keypad_GetKeyStatus(KEY_PPP))
+		{
+			//Delay(10); //todo const
+//      delay += 10;
+
+//      if (delay < 1000) //todo const
+//      {
+			BSP_PowerDisable();
+//      }
+		}
+		else
+		{
+//      delay = 0;
+		}
+	}
+}
+#endif

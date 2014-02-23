@@ -78,6 +78,8 @@
  * See http://www.freertos.org/a00110.html.
  *----------------------------------------------------------*/
 
+#include "assert.h"
+
 /* Ensure stdint is only used by the compiler, and not the assembler. */
 //#ifdef GCC
 	#include <stdint.h>
@@ -90,15 +92,19 @@
 #define configCPU_CLOCK_HZ				( SystemCoreClock )
 #define configTICK_RATE_HZ				( ( portTickType ) 100 )
 #define configMAX_PRIORITIES			( 16 )
-#define configMINIMAL_STACK_SIZE		( ( unsigned short ) 130 )
-#define configTOTAL_HEAP_SIZE			( ( size_t ) ( 75 * 1024 ) )
+#define configMINIMAL_STACK_SIZE		( ( unsigned short ) 128 )
+
+  extern unsigned int _sheap_newlib;
+  extern unsigned int _ssram1;
+
+#define configTOTAL_HEAP_SIZE			( ( size_t ) (&_sheap_newlib - &_ssram1) )
 #define configMAX_TASK_NAME_LEN			( 64 )
 #define configUSE_TRACE_FACILITY		1
 #define configUSE_16_BIT_TICKS			0
 #define configIDLE_SHOULD_YIELD			1
 #define configUSE_MUTEXES				1
 #define configQUEUE_REGISTRY_SIZE		8
-#define configCHECK_FOR_STACK_OVERFLOW	2
+#define configCHECK_FOR_STACK_OVERFLOW	2 /* FIXME only in debug */
 #define configUSE_RECURSIVE_MUTEXES		1
 #define configUSE_MALLOC_FAILED_HOOK	1
 #define configUSE_APPLICATION_TASK_TAG	0
@@ -124,7 +130,7 @@ to exclude the API function. */
 #define INCLUDE_vTaskSuspend			1
 #define INCLUDE_vTaskDelayUntil			1
 #define INCLUDE_vTaskDelay				1
-#define INCLUDE_uxTaskGetStackHighWaterMark		1
+#define INCLUDE_uxTaskGetStackHighWaterMark		1 /* FIXME only in debug */
 
 /* Cortex-M specific definitions. */
 #ifdef __NVIC_PRIO_BITS
@@ -153,7 +159,7 @@ See http://www.FreeRTOS.org/RTOS-Cortex-M3-M4.html. */
 
 /* Normal assert() semantics without relying on the provision of an assert.h
 header file. */
-#define configASSERT( x ) if( ( x ) == 0 ) { taskDISABLE_INTERRUPTS(); for( ;; ); }
+#define configASSERT( x ) assert_param(x)
 
 /* Definitions that map the FreeRTOS port interrupt handlers to their CMSIS
 standard names. */
@@ -176,9 +182,9 @@ standard names. */
 #define configIRQ_PRIORITY_ADC				(configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY + 5)
 
 #define mainINIT_TASK_PRIORITY			( tskIDLE_PRIORITY + 1 )
-#define mainINIT_TASK_STACK_SIZE		( configMINIMAL_STACK_SIZE * 30 )
+#define mainINIT_TASK_STACK_SIZE		( configMINIMAL_STACK_SIZE * 10 )
 
-#define mainUI_TASK_STACK_SIZE			( configMINIMAL_STACK_SIZE * 30 )
+#define mainUI_TASK_STACK_SIZE			( configMINIMAL_STACK_SIZE * 10 )
 #define mainUI_TASK_PRIORITY			( tskIDLE_PRIORITY + 2 )
 
 #define configUSBH_TASK_STACK_SIZE		( configMINIMAL_STACK_SIZE * 10 )

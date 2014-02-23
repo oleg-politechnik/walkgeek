@@ -1,7 +1,7 @@
 /*
- * audio_if.h
+ * display.h
  *
- * Copyright (c) 2012, Oleg Tsaregorodtsev
+ * Copyright (c) 2014, Oleg Tsaregorodtsev
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,46 +25,35 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* Define to prevent recursive inclusion ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-#ifndef AUDIO_IF_H_
-#define AUDIO_IF_H_
+#ifndef DISPLAY_H_
+#define DISPLAY_H_
 
 /* Includes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-#include "common.h"
+#include "FreeRTOSConfig.h"
+#include "disp_1100.h"
 
-/* Exported defines ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-/* Exported macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-/* Exported types ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-typedef enum {
-  AS_STOPPED,
-  AS_PLAYING,
-  AS_PAUSED,
-  AS_ERROR
-} AudioState_Typedef;
+/* Public defines ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+#define display_TASK_STACK_SIZE		( configMINIMAL_STACK_SIZE * 5 )
+#define display_TASK_PRIORITY			( mainPLAYER_TASK_PRIORITY )
+#define configDISPLAY_NEXT_SYMBOL_TIMEOUT_MS			( 1000 / portTICK_RATE_MS )
 
-typedef enum
-{
-  AC_RESET_BUFFERS,
-  AC_PLAY,
-  AC_PAUSE,
-  AC_PLAY_PAUSE,
-  AC_SUSPEND,
-  AC_STOP
-} AudioCommand_Typedef;
+/* Public types ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+/* Public constants ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+/* Public variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+/* Public macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+/* Public functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+void Display_Init(FunctionalState irq_enabled);
+void Display_SetBacklightEnabled(FunctionalState enabled);
 
-/* Exported functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-void Audio_DeInit(void);
+void Display_MainCycle(void);
 
-FuncResult Audio_CommandSync(AudioCommand_Typedef cmd);
-FuncResult Audio_SetVolume(int NewVolume);
-FuncResult Audio_ChangeVolume(int delta);
+void Display_NextWord_FromISR(void);
+void Display_SetData(u8 x, u8 row, u8 byte);
+void Display_String(uint8_t col, uint8_t row, const char *ptr, bool new_line);
 
-FuncResult Audio_PeriodicKick(void);
+void Display_Clear(void);
+void Display_ClearRow(uint8_t row);
 
-AudioState_Typedef Audio_GetState(void);
-int Audio_GetSampleRate(void);
-int Audio_GetVolume(void);
-/* Exported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-/* Exported static inline functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+/* Public static inline functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
-#endif /* AUDIO_IF_H_ */
+#endif /* DISPLAY_H_ */

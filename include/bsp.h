@@ -72,6 +72,11 @@ void Vibrator_Enable(void);
 void USB_OTG_BSP_DeInit(void);
 void BSP_USBD_MSC_Init(void);
 
+/* Disp 1100 */
+void Disp1100_GPIO_Init(void);
+void Disp1100_SetCS(FunctionalState enabled);
+void Disp1100_SetRST(FunctionalState enabled);
+
 /* MM */
 
 void *user_malloc(size_t size);

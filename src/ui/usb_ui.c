@@ -73,12 +73,12 @@ static void USBScreen_VariableChangedHandler(VAR_Index var)
     case VAR_MSC_Speed:
       sprintf(str_buf, "Rx: ");
       PrintSpeed(str_buf + sizeof("Rx"), MSC_TxSpeed);
-      Disp_ClearRow(3);
+      Display_ClearRow(3);
       DISP_ALIGN_LEFT(3, str_buf);
 
       sprintf(str_buf, "Wx: ");
       PrintSpeed(str_buf + sizeof("Wx"), MSC_RxSpeed);
-      Disp_ClearRow(4);
+      Display_ClearRow(4);
       DISP_ALIGN_LEFT(4, str_buf);
       break;
 

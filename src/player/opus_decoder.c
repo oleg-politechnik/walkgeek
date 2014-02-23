@@ -140,14 +140,14 @@ FuncResult OPUS_LoadFile(sDecoderContext *psDecoderContext)
   p->res = f_open(&p->file, psDecoderContext->pcFilePath, FA_READ);
   if (p->res != FR_OK)
   {
-    assert_param(0);
+  	configASSERT(0);
     //
   }
 
   p->ogg_buf_size = 2048;
   p->ogg_buf = pvPortMalloc(p->ogg_buf_size);
 
-  assert_param(p->ogg_buf);
+  configASSERT(p->ogg_buf);
 
   minogg_sync_init(&p->os.oy, p->ogg_buf_size, p->ogg_buf);
 

@@ -6,12 +6,12 @@ IF(NOT CMAKE_BUILD_TYPE)
     MESSAGE(STATUS "No CMAKE_BUILD_TYPE specified, using default DEBUG")
 ENDIF()
 
-SET(CMAKE_C_FLAGS_DEBUG " -ggdb -O0 -Wno-unused-variable -Wno-unused-parameter -Wno-unused-function")
+SET(CMAKE_C_FLAGS_DEBUG " -ggdb -O0 -Wno-unused-variable -Wno-unused-parameter -Wno-unused-function -Wno-attributes")
 SET(CMAKE_CXX_FLAGS_DEBUG " -ggdb -O0")
 SET(CMAKE_ASM_FLAGS_DEBUG " -ggdb")
 
-SET(CMAKE_C_FLAGS_RELEASE " -ggdb -O3 -Wno-unused-variable -Wno-unused-parameter")
-SET(CMAKE_CXX_FLAGS_RELEASE " -ggdb -O3")
+SET(CMAKE_C_FLAGS_RELEASE " -ggdb -O2 -Wno-unused-variable -Wno-unused-parameter -Wno-attributes -Wno-unused-function")
+SET(CMAKE_CXX_FLAGS_RELEASE " -ggdb -O2")
 SET(CMAKE_ASM_FLAGS_RELEASE " -ggdb")
 
 IF(CMAKE_COMPILER_IS_GNUCC)

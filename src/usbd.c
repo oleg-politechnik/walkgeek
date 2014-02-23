@@ -46,8 +46,8 @@ extern void BSP_USBD_MSC_Init(void);
 extern void BSP_USBD_CDC_Init(void);
 extern void BSP_USBD_DeInit(void);
 
-u32 MSC_DataIn, MSC_DataOut;
-u32 MSC_RxSpeed, MSC_TxSpeed;
+volatile u32 MSC_DataIn, MSC_DataOut;
+volatile u32 MSC_RxSpeed, MSC_TxSpeed;
 
 static xTimerHandle xShowUsbSpeedTimer;
 

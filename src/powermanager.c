@@ -25,8 +25,6 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifdef HAS_BATTERY
-
 /* Includes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 #include "powermanager.h"
 #include "system.h"
@@ -38,11 +36,14 @@
 /* Private typedef ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+uint16_t mV[ADCS_MAX];
+
+#ifdef HAS_BATTERY
+
 static PowerManagerState_Typedef PowerManagerState;
 static NestedFilterSet_Typedef *BatteryVoltageFilter = NULL;
 static NestedFilterSet_Typedef *ChargeCurrentFilter = NULL;
-
-uint16_t mV[ADCS_MAX];
 
 /* Private function prototypes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/

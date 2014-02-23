@@ -256,7 +256,7 @@ void Navigator_InitRoot(NavigatorContext_Typedef *ctx,
 
   OpenDir(ctx, root);
 
-  assert_param(res == FR_OK);
+  configASSERT(res == FR_OK);
 
   trace("navigator: init\n");
 }
@@ -346,7 +346,7 @@ bool Navigator_Cd(NavigatorContext_Typedef *ctx, char *path)
         //if (name[0] == '.')
         //  continue; /* Ignore dot entry */
 
-        if (file_info->fattrib & AM_DIR && (!strcmp(name, dir_temp)))
+        if ((file_info->fattrib & AM_DIR) && (!strcmp(name, dir_temp)))
         {
           if (!CdDown(ctx))
           {
@@ -382,8 +382,8 @@ bool Navigator_TryFile(NavigatorContext_Typedef *ctx, char *filename)
 
   snprintf(filepath, sizeof(filepath), "%s/%s", ctx->dir_path, filename);
 
-  if (f_stat(filepath, &ctx->file_info_) != FR_OK || ctx->file_info_.fattrib
-          & AM_DIR)
+  if (f_stat(filepath, &ctx->file_info_) != FR_OK || (ctx->file_info_.fattrib
+          & AM_DIR))
   {
     trace("navigator: jumping to %s failed\n", filename);
     return false;
@@ -442,7 +442,7 @@ bool Navigator_TryFile(NavigatorContext_Typedef *ctx, char *filename)
     }
   }
 
-  assert_param(!"Failed to open file");
+  configASSERT(!"Failed to open file");
   return false;
 }
 
@@ -618,11 +618,11 @@ static void Navigator_PrevFileCurrentDir(NavigatorContext_Typedef *ctx)
     while (new_ix-- > 0)
     {
       res = f_readdir(&ndir->dir, file_info);
-      assert_param(res == FR_OK);
+      configASSERT(res == FR_OK);
 
       if (file_info->fname[0] == 0)
       {
-        assert_param(!"navigator: dir EOF when rewinding");
+      	configASSERT(!"navigator: dir EOF when rewinding");
       }
 
       ndir->dir_entry_ix_new++;

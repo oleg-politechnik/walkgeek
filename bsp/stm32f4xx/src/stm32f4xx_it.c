@@ -72,9 +72,9 @@ void HardFault_TopHandler(unsigned int * hardfault_args)
   // called from HardFault_Handler in file xxx.s
 
   snprintf(str_buf, sizeof(str_buf),
-          "HARD FAULT! PC=0x%08x,LR=0x%08x,R0=0x%08x,R1=0x%08x,R2=0x%08x,"
-          "R3=0x%08x,R12=0x%08x,PSR=0x%08x,BFAR=0x%08x,CFSR=0x%08x,"
-          "HFSR=0x%08x,DFSR=0x%08x,AFSR=0x%08x,SCB_SHCSR=0x%08x",
+          "HARD FAULT!\nPC=0x%08x\nLR=0x%08x\nR0=0x%08x\nR1=0x%08x\nR2=0x%08x\n"
+          "R3=0x%08x\nR12=0x%08x\nPSR=0x%08x\nBFAR=0x%08x\nCFSR=0x%08x\n"
+          "HFSR=0x%08x\nDFSR=0x%08x\nAFSR=0x%08x\nSCB_SHCSR=0x%08x",
           hardfault_args[6], hardfault_args[5], hardfault_args[0],
           hardfault_args[1], hardfault_args[2], hardfault_args[3],
           hardfault_args[4], hardfault_args[7],

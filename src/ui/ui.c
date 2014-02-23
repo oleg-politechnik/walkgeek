@@ -1,7 +1,7 @@
 /*
  * ui.c
  *
- * Copyright (c) 2012, Oleg Tsaregorodtsev
+ * Copyright (c) 2012, 2013, 2014, Oleg Tsaregorodtsev
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,13 +33,12 @@
 #include "system.h"
 #include "ui.h"
 #include "player.h"
-#include "disp_1100.h"
+#include "display.h"
 #include "keypad.h"
 #include "powermanager.h"
 #include <malloc.h>
 #include "common.h"
 
-extern Screen_Typedef MenuScreen;
 extern Screen_Typedef PlayerScreen;
 extern bool PlayerScreen_IsLocked(void);
 extern Screen_Typedef UsbScreen;
@@ -55,7 +54,6 @@ typedef struct
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
 ;
-static volatile u32 dispBKL_Timeout;
 volatile u32 KeyProcessed;
 
 static UserInterfaceMode_Typedef UiMode = UIM_Uninitialized;
@@ -99,7 +97,7 @@ static void UiVariableChanged(int var)
         break;
     }
 
-    Disp_Clear();
+    Display_Clear();
     if (Screens[UiMode] && Screens[UiMode]->Init)
     {
       (Screens[UiMode]->Init)();
@@ -141,7 +139,7 @@ static void UiKeyPressedCallback(void)
   if (!(UiMode == UIM_Player && PlayerScreen_IsLocked()))
   {
     xTimerStop(xBacklightTimer, configTIMER_API_TIMEOUT_MS);
-    Disp_SetBKL(ENABLE);
+    Display_SetBacklightEnabled(ENABLE);
   }
 
   if ((CurrentKey == KEY_PPP && !PlayerScreen_IsLocked()) || CurrentKey == KEY_BTN)
@@ -236,7 +234,6 @@ void prvUiTask(void *pvParameters)
 
   trace("[init] UI\n");
 
-  Disp_Init();
   Keypad_Init();
   Vibrator_Init();
 
@@ -250,13 +247,13 @@ void prvUiTask(void *pvParameters)
           (void *) DisableBacklightCallback,
           DisableBacklightCallback);
 
-  assert_param(xBacklightTimer);
+  configASSERT(xBacklightTimer);
 
   xKeyHoldTimer = xTimerCreate((signed portCHAR *) "Key Hold Timer",
           configUI_PRESS_TIMEOUT_MS, pdFALSE, (void *) HoldTimeoutEvent,
           HoldTimeoutEvent);
 
-  assert_param(xKeyHoldTimer);
+  configASSERT(xKeyHoldTimer);
 
   UI_EnableBacklight();
 
@@ -310,13 +307,13 @@ void prvUiTask(void *pvParameters)
 void UI_EnableBacklight(void)
 {
   xTimerStart(xBacklightTimer, configTIMER_API_TIMEOUT_MS);
-  Disp_SetBKL(ENABLE);
+  Display_SetBacklightEnabled(ENABLE);
 }
 
 void UI_DisableBacklight(void)
 {
   xTimerStop(xBacklightTimer, configTIMER_API_TIMEOUT_MS);
-  Disp_SetBKL(DISABLE);
+  Display_SetBacklightEnabled(DISABLE);
 }
 
 void UI_StartHoldTimer(u16 timeout)
@@ -327,7 +324,7 @@ void UI_StartHoldTimer(u16 timeout)
 
 void DisableBacklightCallback(xTimerHandle xTimer)
 {
-  Disp_SetBKL(DISABLE);
+	Display_SetBacklightEnabled(DISABLE);
 }
 
 void Vibrator_SendSignal(u16 ms)

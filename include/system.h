@@ -60,8 +60,8 @@ void USB_MSC_Init(void);
 void USB_DeInit(void);
 
 /* Exported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-extern SystemState_Typedef SystemState;
-extern u32 MSC_RxSpeed, MSC_TxSpeed;
+extern volatile SystemState_Typedef SystemState;
+extern volatile u32 MSC_RxSpeed, MSC_TxSpeed;
 
 /* Exported static inline functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 

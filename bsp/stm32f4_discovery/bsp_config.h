@@ -38,31 +38,31 @@
 #endif
 
 /* disp_1100 -----------------------------------------------------------------*/
-#define DISP_GPIO                   GPIOA
-#define DISP_GPIO_CLK               RCC_AHB1Periph_GPIOA
+#define DISP_1100_GPIO                   GPIOA
+#define DISP_1100_GPIO_CLK               RCC_AHB1Periph_GPIOA
 
-#define DISP_PinSrc_RST             GPIO_PinSource2
-#define DISP_PinSrc_BKL             GPIO_PinSource3
-#define DISP_Pin_RST                GPIO_Pin_2
-#define DISP_Pin_BKL                GPIO_Pin_3
+#define DISP_1100_PinSrc_RST             GPIO_PinSource2
+#define DISP_1100_PinSrc_BKL             GPIO_PinSource3
+#define DISP_1100_Pin_RST                GPIO_Pin_2
+#define DISP_1100_Pin_BKL                GPIO_Pin_3
 
 #ifdef N1100
-# define DISP_Pin_CS                 GPIO_Pin_4
+# define DISP_1100_Pin_CS                 GPIO_Pin_4
 #elif F4DISCOVERY
-# define DISP_Pin_CS                 GPIO_Pin_1
+# define DISP_1100_Pin_CS                 GPIO_Pin_1
 #endif
 
-#define DISP_Pin_SCK                GPIO_Pin_5
-#define DISP_Pin_MOSI               GPIO_Pin_7
-#define DISP_PinSrc_SCK             GPIO_PinSource5
-#define DISP_PinSrc_MOSI            GPIO_PinSource7
+#define DISP_1100_Pin_SCK                GPIO_Pin_5
+#define DISP_1100_Pin_MOSI               GPIO_Pin_7
+#define DISP_1100_PinSrc_SCK             GPIO_PinSource5
+#define DISP_1100_PinSrc_MOSI            GPIO_PinSource7
 
-#define DISP_SPI                    SPI1
-#define DISP_SPI_IRQ                SPI1_IRQn
-#define DISP_GPIO_AF_SPI            GPIO_AF_SPI1
-#define DISP_RCC_APB2Periph_SPI     RCC_APB2Periph_SPI1
+#define DISP_1100_SPI                    SPI1
+#define DISP_1100_SPI_IRQ                SPI1_IRQn
+#define DISP_1100_GPIO_AF_SPI            GPIO_AF_SPI1
+#define DISP_1100_RCC_APB2Periph_SPI     RCC_APB2Periph_SPI1
 
-#define Disp_IRQHandler             SPI1_IRQHandler
+#define Disp1100_IRQHandler             SPI1_IRQHandler
 
 /* keyboard ------------------------------------------------------------------*/
 #define KEY_DEBOUNCE_CYCLES             4
@@ -136,7 +136,9 @@ typedef struct {
 #define ADC_CHRG_RCC_AHB1Periph_GPIO  RCC_AHB1Periph_GPIOB
 #define ADC_CHRG_PIN                  GPIO_Pin_1
 #define ADC_CHRG_CHANNEL              ADC_Channel_9
+#endif
 
+#ifdef HAS_HEADSET
 #define ADC_BTN_GPIO                  GPIOC
 #define ADC_BTN_RCC_AHB1Periph_GPIO   RCC_AHB1Periph_GPIOC
 #define ADC_BTN_PIN                   GPIO_Pin_0

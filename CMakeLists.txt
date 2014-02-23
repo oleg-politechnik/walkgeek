@@ -46,6 +46,7 @@ set (SOURCES
     src/navigator.c
     src/nestedfilter.c
     src/ui/ui.c
+    src/ui/display.c
     src/ui/player_ui.c
     src/ui/usb_ui.c
     src/usbd.c

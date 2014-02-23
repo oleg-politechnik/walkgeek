@@ -1,7 +1,7 @@
 /*
  * bsp.c
  *
- * Copyright (c) 2012, Oleg Tsaregorodtsev
+ * Copyright (c) 2012, 2013, 2014 Oleg Tsaregorodtsev
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,8 +36,6 @@
 #include "audio_if.h"
 
 /* Imported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-static u32 LastADC_Value_mV;
-
 /* Private define ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private typedef ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 typedef enum
@@ -49,10 +47,10 @@ typedef enum
 
 /* Private macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-#ifdef HAS_BATTERY
-static uint16_t adc_buff[128];
 extern uint16_t mV[ADCS_MAX];
 
+#ifdef HAS_BATTERY
+static uint16_t adc_buff[128];
 static ADC_Source_Typedef ADC_Source;
 #endif
 
@@ -330,60 +328,58 @@ void BSP_PowerDisable(void)
 }
 
 /* disp_1100 -----------------------------------------------------------------*/
-#include "disp_1100.h"
 
-void Disp_GPIO_Init()
+void Disp1100_GPIO_Init(void)
 {
   GPIO_InitTypeDef GPIO_InitStructure;
 
   /* Enable SPI and GPIO clocks */
-  RCC_AHB1PeriphClockCmd(DISP_GPIO_CLK, ENABLE);
-  RCC_APB2PeriphClockCmd(DISP_RCC_APB2Periph_SPI, ENABLE);
+  RCC_AHB1PeriphClockCmd(DISP_1100_GPIO_CLK, ENABLE);
 
-  GPIO_InitStructure.GPIO_Pin = DISP_Pin_RST | DISP_Pin_CS;
+//  RCC_APB2PeriphResetCmd(DISP_1100_RCC_APB2Periph_SPI, ENABLE); //todo
+//  RCC_APB2PeriphResetCmd(DISP_1100_RCC_APB2Periph_SPI, DISABLE);
+
+  RCC_APB2PeriphClockCmd(DISP_1100_RCC_APB2Periph_SPI, ENABLE);
+
+  GPIO_InitStructure.GPIO_Pin = DISP_1100_Pin_RST | DISP_1100_Pin_CS;
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
   GPIO_InitStructure.GPIO_Speed = GPIO_Speed_25MHz;
   GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
   GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-  GPIO_Init(DISP_GPIO, &GPIO_InitStructure);
+  GPIO_Init(DISP_1100_GPIO, &GPIO_InitStructure);
 
-  /* Configure SPI pins: SCK (PA5), MOSI (PA7) */
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_5 | GPIO_Pin_7;
+  /* Configure SPI pins: SCK, MOSI */
+  GPIO_InitStructure.GPIO_Pin = DISP_1100_Pin_SCK | DISP_1100_Pin_MOSI;
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
-  GPIO_Init(DISP_GPIO, &GPIO_InitStructure);
+  GPIO_Init(DISP_1100_GPIO, &GPIO_InitStructure);
 
-  GPIO_InitStructure.GPIO_Pin = DISP_Pin_BKL;
+  GPIO_InitStructure.GPIO_Pin = DISP_1100_Pin_BKL;
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
   GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
   GPIO_InitStructure.GPIO_OType = GPIO_OType_OD;
   GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-  GPIO_Init(DISP_GPIO, &GPIO_InitStructure);
+  GPIO_Init(DISP_1100_GPIO, &GPIO_InitStructure);
 
-  GPIO_PinAFConfig(DISP_GPIO, GPIO_PinSource5, DISP_GPIO_AF_SPI);
-  GPIO_PinAFConfig(DISP_GPIO, GPIO_PinSource7, DISP_GPIO_AF_SPI);
+  GPIO_PinAFConfig(DISP_1100_GPIO, DISP_1100_PinSrc_SCK, DISP_1100_GPIO_AF_SPI);
+  GPIO_PinAFConfig(DISP_1100_GPIO, DISP_1100_PinSrc_MOSI, DISP_1100_GPIO_AF_SPI);
 }
 
-void Disp_SetBKL(FunctionalState enabled)
+void Display_SetBacklightEnabled(FunctionalState enabled)
 {
-  (enabled == ENABLE) ? GPIO_ResetBits(DISP_GPIO, DISP_Pin_BKL) : GPIO_SetBits(
-          DISP_GPIO, DISP_Pin_BKL);
+  (enabled == ENABLE) ? GPIO_ResetBits(DISP_1100_GPIO, DISP_1100_Pin_BKL) : GPIO_SetBits(
+          DISP_1100_GPIO, DISP_1100_Pin_BKL);
 }
 
-void Disp_SetCS(FunctionalState enabled)
+void Disp1100_SetCS(FunctionalState enabled)
 {
-  (enabled == ENABLE) ? GPIO_ResetBits(DISP_GPIO, DISP_Pin_CS) : GPIO_SetBits(
-          DISP_GPIO, DISP_Pin_CS);
+  (enabled == ENABLE) ? GPIO_ResetBits(DISP_1100_GPIO, DISP_1100_Pin_CS) : GPIO_SetBits(
+          DISP_1100_GPIO, DISP_1100_Pin_CS);
 }
 
-bool Disp_GetCS(void)
+void Disp1100_SetRST(FunctionalState enabled)
 {
-  return (GPIO_ReadInputDataBit(DISP_GPIO, DISP_Pin_CS) == Bit_RESET);
-}
-
-void Disp_SetRST(FunctionalState enabled)
-{
-  (enabled == ENABLE) ? GPIO_ResetBits(DISP_GPIO, DISP_Pin_RST) : GPIO_SetBits(
-          DISP_GPIO, DISP_Pin_RST);
+  (enabled == ENABLE) ? GPIO_ResetBits(DISP_1100_GPIO, DISP_1100_Pin_RST) : GPIO_SetBits(
+          DISP_1100_GPIO, DISP_1100_Pin_RST);
 }
 
 /* sdio ----------------------------------------------------------------------*/
@@ -688,56 +684,3 @@ void Vibrator_Enable(void)
   GPIO_ResetBits(VIBRATOR_GPIO, VIBRATOR_PIN);
 #endif
 }
-
-
-#ifdef  USE_FULL_ASSERT
-void assert_failed(char* file, uint32_t line, char* expr)
-{
-  /* User can add his own implementation to report the file name and line number,
-   ex: printf("Wrong parameters value: file %s on line %d\n", file, line) */
-
-  vPortEnterCritical();
-
-  char buf[256];
-
-  //TODO: add application state
-
-  EVAL_AUDIO_DeInit();
-
-  Disp_InitIRQ_Less();
-
-  if (file)
-  {
-    snprintf(buf, sizeof(buf), "ASSERT %i at %s: %s", (int) line,
-	(char *) ((int) strrchr(file, '/') ? strrchr(file, '/') + 1 : file),
-	expr);
-    Disp_String(0, 0, buf, true);
-  }
-  else
-  {
-    Disp_String(0, 0, expr, true);
-  }
-
-  /* Infinite loop */
-  while (1)
-  {
-    Disp_IRQHandler();
-    Disp_MainThread();
-
-    if (BSP_Keypad_GetKeyStatus(KEY_PPP))
-    {
-      //Delay(10); //todo const
-//      delay += 10;
-
-//      if (delay < 1000) //todo const
-//      {
-	BSP_PowerDisable();
-//      }
-    }
-    else
-    {
-//      delay = 0;
-    }
-  }
-}
-#endif

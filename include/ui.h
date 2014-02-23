@@ -1,7 +1,7 @@
 /*
  * ui.h
  *
- * Copyright (c) 2012, Oleg Tsaregorodtsev
+ * Copyright (c) 2012, 2013, 2014, Oleg Tsaregorodtsev
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,7 +31,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "common.h"
-#include "disp_1100.h"
+#include "display.h"
 
 /* Exported constants --------------------------------------------------------*/
 #define KEY_PREV        KEY_1
@@ -111,13 +111,13 @@ typedef enum
 
 /* Exported macro ------------------------------------------------------------*/
 #define DISP_ALIGN_CENTER(row, str) \
-  Disp_String(MAX((int)(DISP_X_COUNT / 2) - ((int) strlen(str) - 1) * 6 / 2, (int)0), row, str, false)
+  Display_String(MAX((int)(DISP_X_COUNT / 2) - ((int) strlen(str) - 1) * 6 / 2, (int)0), row, str, false)
 
 #define DISP_ALIGN_RIGHT(row, str) \
-  Disp_String(DISP_X_COUNT - strlen(str) * 6, row, str, false)
+  Display_String(DISP_X_COUNT - strlen(str) * 6, row, str, false)
 
 #define DISP_ALIGN_LEFT(row, str) \
-  Disp_String(0, row, str, false)
+  Display_String(0, row, str, false)
 
 #define UI_SetVariable(var_ix, var, val) do { if (var != val) { \
         var = val; UI_SyncVariable(var_ix); } } while(0)

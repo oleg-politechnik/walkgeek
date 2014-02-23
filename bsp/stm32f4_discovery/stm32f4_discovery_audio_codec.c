@@ -201,12 +201,23 @@
 DMA_InitTypeDef DMA_InitStructure;
 DMA_InitTypeDef AUDIO_MAL_DMA_InitStructure;
 
+bool CODEC_Inited, AUDIO_MAL_Inited;
+
 uint32_t AudioTotalSize = 0xFFFF; /* This variable holds the total size of the audio file */
 uint32_t AudioRemSize = 0; /* This variable holds the remaining data in audio file */
 uint16_t *CurrentPos; /* This variable holds the current position of audio pointer */
 __IO uint32_t CODECTimeout = CODEC_LONG_TIMEOUT;
 __IO uint8_t OutputDev = 0;
 //__IO uint32_t CurrAudioInterface = AUDIO_INTERFACE_I2S; //AUDIO_INTERFACE_DAC
+
+static const u8 log_table[] =
+{ 0, 2, 38, 61, 77, 89, 99, 108, 115, 122, 128, 133, 138, 142, 146, 150, 154,
+		157, 160, 163, 166, 169, 171, 174, 176, 178, 180, 182, 185, 186, 188, 190,
+		192, 194, 195, 197, 198, 200, 201, 203, 204, 206, 207, 208, 210, 211, 212,
+		213, 214, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228,
+		229, 229, 230, 231, 232, 233, 234, 234, 235, 236, 237, 238, 238, 239, 240,
+		241, 241, 242, 243, 243, 244, 245, 245, 246, 247, 247, 248, 249, 249, 250,
+		250, 251, 252, 252, 253, 253, 254, 254 };
 
 //__IO uint8_t CodecIsInPause = 1;
 /**
@@ -239,7 +250,7 @@ static uint32_t Codec_Mute(uint32_t Cmd);
 static void Codec_CtrlInterface_Init(void);
 static void Codec_CtrlInterface_DeInit(void);
 static void Codec_AudioInterface_DeInit(void);
-static void Codec_Reset(void);
+//static void Codec_Reset(void);
 static uint32_t Codec_WriteRegister(uint8_t RegisterAddr, uint8_t RegisterValue);
 #ifdef VERIFY_WRITTENDATA
 static uint32_t Codec_ReadRegister(uint8_t RegisterAddr);
@@ -271,15 +282,19 @@ uint32_t EVAL_AUDIO_Init(uint16_t OutputDevice, uint8_t Volume,
         uint32_t AudioFreq)
 {
   /* Perform low layer Codec initialization */
-  if (Codec_Init(OutputDevice, VOLUME_CONVERT(Volume), AudioFreq) != 0)
+  if (Codec_Init(OutputDevice, Volume, AudioFreq) != 0)
   {
     return 1;
   }
   else
   {
+  	CODEC_Inited = true;
+
     /* I2S data transfer preparation:
      Prepare the Media to be used for the audio transfer from memory to I2S peripheral */
     Audio_MAL_Init();
+
+    AUDIO_MAL_Inited = true;
 
     /* Return 0 when all operations are OK */
     return 0;
@@ -295,10 +310,16 @@ uint32_t EVAL_AUDIO_Init(uint16_t OutputDevice, uint8_t Volume,
 uint32_t EVAL_AUDIO_DeInit(void)
 {
   /* DeInitialize the Media layer */
-  Audio_MAL_DeInit();
+	if (AUDIO_MAL_Inited)
+	{
+		Audio_MAL_DeInit();
+	}
 
   /* DeInitialize Codec */
-  Codec_DeInit();
+	if (CODEC_Inited)
+	{
+		Codec_DeInit();
+	}
 
   return 0;
 }
@@ -393,8 +414,10 @@ uint32_t EVAL_AUDIO_Stop(uint32_t Option)
  */
 uint32_t EVAL_AUDIO_VolumeCtl(uint8_t Volume)
 {
+	assert_param(Volume < SIZE_OF(log_table));
+
   /* Call the codec volume control function with converted volume value */
-  return (Codec_VolumeCtrl(VOLUME_CONVERT(Volume)));
+  return (Codec_VolumeCtrl(log_table[Volume]));
 }
 
 /**
@@ -580,7 +603,7 @@ static uint32_t Codec_Init(uint16_t OutputDevice, uint8_t Volume,
   counter += Codec_WriteRegister(0x06, CODEC_STANDARD);
 
   /* Set the Master volume */
-  Codec_VolumeCtrl(Volume);
+  EVAL_AUDIO_VolumeCtl(Volume);
 
   if (0)
   {
@@ -654,6 +677,8 @@ static uint32_t Codec_DeInit(void)
 
   /* Deinitialize the Codec audio interface (I2S) */
   Codec_AudioInterface_DeInit();
+
+  CODEC_Inited = false;
 
   /* Return communication control value */
   return counter;
@@ -801,7 +826,7 @@ static uint32_t Codec_Mute(uint32_t Cmd)
  * @param  None
  * @retval None
  */
-static void Codec_Reset(void)
+void Codec_Reset(void)
 {
   /* Power Down the codec */
   GPIO_WriteBit(AUDIO_RESET_GPIO, AUDIO_RESET_PIN, Bit_RESET);
@@ -1520,6 +1545,8 @@ static void Audio_MAL_DeInit(void)
   /*
    The DMA clock is not disabled, since it can be used by other streams
    */
+
+  AUDIO_MAL_Inited = false;
 }
 
 /**
@@ -1669,6 +1696,12 @@ void DAC_Config(void)
   /* Enable DAC Channel1 */
   DAC_Cmd(AUDIO_DAC_CHANNEL, ENABLE);
 }
+
+int EVAL_AUDIO_GetMaxVolume(void)
+{
+	return SIZE_OF(log_table) - 1;
+}
+
 /**
  * @}
  */

@@ -42,22 +42,13 @@
 /* Private macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 static volatile AudioState_Typedef AudioState = AS_STOPPED;
-static uint32_t Volume;
+static int Volume;
 static uint32_t SampleRate;
 static uint32_t NeglectedDMA_Count;
 static volatile uint32_t DMA_Starving_Flag;
 
-static const u8 log_table[] =
-{ 0, 1, 15, 24, 30, 35, 39, 42, 45, 48, 50, 52, 54, 56, 57, 59, 60, 62, 63, 64,
-        65, 66, 67, 68, 69, 70, 71, 72, 72, 73, 74, 75, 75, 76, 77, 77, 78, 78,
-        79, 80, 80, 81, 81, 82, 82, 83, 83, 84, 84, 85, 85, 85, 86, 86, 87, 87,
-        87, 88, 88, 89, 89, 89, 90, 90, 90, 91, 91, 91, 92, 92, 92, 93, 93, 93,
-        93, 94, 94, 94, 95, 95, 95, 95, 96, 96, 96, 96, 97, 97, 97, 97, 98, 98,
-        98, 98, 99, 99, 99, 99, 100, 100 };
-
 /* Private function prototypes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 static FuncResult Audio_Init(u32 AudioFreq);
-static u32 ConvertVolume(u32 NewVolume);
 static FuncResult FeedDMA(void);
 static FuncResult Audio_DoCommand(AudioCommand_Typedef cmd);
 
@@ -65,7 +56,6 @@ void AudioBuffer_Init(void);
 u8 AudioBuffer_GetFullCount(void);
 
 AudioBuffer_Typedef *AudioBuffer_TryGetProducer(void);
-void AudioBuffer_MoveProducer(void);
 
 AudioBuffer_Typedef *AudioBuffer_TryGetConsumer(void);
 void AudioBuffer_MoveConsumer(void);
@@ -80,7 +70,7 @@ FuncResult Audio_Init(u32 AudioFreq)
 {
 
   /* Call low layer function */
-  if (EVAL_AUDIO_Init(OUTPUT_DEVICE_HEADPHONE, ConvertVolume(Volume), AudioFreq)
+  if (EVAL_AUDIO_Init(OUTPUT_DEVICE_HEADPHONE, Volume, AudioFreq)
           != 0)
   {
     Audio_Error();
@@ -215,50 +205,38 @@ FuncResult Audio_CommandSync(AudioCommand_Typedef cmd)
   return (fr == FUNC_SUCCESS) ? fr2 : fr;
 }
 
-u32 ConvertVolume(u32 NewVolume)
+FuncResult Audio_SetVolume(int new_volume)
 {
-  assert_param(NewVolume <= 100);
-  UI_SetVariable(VAR_AudioVolume, Volume, NewVolume);
-  return log_table[NewVolume];
-}
+  if (new_volume > EVAL_AUDIO_GetMaxVolume())
+  {
+  	new_volume = EVAL_AUDIO_GetMaxVolume();
+  }
+  if (new_volume < EVAL_AUDIO_GetMinVolume())
+  {
+  	new_volume = EVAL_AUDIO_GetMinVolume();
+  }
 
-FuncResult Audio_SetVolume(u8 NewVolume)
-{
+	UI_SetVariable(VAR_AudioVolume, Volume, new_volume);
+
   if (AudioState == AS_STOPPED)
   {
-    UI_SetVariable(VAR_AudioVolume, Volume, NewVolume);
+    UI_SetVariable(VAR_AudioVolume, Volume, new_volume);
     return FUNC_SUCCESS;
   }
 
-  if (EVAL_AUDIO_VolumeCtl(ConvertVolume(NewVolume)) != 0)
+  if (EVAL_AUDIO_VolumeCtl(new_volume) != 0)
   {
     Audio_Error();
     return FUNC_ERROR;
   }
 
+  UI_SetVariable(VAR_AudioVolume, Volume, new_volume);
   return FUNC_SUCCESS;
 }
 
-FuncResult Audio_ChangeVolume(s8 delta) //todo async
+FuncResult Audio_ChangeVolume(int delta) //todo async
 {
-  s16 new_volume = Audio_GetVolume() + delta;
-
-  if (delta > 0)
-  {
-    if (new_volume > DEFAULT_VOLMAX)
-    {
-      new_volume = DEFAULT_VOLMAX;
-    }
-  }
-  else
-  {
-    if (new_volume < DEFAULT_VOLMIN)
-    {
-      new_volume = DEFAULT_VOLMIN;
-    }
-  }
-
-  return Audio_SetVolume(new_volume);
+  return Audio_SetVolume(Audio_GetVolume() + delta);
 }
 
 FuncResult Audio_PeriodicKick(void)

@@ -1,7 +1,7 @@
 /*
  * disp_1100.c
  *
- * Copyright (c) 2012, Oleg Tsaregorodtsev
+ * Copyright (c) 2012, 2013, 2014, Oleg Tsaregorodtsev
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,136 +36,51 @@
 #include <string.h>
 #include "system.h"
 
+#include "display.h"
+
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
-#define DISP_INDEX_COUNT            (DISP_X_COUNT * DISP_ROW_COUNT)
-
-#define DISP_IS_VALID_ROW(row)      (row < DISP_ROW_COUNT)
-#define DISP_IS_VALID_X(x)          (x < DISP_X_COUNT)
-#define DISP_IS_VALID_Y(y)          (y < DISP_Y_COUNT)
-#define DISP_IS_VALID_INDEX(ix)     (ix < DISP_INDEX_COUNT)
-
-#define DISP_INDEX(x, row)          (x + row * DISP_X_COUNT)
-
-#define ALL_DISP_DIRTY              DISP_ROW_COUNT
-
 /* Private variables ---------------------------------------------------------*/
-static uint8_t dispRAM[DISP_ROW_COUNT][DISP_X_COUNT];
-static __IO uint32_t dirty_row_flags;
-static __IO uint32_t busy;
-static u16 ram_x;
-static u8 ram_row;
-static bool irq;
-
-static const uint8_t FontLookup[][5] =
-{
-{ 0x00, 0x00, 0x00, 0x00, 0x00 }, // sp
-        { 0x00, 0x00, 0x2f, 0x00, 0x00 }, // !
-        { 0x00, 0x07, 0x00, 0x07, 0x00 }, // "
-        { 0x14, 0x7f, 0x14, 0x7f, 0x14 }, // #
-        { 0x24, 0x2a, 0x7f, 0x2a, 0x12 }, // $
-        { 0xc4, 0xc8, 0x10, 0x26, 0x46 }, // %
-        { 0x36, 0x49, 0x55, 0x22, 0x50 }, // &
-        { 0x00, 0x05, 0x03, 0x00, 0x00 }, // '
-        { 0x00, 0x1c, 0x22, 0x41, 0x00 }, // (
-        { 0x00, 0x41, 0x22, 0x1c, 0x00 }, // )
-        { 0x14, 0x08, 0x3E, 0x08, 0x14 }, // *
-        { 0x08, 0x08, 0x3E, 0x08, 0x08 }, // +
-        { 0x00, 0x00, 0x50, 0x30, 0x00 }, // ,
-        { 0x10, 0x10, 0x10, 0x10, 0x10 }, // -
-        { 0x00, 0x60, 0x60, 0x00, 0x00 }, // .
-        { 0x20, 0x10, 0x08, 0x04, 0x02 }, // /
-        { 0x3E, 0x51, 0x49, 0x45, 0x3E }, // 0
-        { 0x00, 0x42, 0x7F, 0x40, 0x00 }, // 1
-        { 0x42, 0x61, 0x51, 0x49, 0x46 }, // 2
-        { 0x21, 0x41, 0x45, 0x4B, 0x31 }, // 3
-        { 0x18, 0x14, 0x12, 0x7F, 0x10 }, // 4
-        { 0x27, 0x45, 0x45, 0x45, 0x39 }, // 5
-        { 0x3C, 0x4A, 0x49, 0x49, 0x30 }, // 6
-        { 0x01, 0x71, 0x09, 0x05, 0x03 }, // 7
-        { 0x36, 0x49, 0x49, 0x49, 0x36 }, // 8
-        { 0x06, 0x49, 0x49, 0x29, 0x1E }, // 9
-        { 0x00, 0x36, 0x36, 0x00, 0x00 }, // :
-        { 0x00, 0x56, 0x36, 0x00, 0x00 }, // ;
-        { 0x08, 0x14, 0x22, 0x41, 0x00 }, // <
-        { 0x14, 0x14, 0x14, 0x14, 0x14 }, // =
-        { 0x00, 0x41, 0x22, 0x14, 0x08 }, // >
-        { 0x02, 0x01, 0x51, 0x09, 0x06 }, // ?
-        { 0x32, 0x49, 0x59, 0x51, 0x3E }, // @
-        { 0x7E, 0x11, 0x11, 0x11, 0x7E }, // A
-        { 0x7F, 0x49, 0x49, 0x49, 0x36 }, // B
-        { 0x3E, 0x41, 0x41, 0x41, 0x22 }, // C
-        { 0x7F, 0x41, 0x41, 0x22, 0x1C }, // D
-        { 0x7F, 0x49, 0x49, 0x49, 0x41 }, // E
-        { 0x7F, 0x09, 0x09, 0x09, 0x01 }, // F
-        { 0x3E, 0x41, 0x49, 0x49, 0x7A }, // G
-        { 0x7F, 0x08, 0x08, 0x08, 0x7F }, // H
-        { 0x00, 0x41, 0x7F, 0x41, 0x00 }, // I
-        { 0x20, 0x40, 0x41, 0x3F, 0x01 }, // J
-        { 0x7F, 0x08, 0x14, 0x22, 0x41 }, // K
-        { 0x7F, 0x40, 0x40, 0x40, 0x40 }, // L
-        { 0x7F, 0x02, 0x0C, 0x02, 0x7F }, // M
-        { 0x7F, 0x04, 0x08, 0x10, 0x7F }, // N
-        { 0x3E, 0x41, 0x41, 0x41, 0x3E }, // O
-        { 0x7F, 0x09, 0x09, 0x09, 0x06 }, // P
-        { 0x3E, 0x41, 0x51, 0x21, 0x5E }, // Q
-        { 0x7F, 0x09, 0x19, 0x29, 0x46 }, // R
-        { 0x46, 0x49, 0x49, 0x49, 0x31 }, // S
-        { 0x01, 0x01, 0x7F, 0x01, 0x01 }, // T
-        { 0x3F, 0x40, 0x40, 0x40, 0x3F }, // U
-        { 0x1F, 0x20, 0x40, 0x20, 0x1F }, // V
-        { 0x3F, 0x40, 0x38, 0x40, 0x3F }, // W
-        { 0x63, 0x14, 0x08, 0x14, 0x63 }, // X
-        { 0x07, 0x08, 0x70, 0x08, 0x07 }, // Y
-        { 0x61, 0x51, 0x49, 0x45, 0x43 }, // Z
-        { 0x00, 0x7F, 0x41, 0x41, 0x00 }, // [
-        { 0x55, 0x2A, 0x55, 0x2A, 0x55 }, // 55
-        { 0x00, 0x41, 0x41, 0x7F, 0x00 }, // ]
-        { 0x04, 0x02, 0x01, 0x02, 0x04 }, // ^
-        { 0x40, 0x40, 0x40, 0x40, 0x40 }, // _
-        { 0x00, 0x01, 0x02, 0x04, 0x00 }, // '
-        { 0x20, 0x54, 0x54, 0x54, 0x78 }, // a
-        { 0x7F, 0x48, 0x44, 0x44, 0x38 }, // b
-        { 0x38, 0x44, 0x44, 0x44, 0x20 }, // c
-        { 0x38, 0x44, 0x44, 0x48, 0x7F }, // d
-        { 0x38, 0x54, 0x54, 0x54, 0x18 }, // e
-        { 0x08, 0x7E, 0x09, 0x01, 0x02 }, // f
-        { 0x0C, 0x52, 0x52, 0x52, 0x3E }, // g
-        { 0x7F, 0x08, 0x04, 0x04, 0x78 }, // h
-        { 0x00, 0x44, 0x7D, 0x40, 0x00 }, // i
-        { 0x20, 0x40, 0x44, 0x3D, 0x00 }, // j
-        { 0x7F, 0x10, 0x28, 0x44, 0x00 }, // k
-        { 0x00, 0x41, 0x7F, 0x40, 0x00 }, // l
-        { 0x7C, 0x04, 0x18, 0x04, 0x78 }, // m
-        { 0x7C, 0x08, 0x04, 0x04, 0x78 }, // n
-        { 0x38, 0x44, 0x44, 0x44, 0x38 }, // o
-        { 0x7C, 0x14, 0x14, 0x14, 0x08 }, // p
-        { 0x08, 0x14, 0x14, 0x18, 0x7C }, // q
-        { 0x7C, 0x08, 0x04, 0x04, 0x08 }, // r
-        { 0x48, 0x54, 0x54, 0x54, 0x20 }, // s
-        { 0x04, 0x3F, 0x44, 0x40, 0x20 }, // t
-        { 0x3C, 0x40, 0x40, 0x20, 0x7C }, // u
-        { 0x1C, 0x20, 0x40, 0x20, 0x1C }, // v
-        { 0x3C, 0x40, 0x30, 0x40, 0x3C }, // w
-        { 0x44, 0x28, 0x10, 0x28, 0x44 }, // x
-        { 0x0C, 0x50, 0x50, 0x50, 0x3C }, // y
-        { 0x44, 0x64, 0x54, 0x4C, 0x44 } // z
-};
+static FunctionalState disp1100_uses_irq;
 
 /* Private function prototypes -----------------------------------------------*/
-//static inline FuncResult Disp_NextColRow(u16 *x, u8 *row);
+static void Disp1100_SPI_Init(void);
+static void Disp1100_SetIRQ_Enabled(FunctionalState irq_enabled);
+static void Disp1100_InitController(void);
+void uDelay(const uint32_t usec);
+static void Disp1100_SendByte(u16 byte, FunctionalState use_irq);
 
 /* Private functions ---------------------------------------------------------*/
-static inline void Disp_SendData(u8 byte);
-static inline void Disp_SendCommand(u8 byte);
-static inline void FeedDisp();
-static inline void Disp_SendByte(u16 byte);
-
-/* Private low-level functions -----------------------------------------------*/
-
-static void Disp_Interface_Init()
+void Disp1100_Init(FunctionalState irq_enabled)
 {
+	disp1100_uses_irq = irq_enabled;
+
+	Disp1100_SetIRQ_Enabled(DISABLE);
+	Disp1100_GPIO_Init();
+
+	Disp1100_SetRST(ENABLE);
+
+	Disp1100_SPI_Init();
+
+  Disp1100_SetRST(DISABLE);
+
+	if (disp1100_uses_irq)
+	{
+		vTaskDelay(100);
+	}
+	else
+	{
+		uDelay(100 * 1000);
+	}
+
+	Disp1100_InitController();
+}
+
+void Disp1100_SPI_Init(void)
+{
+  Disp1100_SetCS(DISABLE);
+
   SPI_InitTypeDef SPI_InitStructure;
 
   SPI_StructInit(&SPI_InitStructure);
@@ -180,312 +95,108 @@ static void Disp_Interface_Init()
   SPI_InitStructure.SPI_CPHA = SPI_CPHA_2Edge;
   SPI_InitStructure.SPI_NSS = SPI_NSS_Soft;
   SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_8;
-  SPI_Init(DISP_SPI, &SPI_InitStructure);
+  SPI_Init(DISP_1100_SPI, &SPI_InitStructure);
 
-  SPI_Cmd(DISP_SPI, ENABLE);
+  SPI_Cmd(DISP_1100_SPI, ENABLE);
 }
 
-static inline void Disp_SendData(u8 byte)
+void Disp1100_SendByte(u16 byte, FunctionalState use_irq)
 {
-  Disp_SendByte((byte | 0x100) << 7);
-}
+  Disp1100_SetCS(true);
 
-static inline void Disp_SendCommand(u8 byte)
-{
-  Disp_SendByte((byte & ~0x100) << 7);
-}
+  SPI_I2S_ReceiveData(DISP_1100_SPI); /* Reset IRQ */
 
-static inline void FeedDisp()
-{
-  if (DISP_IS_VALID_X(ram_x))
+  if (!use_irq)
   {
-    assert_param(DISP_IS_VALID_ROW(ram_row));
-
-    Disp_SendData(dispRAM[ram_row][ram_x]);
-    ram_x++;
-  }
-}
-
-static inline void Disp_SendByte(u16 byte)
-{
-  if (irq)
-  {
-    while (busy)
-      ;
+  	SPI_I2S_ITConfig(DISP_1100_SPI, SPI_I2S_IT_RXNE, DISABLE);
   }
 
-  busy = true;
-  Disp_SetCS(true);
+  SPI_I2S_SendData(DISP_1100_SPI, byte);
 
-  SPI_I2S_SendData(DISP_SPI, byte);
-
-  /* XXX clear? */
-  SPI_I2S_ITConfig(DISP_SPI, SPI_I2S_IT_RXNE, ENABLE);
-
-  if (!irq)
+  if (!use_irq)
   {
-    while (!SPI_GetITStatus(DISP_SPI, SPI_IT_RXNE))
-      ;
-
-    SPI_I2S_ReceiveData(DISP_SPI);
-
-    Disp_SetCS(DISABLE);
-  }
-}
-
-static void Disp_SetXRow(u8 x, u8 row)
-{
-  Disp_SendCommand(0x10 | ((x >> 4) & 0x7));
-  Disp_SendCommand(x & 0x0f);
-
-  Disp_SendCommand(0xB0 | (row & 0x0f));
-}
-
-static inline void Disp_SetRowDirty(uint8_t row, bool dirty)
-{
-  assert_param(DISP_IS_VALID_ROW(row) || row == ALL_DISP_DIRTY);
-
-  vPortEnterCritical();
-  {
-    if (dirty)
-      dirty_row_flags |= _BV(row);
-    else
-      dirty_row_flags &= ~_BV(row);
-  }
-  vPortExitCritical();
-}
-
-void Disp_MainThread()
-{
-  u32 temp;
-  u16 i;
-
-  if (busy)
-  {
-    if (!irq)
+    while (!SPI_GetFlagStatus(DISP_1100_SPI, SPI_FLAG_RXNE))
     {
-      FeedDisp();
-    }
-    return;
-  }
-
-  if (DISP_IS_VALID_X(ram_x))
-  {
-    return;
-  }
-
-  if (dirty_row_flags)
-  {
-    if (dirty_row_flags == _BV(ALL_DISP_DIRTY))
-    {
-      dirty_row_flags = 0;
-      return;
+      /*vTaskDelay(1)*/;
     }
 
-    for (i = 0; i <= DISP_ROW_COUNT; i++, ram_row++)
-    {
-      if (!DISP_IS_VALID_ROW(ram_row))
-        ram_row = 0;
-
-      temp = _BV(ram_row);
-      if (temp & dirty_row_flags)
-        break;
-    }
-
-    assert_param(DISP_IS_VALID_ROW(ram_row));
-
-    Disp_SetXRow(0, ram_row);
-    Disp_SetRowDirty(ram_row, false);
-    ram_x = 0;
-
-    FeedDisp();
-    return;
+    Disp1100_SetCS(DISABLE);
   }
-}
-
-void Disp_IRQHandler()
-{
-  if (SPI_GetITStatus(DISP_SPI, SPI_IT_RXNE))
+  else
   {
-    SPI_I2S_ReceiveData(DISP_SPI);
-
-    Disp_SetCS(DISABLE);
-
-    busy = false;
-
-    FeedDisp();
+  	SPI_I2S_ITConfig(DISP_1100_SPI, SPI_I2S_IT_RXNE, ENABLE);
   }
 }
 
-void Disp_SetData(u8 x, u8 row, u8 byte)
+void Disp1100_SendData(u8 byte)
 {
-  assert_param(DISP_IS_VALID_X(x));
-  assert_param(DISP_IS_VALID_ROW(row));
+  Disp1100_SendByte((byte | 0x100) << 7, disp1100_uses_irq);
+}
 
-  if (dispRAM[row][x] != byte)
+void Disp1100_SendCommand(u8 byte)
+{
+	/* In order to simplify design, we do not use command queue here */
+  Disp1100_SendByte((byte & ~0x100) << 7, DISABLE);
+}
+
+void Disp1100_SetXRow(u8 x, u8 row)
+{
+  Disp1100_SendCommand(0x10 | ((x >> 4) & 0x7));
+  Disp1100_SendCommand(x & 0x0f);
+
+  Disp1100_SendCommand(0xB0 | (row & 0x0f));
+}
+
+void Disp1100_IRQHandler()
+{
+  if (SPI_GetITStatus(DISP_1100_SPI, SPI_IT_RXNE))
   {
-    dispRAM[row][x] = byte;
-    Disp_SetRowDirty(row, true);
+    SPI_I2S_ReceiveData(DISP_1100_SPI);
+
+    Disp1100_SetCS(DISABLE);
+
+    Display_NextWord_FromISR();
   }
 }
 
-void Disp_Clear(void)
+void Disp1100_SetIRQ_Enabled(FunctionalState irq_enabled)
 {
-  u16 x, row;
-
-  for (row = 0; row < DISP_ROW_COUNT; ++row)
-  {
-    Disp_ClearRow(row);
-  }
+  NVIC_InitTypeDef NVIC_InitStructure;
+  NVIC_InitStructure.NVIC_IRQChannel = DISP_1100_SPI_IRQ;
+  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = configIRQ_PRIORITY_DISP;
+  NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+  NVIC_InitStructure.NVIC_IRQChannelCmd = irq_enabled;
+  NVIC_Init(&NVIC_InitStructure);
 }
 
-void Disp_String(uint8_t col, uint8_t row, const char *ptr, bool new_line)
+static void Disp1100_InitController(void)
 {
-  u8 chr, i, i_row = row;
-  u16 i_col = col;
-  u8 *p_str = (u8 *) ptr;
+  Disp1100_SendCommand(0x20); // write VOP register
+  Disp1100_SendCommand(0x90);
+  Disp1100_SendCommand(0xA4); // all on/normal display
+  Disp1100_SendCommand(0x2F); // Power control set(charge pump on/off)
+  Disp1100_SendCommand(0x40); // set start row address = 0
+  Disp1100_SendCommand(0xac); // set initial row (R0) of the display
+  Disp1100_SendCommand(0x07);
+  Disp1100_SendCommand(0xF9); //
+  Disp1100_SendCommand(0xaf); // display ON/OFF
+  Disp1100_SendCommand(0xa6); // normal display (non inverted) a6
 
-  assert_param(DISP_IS_VALID_X(col));
-  assert_param(DISP_IS_VALID_ROW(row));
-
-  while (1)
-  {
-    chr = *p_str++;
-
-    if (!chr)
-      break;
-
-    if (!DISP_IS_VALID_X(i_col + 5))
-    {
-      if (new_line)
-      {
-        i_col = 0;
-        i_row++;
-      }
-      else
-        break;
-    }
-
-    if (i_row > DISP_ROW_COUNT - 2)
-      break;
-
-    //todo: unicode
-    //todo: line break
-    if ((chr < 0x20) || ((chr -= 0x20) && (chr >= sizeof(FontLookup) / 5)))
-    {
-      //  Convert to a printable character.
-      chr = '[' + 1 - 0x20;
-    }
-
-    for (i = 0; i < 5; i++)
-    {
-      assert_param(chr < sizeof(FontLookup) / 5);
-      Disp_SetData(i_col, i_row, FontLookup[chr][i]);
-      i_col++;
-    }
-
-    //  Horizontal gap between characters.
-    Disp_SetData(i_col, i_row, 0);
-    i_col++;
-  }
+  Disp1100_SetIRQ_Enabled(disp1100_uses_irq);
 }
 
-void Disp_ClearRow(uint8_t row)
+void uDelay(const uint32_t usec)
 {
-  assert_param(DISP_IS_VALID_ROW(row));
+	//todo: implement platform-dependent wall-clock-based delays
 
-  bzero(dispRAM[row], sizeof(dispRAM[row]));
-
-  Disp_SetRowDirty(row, true);
+	uint32_t count = 0;
+	const uint32_t utime = (120 * usec / 7);
+	do
+	{
+		if (++count > utime)
+		{
+			return;
+		}
+	} while (1);
 }
 
-/* Private functions ---------------------------------------------------------*/
-static void Disp_InitFinally()
-{
-  Disp_SetRST(DISABLE);
-
-  if (irq)
-  {
-    NVIC_InitTypeDef NVIC_InitStructure;
-    NVIC_InitStructure.NVIC_IRQChannel = DISP_SPI_IRQ;
-    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = configIRQ_PRIORITY_DISP;
-    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
-    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-    NVIC_Init(&NVIC_InitStructure);
-  }
-
-  Disp_SendCommand(0x20); // write VOP register
-  Disp_SendCommand(0x90);
-  Disp_SendCommand(0xA4); // all on/normal display
-  Disp_SendCommand(0x2F); // Power control set(charge pump on/off)
-  Disp_SendCommand(0x40); // set start row address = 0
-  Disp_SendCommand(0xac); // set initial row (R0) of the display
-  Disp_SendCommand(0x07);
-  Disp_SendCommand(0xF9); //
-  Disp_SendCommand(0xaf); // display ON/OFF
-  Disp_SendCommand(0xa6); // normal display (non inverted) a6
-
-  //
-
-  dirty_row_flags = _BV(DISP_ROW_COUNT) - 1;
-  Disp_SetRowDirty(ALL_DISP_DIRTY, true);
-}
-
-void Disp_Init()
-{
-  ram_x = DISP_X_COUNT;
-  dirty_row_flags = 0;
-
-  Disp_GPIO_Init();
-  Disp_SetRST(ENABLE);
-  Disp_SetCS(DISABLE);
-  busy = false;
-  irq = true;
-
-  Disp_Interface_Init();
-
-  vTaskDelay(100);
-
-  Disp_InitFinally();
-}
-
-
-void uDelay (const uint32_t usec)
-{
-  uint32_t count = 0;
-  const uint32_t utime = (120 * usec / 7);
-  do
-  {
-    if ( ++count > utime )
-    {
-      return ;
-    }
-  }
-  while (1);
-}
-
-
-void mDelay (const uint32_t msec)
-{
-    uDelay(msec * 1000);
-}
-
-void Disp_InitIRQ_Less(void)
-{
-  ram_x = DISP_X_COUNT;
-  dirty_row_flags = 0;
-
-  Disp_Clear();
-
-  Disp_GPIO_Init();
-  Disp_SetRST(ENABLE);
-  Disp_SetCS(DISABLE);
-  busy = false;
-  irq = false;
-
-  Disp_Interface_Init();
-
-  mDelay(100);
-
-  Disp_InitFinally();
-}

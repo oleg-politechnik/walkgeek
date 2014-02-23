@@ -103,6 +103,8 @@ static xQueueHandle xPlayerCommandQueue;
 
 static sDecoderContext *pDecoderContext;
 
+char PlayerErrorString[128];
+
 /* Private functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void prvPlayerTask(void *pvParameters)
 {
@@ -321,7 +323,7 @@ void Player_Next(void)
   }
   else
   {
-    Audio_CommandSync(AC_PAUSE);
+    Player_Stop();
     trace("Player: Cannot switch to the next file\n");
   }
 }
@@ -339,6 +341,7 @@ void Player_Prev(void)
   }
   else
   {
+  	Player_Stop();
     trace("Player: Cannot switch to the previous file\n");
   }
 }
@@ -390,6 +393,7 @@ void Player_SyncCommand(ePlayerCommand cmd, signed portBASE_TYPE arg)
       else
       {
         trace("Player: Cannot switch to the last file\n");
+        Player_Stop();
       }
       break;
 
@@ -483,7 +487,6 @@ void Player_SaveState(void)
   f_sync(&f);
   f_close(&f);
 }
-
 #if 0
 void Player_AudioFileError(char *error)
 {
@@ -491,7 +494,7 @@ void Player_AudioFileError(char *error)
 
   strncpy(PlayerErrorString, error, sizeof(PlayerErrorString));
 
-  SetVariable(VAR_PlayerTrack, PlayerStatus, PS_ERROR_FILE);
+  SetVariable(VAR_PlayerTrack, PlayerState.status, PS_ERROR_FILE);
 }
 
 char *Player_GetErrorString(void)

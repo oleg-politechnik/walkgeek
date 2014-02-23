@@ -1,7 +1,7 @@
 /*
  * player_ui.c
  *
- * Copyright (c) 2013, Oleg Tsaregorodtsev
+ * Copyright (c) 2013, 2014 Oleg Tsaregorodtsev
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,13 +30,13 @@
 #include <timers.h>
 
 #include "ui.h"
-#include "disp_1100.h"
+#include "display.h"
 #include "player.h"
 #include "audio_if.h"
 
 /* Imported variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-extern uint32_t NeglectedDMA_Count;
-extern sPlayerState PlayerState;
+//extern uint32_t NeglectedDMA_Count;
+//extern sPlayerState PlayerState;
 extern volatile u32 KeyProcessed;
 
 /* Private define ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -96,7 +96,7 @@ static void PlayerScreen_Init(void)
           configUI_LOCK_UNLOCK_TIMEOUT_MS, pdFALSE, (void *) LockTimeoutCallback,
           LockTimeoutCallback);
 
-  assert_param(xKeypadLockTimer);
+  configASSERT(xKeypadLockTimer);
 
   UI_SyncVariable(VAR_AudioVolume);
   UI_SyncVariable(VAR_AudioStatus);
@@ -198,12 +198,12 @@ static void PlayerScreen_VariableChangedHandler(VAR_Index var)
           UI_EnableBacklight();
           /* no break here */
         case PSM_HalfLocked:
-          Disp_ClearRow(DISP_LAST_ROW - 1);
+          Display_ClearRow(DISP_LAST_ROW - 1);
           DISP_ALIGN_CENTER(DISP_LAST_ROW-1, "Press *");
           break;
 
         case PSM_Locked:
-          Disp_ClearRow(DISP_LAST_ROW - 1);
+          Display_ClearRow(DISP_LAST_ROW - 1);
           DISP_ALIGN_CENTER(DISP_LAST_ROW-1, "Locked");
           UI_DisableBacklight();
           break;
@@ -219,12 +219,12 @@ static void PlayerScreen_VariableChangedHandler(VAR_Index var)
        {
          case PSM_HalfUnlocked:
          case PSM_HalfLocked:
-           Disp_ClearRow(DISP_LAST_ROW - 1);
+           Display_ClearRow(DISP_LAST_ROW - 1);
            DISP_ALIGN_CENTER(DISP_LAST_ROW-1, "Press *");
            break;
 
          case PSM_Locked:
-           Disp_ClearRow(DISP_LAST_ROW - 1);
+           Display_ClearRow(DISP_LAST_ROW - 1);
            DISP_ALIGN_CENTER(DISP_LAST_ROW-1, "Locked");
            break;
 
@@ -237,18 +237,18 @@ static void PlayerScreen_VariableChangedHandler(VAR_Index var)
       UI_SyncVariable(VAR_PlayerScreenModeFromPlayerTrack);
       for (int i = 1; i <= DISP_LAST_ROW; i++)
       {
-        Disp_ClearRow(i);
+        Display_ClearRow(i);
       }
 
       if (Player_GetState()->status == PS_STOPPED)
       {
-        Disp_String(0, 1, " STOPPED", true);
+        Display_String(0, 1, " STOPPED", true);
         break;
       }
 
       if (Player_GetState()->status == PS_ERROR_FILE)
       {
-        Disp_String(0, 1, Player_GetState()->metadata.error_string, true);
+        Display_String(0, 1, Player_GetState()->metadata.error_string, true);
         break;
       }
 
@@ -296,7 +296,7 @@ static void PlayerScreen_VariableChangedHandler(VAR_Index var)
         str_buf[16 * 4] = 0;
       }
 
-      Disp_String(0, row++, str_buf, true);
+      Display_String(0, row++, str_buf, true);
 
       TimePoint(metadata->mstime_max, &time);
       if (time.hour)
@@ -317,7 +317,7 @@ static void PlayerScreen_VariableChangedHandler(VAR_Index var)
 
       for (u8 i = 0; i < DISP_X_COUNT; i++)
       {
-        Disp_SetData(i, DISP_LAST_ROW + 1, (i < slider_pos) ? 0xFF : 0x00);
+        Display_SetData(i, DISP_LAST_ROW + 1, (i < slider_pos) ? 0xFF : 0x00);
       }
 
       TimePoint(metadata->mstime_curr, &time);
@@ -326,8 +326,8 @@ static void PlayerScreen_VariableChangedHandler(VAR_Index var)
       else
         sprintf(str_buf, "%i:%02i", time.minute, time.second);
 
-      Disp_String(0, DISP_LAST_ROW, "         ", false);
-      Disp_String(0, DISP_LAST_ROW, str_buf, false);
+      Display_String(0, DISP_LAST_ROW, "         ", false);
+      Display_String(0, DISP_LAST_ROW, str_buf, false);
       break;
 
     default:
@@ -408,18 +408,13 @@ u16 PlayerScreen_KeyPressedHandler(KEY_Typedef key)
       break;
 
     case PSM_HalfLocked:
-      switch (key)
-      {
-        case KEY_ASTERICK:
-          UI_SetVariable(VAR_PlayerScreenMode, PlayerScreenMode, PSM_Locked);
-          KeyProcessed = SET;
-          /* fall through */
-
-        default:
-          LockTimeoutCallback(0);
-          break;
-      }
-      break;
+    	if (key == KEY_ASTERICK)
+    	{
+    		UI_SetVariable(VAR_PlayerScreenMode, PlayerScreenMode, PSM_Locked);
+    		KeyProcessed = SET;
+    	}
+    	LockTimeoutCallback(0);
+    	break;
 
     case PSM_Locked:
       switch (key)
@@ -436,13 +431,16 @@ u16 PlayerScreen_KeyPressedHandler(KEY_Typedef key)
       break;
 
     case PSM_HalfUnlocked:
+    	if (key == KEY_ASTERICK)
+    	{
+        UI_SetVariable(VAR_PlayerScreenMode, PlayerScreenMode, PSM_Normal);
+        KeyProcessed = SET;
+        UI_EnableBacklight();
+    	}
+
       switch (key)
       {
         case KEY_ASTERICK:
-          UI_SetVariable(VAR_PlayerScreenMode, PlayerScreenMode, PSM_Normal);
-          KeyProcessed = SET;
-          UI_EnableBacklight();
-
         case KEY_PPP:
         case KEY_UP:
         case KEY_DOWN:
@@ -454,6 +452,7 @@ u16 PlayerScreen_KeyPressedHandler(KEY_Typedef key)
         default:
           break;
       }
+      break;
 
     default:
       break;

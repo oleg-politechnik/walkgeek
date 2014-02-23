@@ -54,7 +54,6 @@
 /** @defgroup STM32F4_DISCOVERY_AUDIO_CODEC_Exported_Macros
   * @{
   */
-#define VOLUME_CONVERT(x)    ((Volume > 100)? 100:((uint8_t)((Volume * 255) / 100)))
 #define DMA_MAX(x)           (((x) <= DMA_MAX_SZE)? (x):DMA_MAX_SZE)
 
 /**
@@ -118,6 +117,11 @@ void EVAL_AUDIO_HalfTransfer_CallBack(uint32_t pBuffer, uint32_t Size);
 /* This function is called when an Interrupt due to transfer error on or peripheral
    error occurs. */
 void EVAL_AUDIO_Error_CallBack(void* pData);
+
+int EVAL_AUDIO_GetMaxVolume(void);
+#define EVAL_AUDIO_GetMinVolume()  0
+
+void Codec_Reset(void);
 
 /* Codec_TIMEOUT_UserCallback() function is called whenever a timeout condition
    occurs during communication (waiting on an event that doesn't occur, bus

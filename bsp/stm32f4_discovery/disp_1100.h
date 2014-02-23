@@ -1,7 +1,7 @@
 /*
  * disp_1100.h
  *
- * Copyright (c) 2012, Oleg Tsaregorodtsev
+ * Copyright (c) 2012, 2013, 2014, Oleg Tsaregorodtsev
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -48,23 +48,10 @@
 #define SYS_MATRIX_SIZE ((CTRL_MAX / 8) + 1)
 
 /* Exported functions ------------------------------------------------------- */
-void Disp_Init();
-void Disp_InitIRQ_Less(void);
-void Disp_GPIO_Init();
+void Disp1100_Init(FunctionalState irq_enabled);
 
-void Disp_MainThread(void);
+void Disp1100_SetXRow(u8 x, u8 row);
 
-void Disp_IRQHandler();
-void Disp_Sync();
-
-void Disp_SetBKL(FunctionalState enabled);
-void Disp_SetCS(FunctionalState enabled);
-bool Disp_GetCS(void);
-void Disp_SetRST(FunctionalState enabled);
-
-void Disp_Clear();
-void Disp_SetData(u8 x, u8 row, u8 byte);
-void Disp_String(uint8_t col, uint8_t row, const char *ptr, bool new_line);
-void Disp_ClearRow(uint8_t row);
+void Disp1100_SendData(u8 byte);
 
 #endif /* DISP_1100_H_ */
