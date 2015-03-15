@@ -35,7 +35,7 @@
 /* Private typedef ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private macro ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 /* Private variables ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-static volatile u32 nesting = 0;
+static volatile int nesting = 0;
 
 u32 profile_entry_points[PF_MAX];
 u32 profile_results[PF_MAX];
@@ -107,9 +107,12 @@ void CPU_DisableInterrupts(void)
 
 void CPU_RestoreInterrupts(void)
 {
-  if (nesting)
+  assert_param(nesting > 0);
+
+  nesting--;
+
+  if (!nesting)
   {
-    nesting--;
     __enable_irq();
   }
 }
